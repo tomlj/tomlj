@@ -1,0 +1,156 @@
+/**
+ * Check that the licenses of our 3rd parties are in our acceptedLicenses list.
+ *
+ * run it with "gradle checkLicenses"
+ *
+ * To add new accepted licenses you need to update this script.
+ * Some products may be available with multiple licenses. In this case you must update
+ *  this script to add it in the downloadLicenses#licenses.
+ */
+
+// Some parts of this code comes from Zipkin/https://github.com/openzipkin/zipkin/pull/852
+// Zipkin itself is under Apache License.
+
+/**
+ * The lists of the license we accept.
+ */
+ext.acceptedLicenses = [
+  'Apache License, Version 2.0',
+  'Bouncy Castle Licence',
+  'CC0',
+  'The 2-Clause BSD License',
+  'The 3-Clause BSD License',
+  'Common Development and Distribution License 1.0',
+  'Eclipse Distribution License - v 1.0',
+  'Eclipse Public License 1.0',
+  'Eclipse Public License 2.0',
+  'The MIT License',
+  'Unicode/ICU License',
+]*.toLowerCase()
+
+/**
+ * This is the configuration we need for our licenses plugin: 'com.github.hierynomus.license'
+ * This plugin generates a list of dependencies.
+ */
+downloadLicenses {
+  includeProjectDependencies = true
+  reportByDependency = false
+  reportByLicenseType = true
+  dependencyConfiguration = 'compileClasspath'
+
+  ext.apache2 = license(
+    'Apache License, Version 2.0',
+    'http://opensource.org/licenses/Apache-2.0')
+  ext.bsd = license(
+    'The 2-Clause BSD License',
+    'https://opensource.org/licenses/BSD-2-Clause')
+  ext.bsd3Clause = license(
+    'The 3-Clause BSD License',
+    'http://opensource.org/licenses/BSD-3-Clause')
+  ext.cddl1 = license(
+    'Common Development and Distribution License 1.0',
+    'https://opensource.org/licenses/CDDL-1.0')
+  ext.edl1 = license(
+    'Eclipse Distribution License - v 1.0',
+    'http://www.eclipse.org/org/documents/edl-v10.html')
+  ext.epl1 = license(
+    'Eclipse Public License 1.0',
+    'https://opensource.org/licenses/EPL-1.0')
+  ext.epl2 = license(
+    'Eclipse Public License 2.0',
+    'https://opensource.org/licenses/EPL-2.0')
+  ext.mit = license(
+    'The MIT License',
+    'https://opensource.org/licenses/MIT')
+
+  aliases = [
+    (apache2): [
+      'Apache',
+      'Apache 2',
+      'Apache 2.0',
+      'Apache-2.0',
+      'Apache License',
+      'Apache License 2.0',
+      'Apache License Version 2.0',
+      'Apache License, Version 2.0',
+      'Apache Software Licenses',
+      'Apache v2',
+      'ASL, Version 2',
+      'The Apache License, Version 2.0',
+      'The Apache Software License, Version 2.0',
+    ],
+    (bsd): [
+      'Berkeley Software Distribution (BSD) License',
+      'BSD',
+      'BSD licence',
+      'BSD Licence',
+      'BSD License',
+      'New BSD License',
+      'The BSD Licence',
+      'The BSD License',
+    ],
+    (bsd3Clause): [
+      'BSD 3-Clause',
+      'BSD 3-Clause "New" or "Revised" License (BSD-3-Clause)',
+      'The 3-Clause BSD License',
+      'The BSD 3-Clause License',
+    ],
+    (cddl1): [
+      'CDDL-1.0',
+      'Common Development and Distribution License',
+      'Common Development and Distribution License 1.0',
+      'Dual license consisting of the CDDL v1.1 and GPL v2',
+    ],
+    (edl1): [
+      'Eclipse Distribution License - v 1.0',
+    ],
+    (epl1): [
+      'Eclipse Public License - v 1.0',
+    ],
+    (epl2): [
+      'Eclipse Public License v2.0',
+      'Eclipse Public License - v 2.0',
+    ],
+    (mit): [
+      'MIT license',
+      'MIT License',
+    ],
+  ]
+
+  licenses = [
+    (group('tomlj')): apache2,
+    (group('org.jboss.spec.javax.transaction')): cddl1,
+    (group('org.rocksdb')): apache2,
+    // https://checkerframework.org/manual/#license
+    // The more permissive MIT License applies to code that you might want
+    // to include in your own program, such as the annotations and run-time utility classes.
+    (group('org.checkerframework')): mit
+  ]
+}
+
+
+task checkLicenses {
+  description "Verify that all dependencies use white-listed licenses."
+  dependsOn ':downloadLicenses'
+
+  def bads = ""
+  doLast {
+    def xml = new XmlParser().parse("$buildDir/reports/license/license-dependency.xml")
+    xml.each { license ->
+      if (!acceptedLicenses.contains((license.@name).toLowerCase())) {
+        def depStrings = []
+        license.dependency.each { depStrings << it.text() }
+        bads = bads + depStrings + " =>  -${license.@name}- \n"
+      }
+    }
+    if (bads != "") {
+      throw new GradleException("Some 3rd parties are using licenses not in our accepted licenses list:\n" +
+      bads +
+      "If it's a license acceptable for us, add it in the file check-licenses.gradle.\n" +
+      "Be careful, some 3rd parties may accept multiple licenses.\n" +
+      "In this case, select the one you want to use by changing downloadLicenses.licenses\n"
+      )
+    }
+  }
+}
+check.dependsOn checkLicenses

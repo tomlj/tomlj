@@ -1,0 +1,323 @@
+import java.util.regex.Pattern
+import net.ltgt.gradle.errorprone.CheckSeverity
+
+plugins {
+  id 'antlr'
+  id 'java-library'
+  id 'jacoco'
+  id 'maven-publish'
+  id 'signing'
+  id 'com.diffplug.gradle.spotless' version '3.23.0'
+  id "com.github.hierynomus.license-report" version "0.15.0"
+  id 'com.jfrog.bintray' version '1.8.4'
+  id 'io.spring.dependency-management' version '1.0.7.RELEASE'
+  id 'net.ltgt.errorprone' version '0.7'
+}
+
+description = 'A parser for Tom\'s Obvious, Minimal Language (TOML).'
+
+//////
+// Version numbering
+
+def versionNumber = '1.0.0'
+version = versionNumber + buildTag()
+
+static String buildTag() {
+  if (System.getenv('BUILD_RELEASE') == 'true') {
+    return ''
+  }
+  if (System.getenv('CIRCLECI')) {
+    def buildNumber = System.getenv('CIRCLE_SHA1').take(4).toUpperCase() +
+      String.format('%02X', System.getenv('CIRCLE_BUILD_NUM').toInteger() % 256, 16)
+    return '-' + buildNumber + '-snapshot'
+  }
+  return '-dev'
+}
+
+//////
+// Dependencies and licensing checks
+
+repositories { jcenter() }
+
+apply from: "${rootDir}/dependency-versions.gradle"
+apply from: "${rootDir}/gradle/check-licenses.gradle"
+
+//////
+// Default tasks and build aliases
+
+defaultTasks 'build', 'checkLicenses', 'javadoc'
+
+def buildAliases = ['dev': [
+    'spotlessApply',
+    'build',
+    'checkLicenses',
+    'javadoc'
+  ]]
+
+def expandedTaskList = []
+gradle.startParameter.taskNames.each {
+  expandedTaskList << (buildAliases[it] ? buildAliases[it] : it)
+}
+gradle.startParameter.taskNames = expandedTaskList.flatten()
+
+//////
+// Source formatting
+
+spotless {
+  groovyGradle {
+    target '**/*.gradle'
+    greclipse().configFile(rootProject.file('gradle/greclipse-gradle-style.properties'))
+    endWithNewline()
+  }
+  java {
+    target project.fileTree(rootDir) {
+      include 'src/**/*.java'
+      exclude '**/generated-src/**/*.*'
+    }
+    removeUnusedImports()
+    licenseHeaderFile rootProject.file('gradle/spotless.license.java')
+    eclipse().configFile(rootProject.file('gradle/eclipse-java-style.xml'))
+    importOrder 'org.tomlj', 'java', ''
+    endWithNewline()
+  }
+}
+
+//////
+// Source generation
+
+generateGrammarSource {
+  outputDirectory file("${buildDir}/generated-src/antlr/main/org/tomlj/internal")
+  arguments << "-visitor" << "-long-messages"
+  arguments << "-Xexact-output-dir"
+}
+
+configurations {
+  compile {
+    extendsFrom = extendsFrom.findAll { it != configurations.antlr }
+  }
+}
+
+//////
+// Compilation
+
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+jacoco { toolVersion = '0.8.2' }
+
+tasks.withType(JavaCompile) {
+  // Until https://github.com/gradle/gradle/issues/2510 is resolved and
+  // something like a `releaseCompability` property is added, we have to add
+  // the --release flag explicitly
+  if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
+    options.compilerArgs.addAll(['--release', '8'])
+  }
+  options.compilerArgs += [
+    '-Xlint:unchecked',
+    '-Xlint:cast',
+    '-Xlint:rawtypes',
+    '-Xlint:overloads',
+    '-Xlint:divzero',
+    '-Xlint:finally',
+    '-Xlint:static',
+    '-Werror'
+  ]
+
+  options.errorprone {
+    excludedPaths '.*/generated-src/.*'
+    check('UnnecessaryParentheses', CheckSeverity.OFF)
+    disableWarningsInGeneratedCode = true
+  }
+}
+
+//////
+// Testing
+
+tasks.withType(Test) {
+  // If GRADLE_MAX_TEST_FORKS is not set, use half the available processors
+  maxParallelForks = (System.getenv('GRADLE_MAX_TEST_FORKS') ?:
+    (Runtime.runtime.availableProcessors().intdiv(2) ?: 1)).toInteger()
+}
+
+test { useJUnitPlatform() }
+
+task jacocoRootTestReport(type: JacocoReport) {
+  reports {
+    html.enabled = true
+    xml.enabled = true
+    csv.enabled = false
+  }
+  doFirst {
+    executionData = files(executionData.findAll { it.exists() })
+  }
+}
+
+//////
+// Documentation
+
+javadoc { exclude '**/internal/**' }
+
+//////
+// Dependencies
+
+dependencies {
+  errorprone("com.google.errorprone:error_prone_core")
+  if (JavaVersion.current().isJava8()) {
+    errorproneJavac("com.google.errorprone:javac")
+  }
+
+  antlr 'org.antlr:antlr4'
+
+  compile 'org.antlr:antlr4-runtime'
+  compile 'com.google.code.findbugs:jsr305'
+
+  testCompile 'org.junit.jupiter:junit-jupiter-api'
+  testCompile 'org.junit.jupiter:junit-jupiter-params'
+
+  testRuntime 'org.junit.jupiter:junit-jupiter-engine'
+}
+
+//////
+// Packaging
+
+jar {
+  destinationDir = file("${rootProject.buildDir}/libs")
+  manifest {
+    attributes('Implementation-Title': project.name,
+    'Implementation-Version': project.version)
+  }
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+  destinationDir = file("${rootProject.buildDir}/src")
+  classifier = 'sources'
+  from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+  destinationDir = file("${rootProject.buildDir}/docs")
+  classifier = 'javadoc'
+  from javadoc.destinationDir
+}
+
+artifacts {
+  archives sourcesJar
+  archives javadocJar
+}
+
+signing {
+  useGpgCmd()
+  sign configurations.archives
+}
+
+task deploy() { }
+
+publishing {
+  publications {
+    MavenDeployment(MavenPublication) {
+      from components.java
+      artifact sourcesJar { classifier 'sources' }
+      artifact javadocJar { classifier 'javadoc' }
+      groupId 'org.tomlj'
+      artifactId project.jar.baseName
+      version project.version
+      pom {
+        name = project.jar.baseName
+        description = project.description
+        url = 'https://github.com/tomlj/tomlj'
+        licenses {
+          license {
+            name = "The Apache License, Version 2.0"
+            url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+          }
+        }
+        scm {
+          connection = 'scm:https://github.com/tomlj/tomlj.git'
+          developerConnection = 'scm:git@github.com:tomlj/tomlj.git'
+          url = 'https://github.com/tomlj/tomlj'
+        }
+        developers {
+          developer {
+            name = 'Chris Leishman'
+            email = 'chris@leishman.org'
+          }
+        }
+      }
+      pom.withXml {
+        if (System.getenv('ENABLE_SIGNING') == 'true') {
+          def pomFile = file("${project.buildDir}/generated-pom.xml")
+          writeTo(pomFile)
+          def pomAscFile = signing.sign(pomFile).signatureFiles[0]
+          artifact(pomAscFile) {
+            classifier = null
+            extension = 'pom.asc'
+          }
+        }
+      }
+
+      if (System.getenv('ENABLE_SIGNING') == 'true') {
+        tasks.signArchives.signatureFiles.each {
+          artifact(it) {
+            def matcher = it.file =~ /-(sources|javadoc)\.jar\.asc$/
+            if (matcher.find()) {
+              classifier = matcher.group(1)
+            } else {
+              classifier = null
+            }
+            extension = 'jar.asc'
+          }
+        }
+      }
+    }
+  }
+}
+
+tasks.withType(Sign) {
+  onlyIf { System.getenv('ENABLE_SIGNING') == 'true' }
+}
+
+model {
+  tasks.generatePomFileForMavenDeploymentPublication {
+    destination = file("$buildDir/generated-pom.xml")
+  }
+  tasks.publishMavenDeploymentPublicationToMavenLocal { dependsOn project.tasks.signArchives }
+}
+
+def artifactIdMatcher = Pattern.compile("(.*)-\\d.*")
+bintray {
+  user = System.getenv('BINTRAY_USER')
+  key = System.getenv('BINTRAY_KEY')
+  publications = ['MavenDeployment']
+  filesSpec {
+    project.extensions.getByType(PublishingExtension).publications.all { publication ->
+      publication.getArtifacts().all {
+        def ascFile = new File(it.file.getParentFile(), it.file.getName() + '.asc')
+        if (ascFile.exists()) {
+          def matcher = artifactIdMatcher.matcher(it.file.getName())
+          matcher.find()
+          def artifactId = matcher.group(1)
+          from ascFile.getAbsolutePath()
+          into publication.groupId.replaceAll('\\.', '/') + '/' + artifactId + '/' + publication.version + '/'
+        }
+      }
+    }
+  }
+  dryRun = !(System.getenv('BINTRAY_DEPLOY') == 'true')
+  publish = true
+  pkg {
+    userOrg = 'tomlj'
+    repo = 'tomlj'
+    name = 'tomlj'
+    websiteUrl = 'https://github.com/tomlj/tomlj'
+    vcsUrl = 'https://github.com/tomlj/tomlj'
+    licenses = ['Apache-2.0']
+    version {
+      name = project.version
+      desc = 'A parser for Tom\'s Obvious, Minimal Language (TOML).'
+      released = new Date()
+      vcsTag = project.version
+    }
+  }
+}
+
+deploy.dependsOn bintrayUpload
