@@ -42,6 +42,6 @@ Snapshot versions are also published to the [bintray repository](https://bintray
 ## Links
 
 - [GitHub project](https://github.com/tomlj/tomlj)
-- [Online Java documentation](https://tomlj.github.io/tomlj/docs/java/latest/org/tomlj/package-summary.html)
+- [Online Java documentation](https://tomlj.org/docs/java/latest/org/tomlj/package-summary.html)
 - [Issue tracker: Report a defect or feature request](https://github.com/tomlj/tomlj/issues/new)
 - [StackOverflow: Ask "how-to" and "why-didn't-it-work" questions](https://stackoverflow.com/questions/ask?tags=tomlj)
