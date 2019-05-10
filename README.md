@@ -14,7 +14,7 @@ runtime library.
 
 Parsing is straightforward:
 
-```
+```java
 Path source = Paths.get("/path/to/file.toml");
 TomlParseResult result = Toml.parse(source);
 result.errors().forEach(error -> System.err.println(error.toString()));
@@ -27,7 +27,7 @@ String value = result.getString("a. dotted . key");
 TomlJ is published to a Maven and JCenter.
 
 To include using Maven:
-```
+```xml
 <dependency>
   <groupId>org.tomlj</groupId>
   <artifactId>tomlj</artifactId>
