@@ -38,12 +38,22 @@ public final class Toml {
    * Parse a TOML string.
    *
    * @param input The input to parse.
-   * @return The parse result.
+   * @return The parse result. Continues parse even if error.
    */
   public static TomlParseResult parse(String input) {
-    return parse(input, TomlVersion.LATEST);
+    return parse(input, TomlVersion.LATEST, false);
   }
 
+  /**
+   * Parse a TOML string.
+   *
+   * @param input The input to parse.
+   * @return The parse result. Continues parse even if error.
+   */
+  public static TomlParseResult parse(String input, boolean throwiferror) {
+    return parse(input, TomlVersion.LATEST, throwiferror);
+  }
+  
   /**
    * Parse a TOML string.
    *
@@ -51,9 +61,9 @@ public final class Toml {
    * @param version The version level to parse at.
    * @return The parse result.
    */
-  public static TomlParseResult parse(String input, TomlVersion version) {
+  public static TomlParseResult parse(String input, TomlVersion version, boolean throwiferror) {
     CharStream stream = CharStreams.fromString(input);
-    return Parser.parse(stream, version.canonical);
+    return Parser.parse(stream, version.canonical, throwiferror);
   }
 
   /**
@@ -61,12 +71,24 @@ public final class Toml {
    *
    * @param file The input file to parse.
    * @return The parse result.
-   * @throws IOException If an IO error occurs.
+   * @throws IOException If an IO error occurs. Continues parse even if error.
    */
   public static TomlParseResult parse(Path file) throws IOException {
-    return parse(file, TomlVersion.LATEST);
+    return parse(file, TomlVersion.LATEST, false);
   }
 
+  /**
+   * Parse a TOML file.
+   *
+   * @param file The input file to parse.
+   * @return The parse result.
+   * @throws IOException If an IO error occurs. Continues parse even if error.
+   */
+  public static TomlParseResult parse(Path file, boolean throwiferror) throws IOException {
+    return parse(file, TomlVersion.LATEST, throwiferror);
+  }
+
+  
   /**
    * Parse a TOML file.
    *
@@ -75,9 +97,9 @@ public final class Toml {
    * @return The parse result.
    * @throws IOException If an IO error occurs.
    */
-  public static TomlParseResult parse(Path file, TomlVersion version) throws IOException {
+  public static TomlParseResult parse(Path file, TomlVersion version, boolean throwiferror) throws IOException {
     CharStream stream = CharStreams.fromPath(file);
-    return Parser.parse(stream, version.canonical);
+    return Parser.parse(stream, version.canonical, throwiferror);
   }
 
   /**
@@ -85,10 +107,21 @@ public final class Toml {
    *
    * @param is The input stream to read the TOML document from.
    * @return The parse result.
-   * @throws IOException If an IO error occurs.
+   * @throws IOException If an IO error occurs. Continues parse even if error.
    */
   public static TomlParseResult parse(InputStream is) throws IOException {
-    return parse(is, TomlVersion.LATEST);
+    return parse(is, TomlVersion.LATEST, false);
+  }
+  
+  /**
+   * Parse a TOML input stream.
+   *
+   * @param is The input stream to read the TOML document from.
+   * @return The parse result.
+   * @throws IOException If an IO error occurs.
+   */
+  public static TomlParseResult parse(InputStream is, boolean throwiferror) throws IOException {
+    return parse(is, TomlVersion.LATEST, throwiferror);
   }
 
   /**
@@ -99,9 +132,9 @@ public final class Toml {
    * @return The parse result.
    * @throws IOException If an IO error occurs.
    */
-  public static TomlParseResult parse(InputStream is, TomlVersion version) throws IOException {
+  public static TomlParseResult parse(InputStream is, TomlVersion version, boolean throwiferror) throws IOException {
     CharStream stream = CharStreams.fromStream(is);
-    return Parser.parse(stream, version.canonical);
+    return Parser.parse(stream, version.canonical, throwiferror);
   }
 
   /**
@@ -109,10 +142,21 @@ public final class Toml {
    *
    * @param reader The reader to obtain the TOML document from.
    * @return The parse result.
-   * @throws IOException If an IO error occurs.
+   * @throws IOException If an IO error occurs. Continues parse even if error.
    */
   public static TomlParseResult parse(Reader reader) throws IOException {
-    return parse(reader, TomlVersion.LATEST);
+    return parse(reader, TomlVersion.LATEST, false);
+  }
+  
+  /**
+   * Parse a TOML reader.
+   *
+   * @param reader The reader to obtain the TOML document from.
+   * @return The parse result.
+   * @throws IOException If an IO error occurs.
+   */
+  public static TomlParseResult parse(Reader reader, boolean throwiferror) throws IOException {
+    return parse(reader, TomlVersion.LATEST, throwiferror);
   }
 
   /**
@@ -123,9 +167,20 @@ public final class Toml {
    * @return The parse result.
    * @throws IOException If an IO error occurs.
    */
-  public static TomlParseResult parse(Reader reader, TomlVersion version) throws IOException {
+  public static TomlParseResult parse(Reader reader, TomlVersion version, boolean throwiferror) throws IOException {
     CharStream stream = CharStreams.fromReader(reader);
-    return Parser.parse(stream, version.canonical);
+    return Parser.parse(stream, version.canonical, throwiferror);
+  }
+
+  /**
+   * Parse a TOML reader.
+   *
+   * @param channel The channel to read the TOML document from.
+   * @return The parse result.
+   * @throws IOException If an IO error occurs. Continues parse even if error.
+   */
+  public static TomlParseResult parse(ReadableByteChannel channel) throws IOException {
+    return parse(channel, TomlVersion.LATEST, false);
   }
 
   /**
@@ -135,10 +190,10 @@ public final class Toml {
    * @return The parse result.
    * @throws IOException If an IO error occurs.
    */
-  public static TomlParseResult parse(ReadableByteChannel channel) throws IOException {
-    return parse(channel, TomlVersion.LATEST);
+  public static TomlParseResult parse(ReadableByteChannel channel, boolean throwiferror) throws IOException {
+    return parse(channel, TomlVersion.LATEST, throwiferror);
   }
-
+  
   /**
    * Parse a TOML input stream.
    *
@@ -147,9 +202,9 @@ public final class Toml {
    * @return The parse result.
    * @throws IOException If an IO error occurs.
    */
-  public static TomlParseResult parse(ReadableByteChannel channel, TomlVersion version) throws IOException {
+  public static TomlParseResult parse(ReadableByteChannel channel, TomlVersion version, boolean throwiferror) throws IOException {
     CharStream stream = CharStreams.fromChannel(channel);
-    return Parser.parse(stream, version.canonical);
+    return Parser.parse(stream, version.canonical, throwiferror);
   }
 
   /**

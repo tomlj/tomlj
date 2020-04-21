@@ -17,7 +17,7 @@ import static org.tomlj.TomlType.typeFor;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -39,7 +39,7 @@ final class MutableTomlTable implements TomlTable {
   }
 
   static final TomlTable EMPTY = new MutableTomlTable(true);
-  private Map<String, Element> properties = new HashMap<>();
+  private Map<String, Element> properties = new LinkedHashMap<>();
   private boolean implicitlyDefined;
 
   MutableTomlTable() {
