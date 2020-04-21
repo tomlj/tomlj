@@ -26,7 +26,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 final class Parser {
-	private Parser() {}
+    private Parser() {}
 
 	static TomlParseResult parse(CharStream stream, TomlVersion version, boolean throwiferror) {
 		TomlLexer lexer = new TomlLexer(stream);
@@ -111,7 +111,8 @@ final class Parser {
 		String[] sSplitKey = Key.split("\\.");
 		String sWrappedKey = "";
 		for (String str : sSplitKey) {
-			if (str.contains(" ")) {
+			str = str.trim();
+			if (str.contains(" ") && !str.contains("\"") && !str.contains("'")) {
 				str = "\"" + str + "\"";
 			}
 			sWrappedKey = sWrappedKey + str + ".";
