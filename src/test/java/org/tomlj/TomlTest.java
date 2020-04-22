@@ -562,6 +562,26 @@ class TomlTest {
   }
 
   @Test
+  void testSpacesInKeys() throws Exception {
+    TomlParseResult result1 = Toml.parse("\"Dog type\" = \"pug\"");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+    assertEquals("pug", result1.getString("\"Dog type\""));
+    assertEquals("pug", result1.getString("Dog type"));
+
+    TomlParseResult result2 = Toml.parse("[\"Dog 1\"]\n  type = \"pug\"");
+    assertFalse(result2.hasErrors(), () -> joinErrors(result2));
+    assertEquals("pug", result2.getString("\"Dog 1\".type"));
+    assertEquals("pug", result2.getString("Dog 1.type"));
+
+    TomlParseResult result3 = Toml.parse("[pets.\"Dog 1\"]\n  type = \"pug\"");
+    assertFalse(result3.hasErrors(), () -> joinErrors(result3));
+    assertEquals("pug", result3.getString("pets.\"Dog 1\".type"));
+    assertEquals("pug", result3.getString("pets.Dog 1.type"));
+    assertEquals("pug", result3.getString("pets.Dog 1  .type"));
+    assertEquals("pug", result3.getString("pets.  Dog 1.type"));
+  }
+
+  @Test
   void testQuotesInJson() throws Exception {
     TomlParseResult result1 = Toml.parse("key = \"this is 'a test' with single quotes\"");
     assertFalse(result1.hasErrors());

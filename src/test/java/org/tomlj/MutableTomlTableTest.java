@@ -110,7 +110,7 @@ class MutableTomlTableTest {
   }
 
   @Test
-  void ignoresWhitespaceInUnquotedKeys() {
+  void ignoresWhitespaceAroundUnquotedKeys() {
     MutableTomlTable table = new MutableTomlTable();
     table.set("foo.bar", 4, positionAt(5, 3));
     assertEquals(Long.valueOf(4), table.getLong(" foo . bar"));
