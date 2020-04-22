@@ -561,6 +561,21 @@ class TomlTest {
     assertTrue(result3.hasErrors());
   }
 
+  @Test
+  void testQuotesInJson() throws Exception {
+    TomlParseResult result1 = Toml.parse("key = \"this is 'a test' with single quotes\"");
+    assertFalse(result1.hasErrors());
+    assertEquals("{\n  \"key\" : \"this is 'a test' with single quotes\"\n}\n", result1.toJson());
+
+    TomlParseResult result2 = Toml.parse("[\"dog 'type'\"]\ntype = \"pug\"");
+    assertFalse(result2.hasErrors());
+    assertEquals("{\n  \"dog 'type'\" : {\n    \"type\" : \"pug\"\n  }\n}\n", result2.toJson());
+
+    TomlParseResult result3 = Toml.parse("key = \"this is \\\"a test\\\" with double quotes\"");
+    assertFalse(result3.hasErrors());
+    assertEquals("{\n  \"key\" : \"this is \\\"a test\\\" with double quotes\"\n}\n", result3.toJson());
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }

@@ -134,8 +134,8 @@ final class JsonSerializer {
     StringBuilder out = new StringBuilder(text.length());
     for (int i = 0; i < text.length(); i++) {
       char ch = text.charAt(i);
-      if (ch == '\'') {
-        out.append("\\'");
+      if (ch == '"') {
+        out.append("\\\"");
         continue;
       }
       if (ch >= 0x20) {
