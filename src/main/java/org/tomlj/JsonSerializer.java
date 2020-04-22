@@ -135,20 +135,17 @@ final class JsonSerializer {
 		for (int i = 0; i < text.length(); i++) {
 			char ch = text.charAt(i);
 			if (ch == '\"') {
-				out.append('\\');
-				out.append('\"');
+				out.append("\\\"");
 				continue;
 			}
 			if (ch == '\\') {
-			    out.append('\\');
-			    out.append('\\');
+			    out.append("\\\\");
 			    continue;
 			}
 			if (ch >= 0x20) {
 				out.append(ch);
 				continue;
 			}
-
 			switch (ch) {
 			case '\t':
 				out.append("\\t");
