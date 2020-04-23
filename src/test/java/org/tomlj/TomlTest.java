@@ -596,6 +596,13 @@ class TomlTest {
     assertEquals("{\n  \"key\" : \"this is \\\"a test\\\" with double quotes\"\n}\n", result3.toJson());
   }
 
+  @Test
+  void testBackslashesInJson() throws Exception {
+    TomlParseResult result1 = Toml.parse("path = 'C:\\Users\\dog\\catsihate'");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+    assertEquals("{\n  \"path\" : \"C:\\\\Users\\\\dog\\\\catsihate\"\n}\n", result1.toJson());
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }
