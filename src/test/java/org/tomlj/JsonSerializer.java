@@ -19,47 +19,9 @@ import org.tomlj.Toml;
 import org.tomlj.TomlParseResult;
 
 class JsonSerializer {
-
-	@Test
-	void shouldPassEscapeChar(){
-		String TOML = "winpath = 'C:\\Users\\nodejs\\templates'";
-		String ExpectedResult = 
-				"{\r\n" + 
-				"  \"winpath\" : \"C:\\\\Users\\\\nodejs\\\\templates\"\r\n" + 
-				"}";
-		TomlParseResult toml = Toml.parse(TOML);
-		String sJson = toml.toJson();
-		assertEquals(ExpectedResult, sJson);
-	}
 	
 	@Test
-	void shouldBeOrderedJson(){
-		String TOML = 
-				"Name = { First = \"John\", Last = \"Doe\" }\r\n" + 
-				"Company = { Name = \"GitHub\" }\r\n" + 
-				"Phone = 8123456789\r\n" + 
-				"DateOfBirth = 1993-08-04T15:05:00Z";
-		
-		String ExpectedResult = 
-				"{\r\n" + 
-				"  \"Name\" : {\r\n" + 
-				"    \"First\" : \"John\",\r\n" + 
-				"    \"Last\" : \"Doe\"\r\n" + 
-				"  },\r\n" + 
-				"  \"Company\" : {\r\n" + 
-				"    \"Name\" : \"GitHub\"\r\n" + 
-				"  },\r\n" + 
-				"  \"Phone\" : 8123456789,\r\n" + 
-				"  \"DateOfBirth\" : \"1993-08-04T15:05Z\"\r\n" + 
-				"}";
-		
-		TomlParseResult toml = Toml.parse(TOML);
-		String sJson = toml.toJson();
-		assertEquals(ExpectedResult, sJson);
-	}
-	
-    @Test
-	void shouldGenerateJsonArray(){
+	void shouldGenerateJsonArrayofMixedDataType(){
 		String TOML = 
 				"[array]\r\n" + 
 				"key1 = [ 1993-08-04T15:05:00Z, 15:05:00, 2014-01-03T23:28:56.782Z, 15:06:00 ]";
@@ -76,6 +38,94 @@ class JsonSerializer {
 				"}\r\n" + 
 				"\r\n" + 
 				"";
+		TomlParseResult toml = Toml.parse(TOML);
+		String sJson = toml.toJson();
+		
+		assertEquals(ExpectedResult, sJson);
+	}
+	
+	@Test
+	void shouldGenerateJsonArrayofOffsetDateTimeDataType(){
+		
+		String TOML = "key1 = [ 1979-05-27T00:32:00.999999-07:00, 1979-05-27T00:32:00.999999-07:00, 1979-05-27T00:32:00.999999-07:00, 1979-05-27T00:32:00.999999-07:00 ]";
+		String ExpectedResult = 
+				"{\r\n" + 
+				"  \"key1\" : [\r\n" + 
+				"    \"1979-05-27T00:32:00.999999-07:00\",\r\n" + 
+				"    \"1979-05-27T00:32:00.999999-07:00\",\r\n" + 
+				"    \"1979-05-27T00:32:00.999999-07:00\",\r\n" + 
+				"    \"1979-05-27T00:32:00.999999-07:00\"\r\n" + 
+				"  ]\r\n" + 
+				"}\r\n" + 
+				"\r\n" + 
+				"";
+		
+		TomlParseResult toml = Toml.parse(TOML);
+		String sJson = toml.toJson();
+		
+		assertEquals(ExpectedResult, sJson);
+	}
+	
+	@Test
+	void shouldGenerateJsonArrayofLocalDateTimeDataType(){
+		
+		String TOML = "key1 = [1979-05-27T07:32:00, 1979-05-27T07:32:00, 1979-05-27T07:32:00, 1979-05-27T07:32:00 ]";
+		String ExpectedResult = 
+				"{\r\n" + 
+				"  \"key1\": [\r\n" + 
+				"    \"1979-05-27T07:32:00\",\r\n" + 
+				"    \"1979-05-27T07:32:00\",\r\n" + 
+				"    \"1979-05-27T07:32:00\",\r\n" + 
+				"    \"1979-05-27T07:32:00\"\r\n" + 
+				"  ]\r\n" + 
+				"}\r\n" + 
+				"\r\n" + 
+				"";
+		
+		TomlParseResult toml = Toml.parse(TOML);
+		String sJson = toml.toJson();
+		
+		assertEquals(ExpectedResult, sJson);
+	}
+	
+	@Test
+	void shouldGenerateJsonArrayofLocalDateDataType(){
+		
+		String TOML = "key1 = [1979-05-27, 1979-05-27, 1979-05-27, 1979-05-27 ]";
+		String ExpectedResult = 
+				"{\r\n" + 
+				"  \"key1\": [\r\n" + 
+				"    \"1979-05-27\",\r\n" + 
+				"    \"1979-05-27\",\r\n" + 
+				"    \"1979-05-27\",\r\n" + 
+				"    \"1979-05-27\"\r\n" + 
+				"  ]\r\n" + 
+				"}\r\n" + 
+				"\r\n" + 
+				"";
+		
+		TomlParseResult toml = Toml.parse(TOML);
+		String sJson = toml.toJson();
+		
+		assertEquals(ExpectedResult, sJson);
+	}
+	
+	@Test
+	void shouldGenerateJsonArrayofLocalTimeDataType(){
+		
+		String TOML = "key1 = [00:32:00.999999, 00:32:00.999999, 00:32:00.999999, 00:32:00.999999 ]";
+		String ExpectedResult = 
+				"{\r\n" + 
+				"  \"key1\": [\r\n" + 
+				"    \"00:32:00.999999\",\r\n" + 
+				"    \"00:32:00.999999\",\r\n" + 
+				"    \"00:32:00.999999\",\r\n" + 
+				"    \"00:32:00.999999\"\r\n" + 
+				"  ]\r\n" + 
+				"}\r\n" + 
+				"\r\n" + 
+				"";
+		
 		TomlParseResult toml = Toml.parse(TOML);
 		String sJson = toml.toJson();
 		
