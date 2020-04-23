@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -157,6 +158,46 @@ class MutableTomlTableTest {
         new HashSet<>(Arrays.asList("bar", "foo", "foo.baz", "foo.buz", "foo.buz.bar")),
         table.dottedKeySet(true));
     assertEquals(new HashSet<>(Arrays.asList("bar", "foo.baz", "foo.buz.bar")), table.dottedKeySet());
+  }
+
+  @Test
+  void shouldReturnEntrySet() {
+    MutableTomlTable table = new MutableTomlTable();
+    table.set("bar", "one", positionAt(4, 3));
+    table.set("foo.baz", "two", positionAt(15, 2));
+    assertEquals(
+        new HashSet<>(
+            Arrays
+                .asList(
+                    new AbstractMap.SimpleEntry<>("bar", "one"),
+                    new AbstractMap.SimpleEntry<>("foo", table.get("foo")))),
+        table.entrySet());
+  }
+
+  @Test
+  void shouldReturnDottedEntrySet() {
+    MutableTomlTable table = new MutableTomlTable();
+    table.set("bar", "one", positionAt(4, 3));
+    table.set("foo.baz", "two", positionAt(15, 2));
+    table.set("foo.buz.bar", "three", positionAt(15, 2));
+    assertEquals(
+        new HashSet<>(
+            Arrays
+                .asList(
+                    new AbstractMap.SimpleEntry<>("bar", "one"),
+                    new AbstractMap.SimpleEntry<>("foo", table.get("foo")),
+                    new AbstractMap.SimpleEntry<>("foo.baz", "two"),
+                    new AbstractMap.SimpleEntry<>("foo.buz", table.get("foo.buz")),
+                    new AbstractMap.SimpleEntry<>("foo.buz.bar", "three"))),
+        table.dottedEntrySet(true));
+    assertEquals(
+        new HashSet<>(
+            Arrays.<AbstractMap
+                .SimpleEntry<String, Object>>asList(
+                    new AbstractMap.SimpleEntry<>("bar", "one"),
+                    new AbstractMap.SimpleEntry<>("foo.baz", "two"),
+                    new AbstractMap.SimpleEntry<>("foo.buz.bar", "three"))),
+        table.dottedEntrySet());
   }
 
   @Test

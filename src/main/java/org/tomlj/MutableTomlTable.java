@@ -15,6 +15,7 @@ package org.tomlj;
 import static org.tomlj.Parser.parseDottedKey;
 import static org.tomlj.TomlType.typeFor;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -87,6 +88,43 @@ final class MutableTomlTable implements TomlTable {
         return Stream.concat(Stream.of(basePath), subKeys);
       } else {
         return subKeys;
+      }
+    }).collect(Collectors.toSet());
+  }
+
+  @Override
+  public Set<Entry<String, Object>> entrySet() {
+    return properties
+        .entrySet()
+        .stream()
+        .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().value))
+        .collect(Collectors.toSet());
+  }
+
+  @Override
+  public Set<Entry<List<String>, Object>> entryPathSet(boolean includeTables) {
+    return properties.entrySet().stream().flatMap(entry -> {
+      String key = entry.getKey();
+      List<String> entryPath = Collections.singletonList(key);
+      Element element = entry.getValue();
+
+      if (!(element.value instanceof TomlTable)) {
+        return Stream.of(new AbstractMap.SimpleEntry<>(entryPath, element.value));
+      }
+
+      Stream<Entry<List<String>, Object>> subEntries =
+          ((TomlTable) element.value).entryPathSet(includeTables).stream().map(subEntry -> {
+            List<String> subPath = subEntry.getKey();
+            List<String> path = new ArrayList<>(subPath.size() + 1);
+            path.add(key);
+            path.addAll(subPath);
+            return new AbstractMap.SimpleEntry<>(path, subEntry.getValue());
+          });
+
+      if (includeTables) {
+        return Stream.concat(Stream.of(new AbstractMap.SimpleEntry<>(entryPath, element.value)), subEntries);
+      } else {
+        return subEntries;
       }
     }).collect(Collectors.toSet());
   }
