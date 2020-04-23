@@ -21,7 +21,7 @@ import org.tomlj.TomlParseResult;
 class JsonSerializer {
 
 	@Test
-	void shouldPassEscapeChar() throws Exception {
+	void shouldPassEscapeChar(){
 		String TOML = "winpath = 'C:\\Users\\nodejs\\templates'";
 		String ExpectedResult = 
 				"{\r\n" + 
@@ -33,7 +33,7 @@ class JsonSerializer {
 	}
 	
 	@Test
-	void shouldBeOrderedJson() throws Exception {
+	void shouldBeOrderedJson(){
 		String TOML = 
 				"Name = { First = \"John\", Last = \"Doe\" }\r\n" + 
 				"Company = { Name = \"GitHub\" }\r\n" + 
@@ -55,6 +55,30 @@ class JsonSerializer {
 		
 		TomlParseResult toml = Toml.parse(TOML);
 		String sJson = toml.toJson();
+		assertEquals(ExpectedResult, sJson);
+	}
+	
+    @Test
+	void shouldGenerateJsonArray(){
+		String TOML = 
+				"[array]\r\n" + 
+				"key1 = [ 1993-08-04T15:05:00Z, 15:05:00, 2014-01-03T23:28:56.782Z, 15:06:00 ]";
+		String ExpectedResult = 
+				"{\r\n" + 
+				"  \"array\" : {\r\n" + 
+				"    \"key1\" : [\r\n" + 
+				"      \"1993-08-04T15:05Z\",\r\n" + 
+				"      \"15:05\",\r\n" + 
+				"      \"2014-01-03T23:28:56.782Z\",\r\n" + 
+				"      \"15:06\"\r\n" + 
+				"    ]\r\n" + 
+				"  }\r\n" + 
+				"}\r\n" + 
+				"\r\n" + 
+				"";
+		TomlParseResult toml = Toml.parse(TOML);
+		String sJson = toml.toJson();
+		
 		assertEquals(ExpectedResult, sJson);
 	}
 }
