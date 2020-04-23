@@ -585,23 +585,27 @@ class TomlTest {
   @Test
   void testQuotesInJson() throws Exception {
     TomlParseResult result1 = Toml.parse("key = \"this is 'a test' with single quotes\"");
-    assertFalse(result1.hasErrors());
-    assertEquals("{\n  \"key\" : \"this is 'a test' with single quotes\"\n}\n", result1.toJson());
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+    String expected1 = "{\n  \"key\" : \"this is 'a test' with single quotes\"\n}\n";
+    assertEquals(expected1.replace("\n", System.lineSeparator()), result1.toJson());
 
     TomlParseResult result2 = Toml.parse("[\"dog 'type'\"]\ntype = \"pug\"");
-    assertFalse(result2.hasErrors());
-    assertEquals("{\n  \"dog 'type'\" : {\n    \"type\" : \"pug\"\n  }\n}\n", result2.toJson());
+    assertFalse(result2.hasErrors(), () -> joinErrors(result2));
+    String expected2 = "{\n  \"dog 'type'\" : {\n    \"type\" : \"pug\"\n  }\n}\n";
+    assertEquals(expected2.replace("\n", System.lineSeparator()), result2.toJson());
 
     TomlParseResult result3 = Toml.parse("key = \"this is \\\"a test\\\" with double quotes\"");
-    assertFalse(result3.hasErrors());
-    assertEquals("{\n  \"key\" : \"this is \\\"a test\\\" with double quotes\"\n}\n", result3.toJson());
+    assertFalse(result3.hasErrors(), () -> joinErrors(result3));
+    String expected3 = "{\n  \"key\" : \"this is \\\"a test\\\" with double quotes\"\n}\n";
+    assertEquals(expected3.replace("\n", System.lineSeparator()), result3.toJson());
   }
 
   @Test
   void testBackslashesInJson() throws Exception {
     TomlParseResult result1 = Toml.parse("path = 'C:\\Users\\dog\\catsihate'");
     assertFalse(result1.hasErrors(), () -> joinErrors(result1));
-    assertEquals("{\n  \"path\" : \"C:\\\\Users\\\\dog\\\\catsihate\"\n}\n", result1.toJson());
+    String expected = "{\n  \"path\" : \"C:\\\\Users\\\\dog\\\\catsihate\"\n}\n";
+    assertEquals(expected.replace("\n", System.lineSeparator()), result1.toJson());
   }
 
   @Test
@@ -609,12 +613,12 @@ class TomlTest {
     String expectedJson =
         new Scanner(this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.json"), "UTF-8")
             .useDelimiter("\\A")
-            .next();;
+            .next();
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.toml");
     assertNotNull(is);
     TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
-    assertEquals(expectedJson, result.toJson());
+    assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
   }
 
   private String joinErrors(TomlParseResult result) {
