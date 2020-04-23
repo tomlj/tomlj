@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.AbstractMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -92,7 +93,7 @@ public interface TomlTable {
    * @return A set containing all the dotted keys of this table.
    */
   default Set<String> dottedKeySet() {
-    return keyPathSet().stream().map(Toml::joinKeyPath).collect(Collectors.toSet());
+    return keyPathSet().stream().map(Toml::joinKeyPath).collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
@@ -102,7 +103,10 @@ public interface TomlTable {
    * @return A set containing all the dotted keys of this table.
    */
   default Set<String> dottedKeySet(boolean includeTables) {
-    return keyPathSet(includeTables).stream().map(Toml::joinKeyPath).collect(Collectors.toSet());
+    return keyPathSet(includeTables)
+        .stream()
+        .map(Toml::joinKeyPath)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
@@ -149,7 +153,7 @@ public interface TomlTable {
     return entryPathSet()
         .stream()
         .map(e -> new AbstractMap.SimpleEntry<>(Toml.joinKeyPath(e.getKey()), e.getValue()))
-        .collect(Collectors.toSet());
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
@@ -162,7 +166,7 @@ public interface TomlTable {
     return entryPathSet(includeTables)
         .stream()
         .map(e -> new AbstractMap.SimpleEntry<>(Toml.joinKeyPath(e.getKey()), e.getValue()))
-        .collect(Collectors.toSet());
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**

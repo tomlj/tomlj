@@ -216,20 +216,20 @@ class MutableTomlTableTest {
     table.set("zoo", LocalDate.parse("1937-07-18"), positionAt(5, 2));
     table.set("alpha", LocalTime.parse("03:25:43"), positionAt(5, 2));
     String expected = "{\n"
-        + "  \"alpha\" : \"03:25:43\",\n"
         + "  \"bar\" : \"one\",\n"
-        + "  \"buz\" : \"1937-07-18T03:25:43-04:00\",\n"
         + "  \"foo\" : {\n"
         + "    \"baz\" : \"two\",\n"
+        + "    \"buz\" : [],\n"
+        + "    \"foo\" : {},\n"
         + "    \"blah\" : [\n"
         + "      \"hello\\nthere\",\n"
         + "      \"goodbye\"\n"
-        + "    ],\n"
-        + "    \"buz\" : [],\n"
-        + "    \"foo\" : {}\n"
+        + "    ]\n"
         + "  },\n"
+        + "  \"buz\" : \"1937-07-18T03:25:43-04:00\",\n"
         + "  \"glad\" : \"1937-07-18T03:25:43\",\n"
-        + "  \"zoo\" : \"1937-07-18\"\n"
+        + "  \"zoo\" : \"1937-07-18\",\n"
+        + "  \"alpha\" : \"03:25:43\"\n"
         + "}\n";
     assertEquals(expected.replace("\n", System.lineSeparator()), table.toJson());
   }

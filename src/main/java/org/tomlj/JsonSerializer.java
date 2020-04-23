@@ -16,8 +16,8 @@ import static java.util.Objects.requireNonNull;
 import static org.tomlj.TomlType.typeFor;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Optional;
 
 final class JsonSerializer {
@@ -36,10 +36,11 @@ final class JsonSerializer {
       return;
     }
     appendLine(appendable, "{");
-    for (Iterator<String> iterator = table.keySet().stream().sorted().iterator(); iterator.hasNext();) {
-      String key = iterator.next();
+    for (Iterator<Map.Entry<String, Object>> iterator = table.entrySet().stream().iterator(); iterator.hasNext();) {
+      Map.Entry<String, Object> entry = iterator.next();
+      String key = entry.getKey();
       append(appendable, indent + 2, "\"" + escape(key) + "\" : ");
-      Object value = table.get(Collections.singletonList(key));
+      Object value = entry.getValue();
       assert value != null;
       appendTomlValue(value, appendable, indent);
       if (iterator.hasNext()) {

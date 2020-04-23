@@ -18,7 +18,8 @@ import static org.tomlj.TomlType.typeFor;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -40,7 +41,7 @@ final class MutableTomlTable implements TomlTable {
   }
 
   static final TomlTable EMPTY = new MutableTomlTable(true);
-  private final Map<String, Element> properties = new HashMap<>();
+  private final Map<String, Element> properties = new LinkedHashMap<>();
   private boolean implicitlyDefined;
 
   MutableTomlTable() {
@@ -98,7 +99,7 @@ final class MutableTomlTable implements TomlTable {
         .entrySet()
         .stream()
         .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().value))
-        .collect(Collectors.toSet());
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   @Override
@@ -126,7 +127,7 @@ final class MutableTomlTable implements TomlTable {
       } else {
         return subEntries;
       }
-    }).collect(Collectors.toSet());
+    }).collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   @Override
