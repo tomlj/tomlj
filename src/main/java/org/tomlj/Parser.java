@@ -59,6 +59,16 @@ final class Parser {
       }
 
       @Override
+      public Set<Map.Entry<String, Object>> entrySet() {
+        return table.entrySet();
+      }
+
+      @Override
+      public Set<Map.Entry<List<String>, Object>> entryPathSet(boolean includeTables) {
+        return table.entryPathSet(includeTables);
+      }
+
+      @Override
       @Nullable
       public Object get(List<String> path) {
         return table.get(path);

@@ -26,6 +26,7 @@ import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Scanner;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -601,6 +602,19 @@ class TomlTest {
     TomlParseResult result1 = Toml.parse("path = 'C:\\Users\\dog\\catsihate'");
     assertFalse(result1.hasErrors(), () -> joinErrors(result1));
     assertEquals("{\n  \"path\" : \"C:\\\\Users\\\\dog\\\\catsihate\"\n}\n", result1.toJson());
+  }
+
+  @Test
+  void testOrderPreservationInJson() throws Exception {
+    String expectedJson =
+        new Scanner(this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.json"), "UTF-8")
+            .useDelimiter("\\A")
+            .next();;
+    InputStream is = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.toml");
+    assertNotNull(is);
+    TomlParseResult result = Toml.parse(is);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    assertEquals(expectedJson, result.toJson());
   }
 
   private String joinErrors(TomlParseResult result) {

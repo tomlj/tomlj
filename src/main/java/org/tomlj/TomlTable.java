@@ -20,6 +20,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.AbstractMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,7 +93,7 @@ public interface TomlTable {
    * @return A set containing all the dotted keys of this table.
    */
   default Set<String> dottedKeySet() {
-    return keyPathSet().stream().map(Toml::joinKeyPath).collect(Collectors.toSet());
+    return keyPathSet().stream().map(Toml::joinKeyPath).collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
@@ -101,7 +103,10 @@ public interface TomlTable {
    * @return A set containing all the dotted keys of this table.
    */
   default Set<String> dottedKeySet(boolean includeTables) {
-    return keyPathSet(includeTables).stream().map(Toml::joinKeyPath).collect(Collectors.toSet());
+    return keyPathSet(includeTables)
+        .stream()
+        .map(Toml::joinKeyPath)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
@@ -123,6 +128,66 @@ public interface TomlTable {
    * @return A set containing all the key paths of this table.
    */
   Set<List<String>> keyPathSet(boolean includeTables);
+
+  /**
+   * Get the entries of this table.
+   *
+   * <p>
+   * The returned set contains only immediate entries of this table, and not entries with dotted keys or key paths. For
+   * a complete view of all entries available in the TOML document, use {@link #dottedEntrySet()} or
+   * {@link #entryPathSet()}.
+   *
+   * @return A set containing the immediate entries of this table.
+   */
+  Set<Map.Entry<String, Object>> entrySet();
+
+  /**
+   * Get all the dotted entries of this table.
+   *
+   * <p>
+   * Paths to intermediary and empty tables are not returned. To include these, use {@link #dottedEntrySet(boolean)}.
+   *
+   * @return A set containing all the entries of this table.
+   */
+  default Set<Map.Entry<String, Object>> dottedEntrySet() {
+    return entryPathSet()
+        .stream()
+        .map(e -> new AbstractMap.SimpleEntry<>(Toml.joinKeyPath(e.getKey()), e.getValue()))
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+  }
+
+  /**
+   * Get all the dotted entries of this table.
+   *
+   * @param includeTables If {@code true}, also include paths to intermediary and empty tables.
+   * @return A set containing all the entries of this table.
+   */
+  default Set<Map.Entry<String, Object>> dottedEntrySet(boolean includeTables) {
+    return entryPathSet(includeTables)
+        .stream()
+        .map(e -> new AbstractMap.SimpleEntry<>(Toml.joinKeyPath(e.getKey()), e.getValue()))
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+  }
+
+  /**
+   * Get all the entries in this table.
+   *
+   * <p>
+   * Paths to intermediary and empty tables are not returned. To include these, use {@link #entryPathSet(boolean)}.
+   *
+   * @return A set containing all the entries of this table.
+   */
+  default Set<Map.Entry<List<String>, Object>> entryPathSet() {
+    return entryPathSet(false);
+  }
+
+  /**
+   * Get all the entries in this table.
+   *
+   * @param includeTables If {@code true}, also include entries in intermediary and empty tables.
+   * @return A set containing all the entries of this table.
+   */
+  Set<Map.Entry<List<String>, Object>> entryPathSet(boolean includeTables);
 
   /**
    * Get a value from the TOML document.
