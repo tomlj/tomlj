@@ -39,7 +39,7 @@ final class MutableTomlTable implements TomlTable {
   }
 
   static final TomlTable EMPTY = new MutableTomlTable(true);
-  private Map<String, Element> properties = new HashMap<>();
+  private final Map<String, Element> properties = new HashMap<>();
   private boolean implicitlyDefined;
 
   MutableTomlTable() {
@@ -93,7 +93,6 @@ final class MutableTomlTable implements TomlTable {
 
   @Override
   @Nullable
-  @SuppressWarnings("unchecked")
   public Object get(List<String> path) {
     if (path.isEmpty()) {
       return this;
@@ -193,7 +192,6 @@ final class MutableTomlTable implements TomlTable {
   MutableTomlTable set(List<String> path, Object value, TomlPosition position) {
     int depth = path.size();
     assert (depth > 0);
-    assert (value != null);
     if (value instanceof Integer) {
       value = ((Integer) value).longValue();
     }
