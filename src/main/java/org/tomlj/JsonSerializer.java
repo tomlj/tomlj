@@ -138,6 +138,10 @@ final class JsonSerializer {
         out.append("\\\"");
         continue;
       }
+      if (ch == '\\') {
+        out.append("\\\\");
+        continue;
+      }
       if (ch >= 0x20) {
         out.append(ch);
         continue;
