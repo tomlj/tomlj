@@ -26,7 +26,8 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 final class Parser {
-    private Parser() {}
+	private Parser() {
+	}
 
 	static TomlParseResult parse(CharStream stream, TomlVersion version, boolean throwiferror) {
 		TomlLexer lexer = new TomlLexer(stream);
@@ -67,6 +68,16 @@ final class Parser {
 			}
 
 			@Override
+			public Set<Map.Entry<String, Object>> entrySet() {
+				return table.entrySet();
+			}
+
+			@Override
+			public Set<Map.Entry<List<String>, Object>> entryPathSet(boolean includeTables) {
+				return table.entryPathSet(includeTables);
+			}
+
+			@Override
 			@Nullable
 			public Object get(List<String> path) {
 				return table.get(path);
@@ -91,9 +102,8 @@ final class Parser {
 	}
 
 	static List<String> parseDottedKey(String dottedKey) {
-		dottedKey = wrapKey(dottedKey);
 		TomlLexer lexer = new TomlLexer(CharStreams.fromString(dottedKey));
-		lexer.mode(TomlLexer.KeyMode);
+		lexer.mode(TomlLexer.TomlKeyMode);
 		TomlParser parser = new TomlParser(new CommonTokenStream(lexer));
 		parser.removeErrorListeners();
 		AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
@@ -105,19 +115,5 @@ final class Parser {
 			throw new IllegalArgumentException("Invalid key: " + e.getMessage(), e);
 		}
 		return keyList;
-	}
-
-	private static String wrapKey(String Key) {
-		String[] sSplitKey = Key.split("\\.");
-		String sWrappedKey = "";
-		for (String str : sSplitKey) {
-			str = str.trim();
-			if (str.contains(" ") && !str.contains("\"") && !str.contains("'")) {
-				str = "\"" + str + "\"";
-			}
-			sWrappedKey = sWrappedKey + str + ".";
-		}
-		sWrappedKey = sWrappedKey.replaceAll("\\.$", "");
-		return sWrappedKey;
 	}
 }

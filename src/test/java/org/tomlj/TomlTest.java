@@ -561,6 +561,48 @@ class TomlTest {
     assertTrue(result3.hasErrors());
   }
 
+  @Test
+  void testSpacesInKeys() throws Exception {
+    TomlParseResult result1 = Toml.parse("\"Dog type\" = \"pug\"");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+    assertEquals("pug", result1.getString("\"Dog type\""));
+    assertEquals("pug", result1.getString("Dog type"));
+
+    TomlParseResult result2 = Toml.parse("[\"Dog 1\"]\n  type = \"pug\"");
+    assertFalse(result2.hasErrors(), () -> joinErrors(result2));
+    assertEquals("pug", result2.getString("\"Dog 1\".type"));
+    assertEquals("pug", result2.getString("Dog 1.type"));
+
+    TomlParseResult result3 = Toml.parse("[pets.\"Dog 1\"]\n  type = \"pug\"");
+    assertFalse(result3.hasErrors(), () -> joinErrors(result3));
+    assertEquals("pug", result3.getString("pets.\"Dog 1\".type"));
+    assertEquals("pug", result3.getString("pets.Dog 1.type"));
+    assertEquals("pug", result3.getString("pets.Dog 1  .type"));
+    assertEquals("pug", result3.getString("pets.  Dog 1.type"));
+  }
+
+  @Test
+  void testQuotesInJson() throws Exception {
+    TomlParseResult result1 = Toml.parse("key = \"this is 'a test' with single quotes\"");
+    assertFalse(result1.hasErrors());
+    assertEquals("{\n  \"key\" : \"this is 'a test' with single quotes\"\n}\n", result1.toJson());
+
+    TomlParseResult result2 = Toml.parse("[\"dog 'type'\"]\ntype = \"pug\"");
+    assertFalse(result2.hasErrors());
+    assertEquals("{\n  \"dog 'type'\" : {\n    \"type\" : \"pug\"\n  }\n}\n", result2.toJson());
+
+    TomlParseResult result3 = Toml.parse("key = \"this is \\\"a test\\\" with double quotes\"");
+    assertFalse(result3.hasErrors());
+    assertEquals("{\n  \"key\" : \"this is \\\"a test\\\" with double quotes\"\n}\n", result3.toJson());
+  }
+
+  @Test
+  void testBackslashesInJson() throws Exception {
+    TomlParseResult result1 = Toml.parse("path = 'C:\\Users\\dog\\catsihate'");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+    assertEquals("{\n  \"path\" : \"C:\\\\Users\\\\dog\\\\catsihate\"\n}\n", result1.toJson());
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }

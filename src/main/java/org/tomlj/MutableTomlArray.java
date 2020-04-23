@@ -178,9 +178,10 @@ final class MutableTomlArray implements TomlArray {
 			throw new IllegalArgumentException("Unsupported type " + value.getClass().getSimpleName());
 		}
 		if (type != null) {
-//			if (valueType.get() != type) {
-//				throw new TomlInvalidTypeException("Cannot add a " + TomlType.typeNameFor(value) + " to an array containing " + type.typeName() + "s");
-//			}
+//			 if (valueType.get() != type) {
+//			 throw new TomlInvalidTypeException(
+//			 "Cannot add a " + TomlType.typeNameFor(value) + " to an array containing " + type.typeName() + "s");
+//			 }
 		} else {
 			type = valueType.get();
 		}

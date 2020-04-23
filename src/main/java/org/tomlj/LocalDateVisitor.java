@@ -22,7 +22,7 @@ import org.antlr.v4.runtime.tree.ErrorNode;
 
 final class LocalDateVisitor extends TomlParserBaseVisitor<LocalDate> {
 
-  private static LocalDate INITIAL = LocalDate.parse("1900-01-01");
+  private static final LocalDate INITIAL = LocalDate.parse("1900-01-01");
   private LocalDate date = INITIAL;
 
   @Override

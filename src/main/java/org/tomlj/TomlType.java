@@ -19,7 +19,7 @@ import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Optional;
 
-public enum TomlType {
+enum TomlType {
   STRING("string", String.class),
   INTEGER("integer", Long.class),
   FLOAT("float", Double.class),
@@ -47,7 +47,7 @@ public enum TomlType {
     return Arrays.stream(values()).filter(t -> t.clazz.isAssignableFrom(clazz)).findAny();
   }
 
-  public static String typeNameFor(Object obj) {
+  static String typeNameFor(Object obj) {
     return typeNameForClass(obj.getClass());
   }
 

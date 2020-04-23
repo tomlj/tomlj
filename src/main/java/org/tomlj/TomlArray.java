@@ -13,12 +13,12 @@
 package org.tomlj;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * An array of TOML values.
@@ -279,17 +279,31 @@ public interface TomlArray {
    *
    * @return A JSON representation of this array.
    */
-  default String toJson() {
-    StringBuilder builder = new StringBuilder();
-    try {
-      toJson(builder);
-    } catch (IOException e) {
-      // not reachable
-      throw new UncheckedIOException(e);
-    }
-    return builder.toString();
-  }
+	default String toJson() throws Exception {
+		StringBuilder builder = new StringBuilder();
+		try {
+			toJson(builder);
+		} catch (JSONException e) {
+			throw new JSONException(e);
+		}
+		JSONPath.validateJSON(builder.toString());
+		return builder.toString();
+	}
 
+	/**
+	 * Return a Map contaning Key = JSONPath Value = actual TOML value
+	 * 
+	 * @return A Map with JSONPath representation of this Array.
+	 * @throws Exception
+	 */
+	default Map<String, Object> toJsonPath() throws Exception {
+		try {
+			return JSONPath.setJsonPaths(toJson());
+		} catch (Exception e) {
+			throw new JSONException(e);
+		}
+	}
+  
   /**
    * Append a JSON representation of this array to the appendable output.
    *

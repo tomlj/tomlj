@@ -37,7 +37,9 @@ fragment Digit0_7 : [0-7];
 fragment Digit0_1 : [0-1];
 fragment HexDig : Digit | [A-Fa-f];
 
-fragment UNQUOTED_KEY : (Alpha | Digit | '-' | '_')+;
+fragment KeyChar : (Alpha | Digit | '-' | '_');
+fragment UNQUOTED_KEY : KeyChar+;
+fragment LENIENT_UNQUOTED_KEY : KeyChar | KeyChar (KeyChar | WSChar)* KeyChar;
 
 Dot : '.';
 Equals : '=' { resetArrayDepth(); } -> pushMode(ValueMode);
@@ -65,6 +67,15 @@ KeyUnquotedKey : UNQUOTED_KEY -> type(UnquotedKey);
 KeyWS : WSChar+ -> type(WS), channel(WHITESPACE);
 KeyError : . -> type(Error);
 
+mode TomlKeyMode;
+
+TomlKeyDot : '.' -> type(Dot);
+TomlKeyQuotationMark : '"' -> type(QuotationMark), pushMode(BasicStringMode);
+TomlKeyApostrophe : '\'' -> type(Apostrophe), pushMode(LiteralStringMode);
+TomlKeyUnquotedKey : LENIENT_UNQUOTED_KEY -> type(UnquotedKey);
+
+TomlKeyWS : WSChar+ -> type(WS), channel(WHITESPACE);
+TomlKeyError : . -> type(Error);
 
 mode ValueMode;
 
@@ -82,7 +93,7 @@ OctalInteger : '0o' Digit0_7 ('_'? Digit0_7)* -> popMode;
 BinaryInteger : '0b' Digit0_1 ('_'? Digit0_1)* -> popMode;
 
 // Float
-fragment Exp : [eE] DecInt;
+fragment Exp : [eE] [-+]? [0]? (Digit | Digit1_9 ('_'? Digit)+);
 fragment Frac : '.' Digit ('_'? Digit)*;
 FloatingPoint : DecInt (Exp | Frac Exp?) -> popMode;
 FloatingPointInf: [-+]? 'inf' -> popMode;
@@ -97,8 +108,8 @@ ValueDateStart : Digit+ { "-:".indexOf(_input.LA(1)) >= 0 }? -> type(DateDigits)
 
 // Array
 ArrayStart : '[' { arrayDepth++; } -> pushMode(ValueMode);
-ArrayEnd : ']' { arrayDepth--; } -> popMode;
 ArrayComma : ',' { arrayDepth > 0 }? -> type(Comma), pushMode(ValueMode);
+ArrayEnd : ']' { arrayDepth--; } -> popMode;
 
 // Table
 InlineTableStart : '{' { pushArrayDepth(); } -> mode(InlineTableMode);
@@ -114,7 +125,7 @@ ValueError : . -> type(Error), popMode;
 mode BasicStringMode;
 
 BasicStringEnd : '"' -> type(QuotationMark), popMode;
-BasicStringUnescaped : ~[\u0000-\u001F"\\\u007F] -> type(StringChar);
+BasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F\u007F] -> type(StringChar);
 EscapeSequence
   : '\\' ~[\n]
   | '\\u' HexDig HexDig HexDig HexDig
@@ -128,7 +139,7 @@ mode MLBasicStringMode;
 
 MLBasicStringEnd : '"""' -> type(TripleQuotationMark), popMode;
 MLBasicStringLineEnd : '\\' [ \t]* NL { setText(System.lineSeparator()); } -> type(NewLine);
-MLBasicStringUnescaped : ~[\u0000-\u001F\\\u007F] -> type(StringChar);
+MLBasicStringUnescaped : ~[\u0000-\u0008\u000C\u000E-\u001F\u007F] -> type(StringChar);
 MLBasicStringEscape :
   ('\\u' HexDig HexDig HexDig HexDig
   | '\\U' HexDig HexDig HexDig HexDig HexDig HexDig HexDig HexDig

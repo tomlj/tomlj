@@ -78,7 +78,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   private Double toDouble(String s, ParserRuleContext ctx) {
     try {
-      Double value = Double.valueOf(s);
+      double value = Double.parseDouble(s);
       if (value == Double.POSITIVE_INFINITY || value == Double.NEGATIVE_INFINITY) {
         throw new TomlParseError("Float is too large", new TomlPosition(ctx));
       }

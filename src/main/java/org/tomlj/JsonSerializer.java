@@ -16,12 +16,13 @@ import static java.util.Objects.requireNonNull;
 import static org.tomlj.TomlType.typeFor;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Optional;
 
 final class JsonSerializer {
-  private JsonSerializer() {}
+	private JsonSerializer() {
+	}
 
 	static void toJson(TomlTable table, Appendable appendable) throws IOException {
 		requireNonNull(table);
@@ -36,10 +37,11 @@ final class JsonSerializer {
 			return;
 		}
 		appendLine(appendable, "{");
-		for (Iterator<String> iterator = table.keySet().iterator(); iterator.hasNext();) {
-			String key = iterator.next();
+		for (Iterator<Map.Entry<String, Object>> iterator = table.entrySet().stream().iterator(); iterator.hasNext();) {
+			Map.Entry<String, Object> entry = iterator.next();
+			String key = entry.getKey();
 			append(appendable, indent + 4, "\"" + escape(key) + "\": ");
-			Object value = table.get(Collections.singletonList(key));
+			Object value = entry.getValue();
 			assert value != null;
 			appendTomlValue(value, appendable, indent);
 			if (iterator.hasNext()) {
@@ -134,18 +136,19 @@ final class JsonSerializer {
 		StringBuilder out = new StringBuilder(text.length());
 		for (int i = 0; i < text.length(); i++) {
 			char ch = text.charAt(i);
-			if (ch == '\"') {
+			if (ch == '"') {
 				out.append("\\\"");
 				continue;
 			}
 			if (ch == '\\') {
-			    out.append("\\\\");
-			    continue;
+				out.append("\\\\");
+				continue;
 			}
 			if (ch >= 0x20) {
 				out.append(ch);
 				continue;
 			}
+
 			switch (ch) {
 			case '\t':
 				out.append("\\t");
