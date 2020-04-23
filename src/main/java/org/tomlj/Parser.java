@@ -84,7 +84,7 @@ final class Parser {
 
   static List<String> parseDottedKey(String dottedKey) {
     TomlLexer lexer = new TomlLexer(CharStreams.fromString(dottedKey));
-    lexer.mode(TomlLexer.KeyMode);
+    lexer.mode(TomlLexer.TomlKeyMode);
     TomlParser parser = new TomlParser(new CommonTokenStream(lexer));
     parser.removeErrorListeners();
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();

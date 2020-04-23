@@ -37,7 +37,9 @@ fragment Digit0_7 : [0-7];
 fragment Digit0_1 : [0-1];
 fragment HexDig : Digit | [A-Fa-f];
 
-fragment UNQUOTED_KEY : (Alpha | Digit | '-' | '_')+;
+fragment KeyChar : (Alpha | Digit | '-' | '_');
+fragment UNQUOTED_KEY : KeyChar+;
+fragment LENIENT_UNQUOTED_KEY : KeyChar | KeyChar (KeyChar | WSChar)* KeyChar;
 
 Dot : '.';
 Equals : '=' { resetArrayDepth(); } -> pushMode(ValueMode);
@@ -65,6 +67,15 @@ KeyUnquotedKey : UNQUOTED_KEY -> type(UnquotedKey);
 KeyWS : WSChar+ -> type(WS), channel(WHITESPACE);
 KeyError : . -> type(Error);
 
+mode TomlKeyMode;
+
+TomlKeyDot : '.' -> type(Dot);
+TomlKeyQuotationMark : '"' -> type(QuotationMark), pushMode(BasicStringMode);
+TomlKeyApostrophe : '\'' -> type(Apostrophe), pushMode(LiteralStringMode);
+TomlKeyUnquotedKey : LENIENT_UNQUOTED_KEY -> type(UnquotedKey);
+
+TomlKeyWS : WSChar+ -> type(WS), channel(WHITESPACE);
+TomlKeyError : . -> type(Error);
 
 mode ValueMode;
 
