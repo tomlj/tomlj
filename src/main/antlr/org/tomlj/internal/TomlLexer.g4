@@ -137,7 +137,7 @@ BasicStringError : . -> type(Error), popMode;
 
 mode MLBasicStringMode;
 
-MLBasicStringEnd : '""' -> type(TripleQuotationMark), popMode;
+MLBasicStringEnd : '"""' -> type(TripleQuotationMark), popMode;
 MLBasicStringLineEnd : '\\' [ \t]* NL { setText(System.lineSeparator()); } -> type(NewLine);
 MLBasicStringUnescaped : ~[\u0000-\u0008\u000C\u000E-\u001F\\\u007F] -> type(StringChar);
 MLBasicStringEscape :
