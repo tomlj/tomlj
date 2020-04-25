@@ -13,6 +13,8 @@
 package org.tomlj;
 
 import static java.util.Objects.requireNonNull;
+import static org.tomlj.EmptyTomlArray.EMPTY_ARRAY;
+import static org.tomlj.EmptyTomlTable.EMPTY_TABLE;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -1081,7 +1083,7 @@ public interface TomlTable {
    * Get an array from the TOML document.
    *
    * @param dottedKey A dotted key (e.g. {@code "server.addresses"}).
-   * @return The value, or an empty list if no list was set in the TOML document.
+   * @return The value, or an empty array if no array was set in the TOML document.
    * @throws IllegalArgumentException If the key cannot be parsed.
    * @throws TomlInvalidTypeException If the value is present but not an array, or any element of the path preceding the
    *         final key is not a table.
@@ -1095,7 +1097,7 @@ public interface TomlTable {
    * Get an array from the TOML document.
    *
    * @param path The key path.
-   * @return The value, or an empty list if no list was set in the TOML document.
+   * @return The value, or an empty array if no array was set in the TOML document.
    * @throws TomlInvalidTypeException If the value is present but not an array, or any element of the path preceding the
    *         final key is not a table.
    */
@@ -1104,7 +1106,7 @@ public interface TomlTable {
     if (value != null) {
       return value;
     }
-    return MutableTomlArray.EMPTY;
+    return EMPTY_ARRAY;
   }
 
   /**
@@ -1198,7 +1200,7 @@ public interface TomlTable {
     if (value != null) {
       return value;
     }
-    return MutableTomlTable.EMPTY;
+    return EMPTY_TABLE;
   }
 
   /**

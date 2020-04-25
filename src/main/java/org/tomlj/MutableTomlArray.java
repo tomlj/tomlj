@@ -31,7 +31,6 @@ final class MutableTomlArray implements TomlArray {
     }
   }
 
-  static final TomlArray EMPTY = new MutableTomlArray(true);
   private final List<Element> elements = new ArrayList<>();
   private final boolean definedAsLiteral;
   private TomlType type = null;

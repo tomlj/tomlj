@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static org.tomlj.EmptyTomlArray.EMPTY_ARRAY;
+
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
@@ -130,7 +132,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
   public Object visitArray(TomlParser.ArrayContext ctx) {
     TomlParser.ArrayValuesContext valuesContext = ctx.arrayValues();
     if (valuesContext == null) {
-      return MutableTomlArray.EMPTY;
+      return EMPTY_ARRAY;
     }
     return valuesContext.accept(new ArrayVisitor());
   }
@@ -139,7 +141,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
   public Object visitInlineTable(TomlParser.InlineTableContext ctx) {
     TomlParser.InlineTableValuesContext valuesContext = ctx.inlineTableValues();
     if (valuesContext == null) {
-      return MutableTomlTable.EMPTY;
+      return EmptyTomlTable.EMPTY_TABLE;
     }
     return valuesContext.accept(new InlineTableVisitor());
   }

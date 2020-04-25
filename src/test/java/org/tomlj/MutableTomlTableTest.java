@@ -17,6 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.tomlj.EmptyTomlArray.EMPTY_ARRAY;
+import static org.tomlj.EmptyTomlTable.EMPTY_TABLE;
 import static org.tomlj.TomlPosition.positionAt;
 
 import java.time.LocalDate;
@@ -205,8 +207,8 @@ class MutableTomlTableTest {
     MutableTomlTable table = new MutableTomlTable();
     table.set("bar", "one", positionAt(2, 1));
     table.set("foo.baz", "two", positionAt(3, 2));
-    table.set("foo.buz", MutableTomlArray.EMPTY, positionAt(3, 2));
-    table.set("foo.foo", MutableTomlTable.EMPTY, positionAt(3, 2));
+    table.set("foo.buz", EMPTY_ARRAY, positionAt(3, 2));
+    table.set("foo.foo", EMPTY_TABLE, positionAt(3, 2));
     MutableTomlArray array = new MutableTomlArray();
     array.append("hello\nthere", positionAt(5, 2));
     array.append("goodbye", positionAt(5, 2));

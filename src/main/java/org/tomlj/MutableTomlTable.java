@@ -40,7 +40,6 @@ final class MutableTomlTable implements TomlTable {
     }
   }
 
-  static final TomlTable EMPTY = new MutableTomlTable(true);
   private final Map<String, Element> properties = new LinkedHashMap<>();
   private boolean implicitlyDefined;
 
@@ -210,15 +209,15 @@ final class MutableTomlTable implements TomlTable {
 
     String key = path.get(depth - 1);
     Element element = table.properties.computeIfAbsent(key, k -> new Element(new MutableTomlArray(), position));
-    if (!(element.value instanceof MutableTomlArray)) {
+    if (!(element.value instanceof TomlArray)) {
       String message = Toml.joinKeyPath(path) + " is not an array (previously defined at " + element.position + ")";
       throw new TomlParseError(message, position);
     }
-    MutableTomlArray array = (MutableTomlArray) element.value;
-    if (array.wasDefinedAsLiteral()) {
+    if (!(element.value instanceof MutableTomlArray) || ((MutableTomlArray) element.value).wasDefinedAsLiteral()) {
       String message = Toml.joinKeyPath(path) + " previously defined as a literal array at " + element.position;
       throw new TomlParseError(message, position);
     }
+    MutableTomlArray array = (MutableTomlArray) element.value;
     MutableTomlTable newTable = new MutableTomlTable();
     array.append(newTable, position);
     return newTable;
@@ -255,6 +254,13 @@ final class MutableTomlTable implements TomlTable {
       if (element.value instanceof MutableTomlTable) {
         table = (MutableTomlTable) element.value;
         continue;
+      }
+      if (element.value instanceof TomlTable) {
+        String message = Toml.joinKeyPath(path.subList(0, i + 1))
+            + " is not a table (previously defined at "
+            + element.position
+            + ")";
+        throw new TomlParseError(message, position);
       }
       if (followArrayTables && element.value instanceof MutableTomlArray) {
         MutableTomlArray array = (MutableTomlArray) element.value;
