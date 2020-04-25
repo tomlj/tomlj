@@ -11,7 +11,7 @@
 .gradle/
 .vscode/
 *.code-workspace
-.idea/*
+.idea
 !.idea/codeStyles/
 .loadpath
 .metadata
@@ -28,3 +28,4 @@ target/
 tmp/
 build/
 out/
+src/main/gen
