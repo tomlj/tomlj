@@ -116,9 +116,9 @@ InlineTableStart : '{' { pushArrayDepth(); } -> mode(InlineTableMode);
 
 ValueWS : WSChar+ -> type(WS), channel(WHITESPACE);
 ValueComment : COMMENT -> type(Comment), channel(COMMENTS);
-ArrayNewLine: NL { arrayDepth > 0}? -> type(NewLine);
+ArrayNewLine: NL { arrayDepth > 0 }? -> type(NewLine);
 
-ValueNewLine: NL { arrayDepth == 0}? -> type(NewLine), popMode;
+ValueNewLine: NL { arrayDepth == 0 }? -> type(NewLine), popMode;
 ValueError : . -> type(Error), popMode;
 
 
@@ -180,7 +180,8 @@ DateDigits : Digit+;
 DateWS : WSChar+ -> type(WS), channel(WHITESPACE), popMode;
 DateComment : COMMENT -> type(Comment), channel(COMMENTS), popMode;
 DateNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine), popMode;
-DateComma: ',' -> type(Comma), popMode;
+DateComma: ',' { arrayDepth > 0 }? -> type(Comma), mode(ValueMode);
+DateArrayEnd : ']' { arrayDepth > 0 }? { arrayDepth--; } -> type(ArrayEnd), popMode;
 DateError : . -> type(Error), popMode;
 
 
