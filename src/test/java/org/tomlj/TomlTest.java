@@ -294,18 +294,31 @@ class TomlTest {
   }
 
   static Stream<Arguments> arraySupplier() {
+    // @formatter:off
     return Stream
         .of(
             Arguments.of("foo = []", new Object[0]),
             Arguments.of("foo = [\n]", new Object[0]),
             Arguments.of("foo = [1]", new Object[] {1L}),
             Arguments.of("foo = [ \"bar\"\n]", new Object[] {"bar"}),
+            Arguments.of("foo = [11:44:02]", new Object[] {LocalTime.parse("11:44:02")}),
+            Arguments.of("foo = [1993-08-04]", new Object[] {LocalDate.of(1993, 8, 4)}),
             Arguments.of("foo = [11:44:02,]", new Object[] {LocalTime.parse("11:44:02")}),
             Arguments.of("foo = [\n'bar', #baz\n]", new Object[] {"bar"}),
             Arguments.of("foo = ['bar', 'baz']", new Object[] {"bar", "baz"}),
-            Arguments
-                .of("foo = [\n'''bar\nbaz''',\n'baz'\n]", new Object[] {"bar" + System.lineSeparator() + "baz", "baz"}),
+            Arguments.of("foo = [1993-08-04,1993-08-04]",
+                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+            Arguments.of("foo = [1993-08-04,1993-08-04,]",
+                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+            Arguments.of("foo = [1993-08-04,1993-08-04   ]",
+                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+            Arguments.of("foo = [ 1993-08-04 , 1993-08-04   ]",
+                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+            Arguments.of("foo = [ 1993-08-04 , 1993-08-04   , ]",
+                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+            Arguments.of("foo = [\n'''bar\nbaz''',\n'baz'\n]", new Object[] {"bar" + System.lineSeparator() + "baz", "baz"}),
             Arguments.of("foo = [['bar']]", new Object[] {new Object[] {"bar"}}));
+    // @formatter:on
   }
 
   @ParameterizedTest
@@ -469,6 +482,8 @@ class TomlTest {
         Arguments.of("\nfoo = 13:70:00", 2, 10, "Invalid minutes (valid range 00..59)"),
         Arguments.of("\nfoo = 13:55:92", 2, 13, "Invalid seconds (valid range 00..59)"),
         Arguments.of("\nfoo = 13:55:02.0000000009", 2, 16, "Invalid nanoseconds (valid range 0..999999999)"),
+        Arguments.of("\nfoo = 13:55:02,", 2, 15, "Unexpected ',', expected a newline or end-of-input"),
+        Arguments.of("\nfoo = 13:55:02 , ", 2, 16, "Unexpected ',', expected a newline or end-of-input"),
 
         Arguments.of("foo = [", 1, 8, "Unexpected end of input, expected ], ', \", ''', \"\"\", a number, a boolean, a date/time, an array, a table, or a newline"),
         Arguments.of("foo = [ 1\n", 2, 1, "Unexpected end of input, expected ] or a newline"),
