@@ -35,7 +35,7 @@ final class Parser {
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
     parser.addErrorListener(errorListener);
     ParseTree tree = parser.toml();
-    TomlTable table = tree.accept(new LineVisitor(errorListener, version));
+    TomlTable table = tree.accept(new LineVisitor(version, errorListener));
 
     return new TomlParseResult() {
       @Override
@@ -99,7 +99,7 @@ final class Parser {
     parser.removeErrorListeners();
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
     parser.addErrorListener(errorListener);
-    List<String> keyList = parser.tomlKey().accept(new KeyVisitor());
+    List<String> keyList = parser.tomlKey().accept(new KeyVisitor(TomlVersion.HEAD));
     List<TomlParseError> errors = errorListener.errors();
     if (!errors.isEmpty()) {
       TomlParseError e = errors.get(0);

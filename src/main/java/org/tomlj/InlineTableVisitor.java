@@ -19,16 +19,22 @@ import java.util.List;
 
 final class InlineTableVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
-  private final MutableTomlTable table = new MutableTomlTable();
+  private final TomlVersion version;
+  private final MutableTomlTable table;
+
+  public InlineTableVisitor(TomlVersion version) {
+    this.version = version;
+    this.table = new MutableTomlTable(version);
+  }
 
   @Override
   public MutableTomlTable visitKeyval(TomlParser.KeyvalContext ctx) {
     TomlParser.KeyContext keyContext = ctx.key();
     TomlParser.ValContext valContext = ctx.val();
     if (keyContext != null && valContext != null) {
-      List<String> path = keyContext.accept(new KeyVisitor());
+      List<String> path = keyContext.accept(new KeyVisitor(version));
       if (path != null && !path.isEmpty()) {
-        Object value = valContext.accept(new ValueVisitor());
+        Object value = valContext.accept(new ValueVisitor(version));
         if (value != null) {
           table.set(path, value, new TomlPosition(ctx));
         }

@@ -20,7 +20,12 @@ import java.util.List;
 
 final class KeyVisitor extends TomlParserBaseVisitor<List<String>> {
 
+  private final TomlVersion version;
   private final List<String> keys = new ArrayList<>();
+
+  public KeyVisitor(TomlVersion version) {
+    this.version = version;
+  }
 
   @Override
   public List<String> visitUnquotedKey(TomlParser.UnquotedKeyContext ctx) {
@@ -30,7 +35,7 @@ final class KeyVisitor extends TomlParserBaseVisitor<List<String>> {
 
   @Override
   public List<String> visitQuotedKey(TomlParser.QuotedKeyContext ctx) {
-    StringBuilder builder = ctx.accept(new QuotedStringVisitor());
+    StringBuilder builder = ctx.accept(new QuotedStringVisitor(version));
     keys.add(builder.toString());
     return keys;
   }

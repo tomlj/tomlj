@@ -13,6 +13,7 @@
 package org.tomlj;
 
 import static java.util.Objects.requireNonNull;
+import static org.tomlj.TomlType.TABLE;
 import static org.tomlj.TomlType.typeFor;
 
 import java.io.IOException;
@@ -62,28 +63,27 @@ final class JsonSerializer {
       appendable.append("[]");
       return;
     }
-    if (array.containsTables()) {
-      append(appendable, 0, "[");
-      for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext();) {
+
+    appendable.append("[");
+    for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext();) {
+      Object tomlValue = iterator.next();
+      Optional<TomlType> tomlType = typeFor(tomlValue);
+      assert tomlType.isPresent();
+      if (tomlType.get().equals(TABLE)) {
         toJson((TomlTable) iterator.next(), appendable, indent);
-        if (iterator.hasNext()) {
-          appendable.append(",");
-        }
-      }
-      append(appendable, 0, "]");
-    } else {
-      appendLine(appendable, "[");
-      for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext();) {
+      } else {
+        appendable.append(System.lineSeparator());
         indentLine(appendable, indent + 2);
-        appendTomlValue(iterator.next(), appendable, indent);
-        if (iterator.hasNext()) {
-          appendable.append(",");
-          appendable.append(System.lineSeparator());
-        }
+        appendTomlValue(tomlValue, appendable, indent);
       }
-      appendable.append(System.lineSeparator());
-      append(appendable, indent, "]");
+
+      if (iterator.hasNext()) {
+        appendable.append(",");
+      } else if (!tomlType.get().equals(TABLE)) {
+        appendable.append(System.lineSeparator());
+      }
     }
+    append(appendable, indent, "]");
   }
 
   private static void appendTomlValue(Object value, Appendable appendable, int indent) throws IOException {

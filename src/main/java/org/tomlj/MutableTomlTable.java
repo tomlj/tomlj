@@ -40,15 +40,16 @@ final class MutableTomlTable implements TomlTable {
     }
   }
 
-  static final TomlTable EMPTY = new MutableTomlTable(true);
   private final Map<String, Element> properties = new LinkedHashMap<>();
+  private final TomlVersion version;
   private boolean implicitlyDefined;
 
-  MutableTomlTable() {
-    this(false);
+  MutableTomlTable(TomlVersion version) {
+    this(version, false);
   }
 
-  private MutableTomlTable(boolean implicitlyDefined) {
+  private MutableTomlTable(TomlVersion version, boolean implicitlyDefined) {
+    this.version = version;
     this.implicitlyDefined = implicitlyDefined;
   }
 
@@ -184,7 +185,7 @@ final class MutableTomlTable implements TomlTable {
     String key = path.get(depth - 1);
     Element element = table.properties.get(key);
     if (element == null) {
-      MutableTomlTable newTable = new MutableTomlTable();
+      MutableTomlTable newTable = new MutableTomlTable(version);
       table.properties.put(key, new Element(newTable, position));
       return newTable;
     }
@@ -200,7 +201,7 @@ final class MutableTomlTable implements TomlTable {
     throw new TomlParseError(message, position);
   }
 
-  MutableTomlTable createArrayTable(List<String> path, TomlPosition position) {
+  MutableTomlTable createTableArray(List<String> path, TomlPosition position) {
     if (path.isEmpty()) {
       throw new IllegalArgumentException("empty path");
     }
@@ -209,17 +210,18 @@ final class MutableTomlTable implements TomlTable {
     MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true);
 
     String key = path.get(depth - 1);
-    Element element = table.properties.computeIfAbsent(key, k -> new Element(new MutableTomlArray(), position));
-    if (!(element.value instanceof MutableTomlArray)) {
+    Element element =
+        table.properties.computeIfAbsent(key, k -> new Element(MutableTomlArray.create(version, true), position));
+    if (!(element.value instanceof TomlArray)) {
       String message = Toml.joinKeyPath(path) + " is not an array (previously defined at " + element.position + ")";
       throw new TomlParseError(message, position);
     }
-    MutableTomlArray array = (MutableTomlArray) element.value;
-    if (array.wasDefinedAsLiteral()) {
+    if (!(element.value instanceof MutableTomlArray) || !((MutableTomlArray) element.value).isTableArray()) {
       String message = Toml.joinKeyPath(path) + " previously defined as a literal array at " + element.position;
       throw new TomlParseError(message, position);
     }
-    MutableTomlTable newTable = new MutableTomlTable();
+    MutableTomlArray array = (MutableTomlArray) element.value;
+    MutableTomlTable newTable = new MutableTomlTable(version);
     array.append(newTable, position);
     return newTable;
   }
@@ -246,19 +248,36 @@ final class MutableTomlTable implements TomlTable {
     return this;
   }
 
-  private MutableTomlTable ensureTable(List<String> path, TomlPosition position, boolean followArrayTables) {
+  /**
+   * Ensure a table exists at a given path.
+   *
+   * @param path The path to ensure exists (as a table)
+   * @param position The input position.
+   * @param followTableArrays If `true`, path walking is permitted via the last element of array tables.
+   * @return The table at that path.
+   * @throws TomlParseError If the table cannot be created.
+   */
+  private MutableTomlTable ensureTable(List<String> path, TomlPosition position, boolean followTableArrays) {
     MutableTomlTable table = this;
     int depth = path.size();
     for (int i = 0; i < depth; ++i) {
-      Element element =
-          table.properties.computeIfAbsent(path.get(i), k -> new Element(new MutableTomlTable(true), position));
+      Element element = table.properties
+          .computeIfAbsent(path.get(i), k -> new Element(new MutableTomlTable(version, true), position));
       if (element.value instanceof MutableTomlTable) {
         table = (MutableTomlTable) element.value;
         continue;
       }
-      if (followArrayTables && element.value instanceof MutableTomlArray) {
+      if (element.value instanceof TomlTable) {
+        String message = Toml.joinKeyPath(path.subList(0, i + 1))
+            + " is not a table (previously defined at "
+            + element.position
+            + ")";
+        throw new TomlParseError(message, position);
+      }
+      if (followTableArrays && element.value instanceof MutableTomlArray) {
         MutableTomlArray array = (MutableTomlArray) element.value;
-        if (!array.wasDefinedAsLiteral() && !array.isEmpty() && array.containsTables()) {
+        if (array.isTableArray()) {
+          assert !array.isEmpty();
           table = (MutableTomlTable) array.get(array.size() - 1);
           continue;
         }

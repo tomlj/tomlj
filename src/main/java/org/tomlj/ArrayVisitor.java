@@ -17,13 +17,19 @@ import org.tomlj.internal.TomlParserBaseVisitor;
 
 final class ArrayVisitor extends TomlParserBaseVisitor<MutableTomlArray> {
 
-  private final MutableTomlArray array = new MutableTomlArray(true);
+  private final TomlVersion version;
+  private final MutableTomlArray array;
+
+  public ArrayVisitor(TomlVersion version) {
+    this.version = version;
+    this.array = MutableTomlArray.create(version);
+  }
 
   @Override
   public MutableTomlArray visitArrayValue(TomlParser.ArrayValueContext ctx) {
     TomlParser.ValContext valContext = ctx.val();
     if (valContext != null) {
-      Object value = valContext.accept(new ValueVisitor());
+      Object value = valContext.accept(new ValueVisitor(version));
       if (value != null) {
         TomlPosition position = new TomlPosition(ctx);
         try {

@@ -12,14 +12,21 @@
  */
 package org.tomlj;
 
-import static java.util.Objects.requireNonNull;
+import static org.tomlj.TomlVersion.V0_5_0;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
-final class MutableTomlArray implements TomlArray {
+class MutableTomlArray implements TomlArray {
+
+  static MutableTomlArray create(TomlVersion version) {
+    return create(version, false);
+  }
+
+  static MutableTomlArray create(TomlVersion version, boolean tableArray) {
+    return version.after(V0_5_0) ? new MutableTomlArray(tableArray) : new MutableHomogeneousTomlArray(tableArray);
+  }
 
   private static class Element {
     final Object value;
@@ -31,21 +38,65 @@ final class MutableTomlArray implements TomlArray {
     }
   }
 
-  static final TomlArray EMPTY = new MutableTomlArray(true);
   private final List<Element> elements = new ArrayList<>();
-  private final boolean definedAsLiteral;
-  private TomlType type = null;
+  private final boolean isTableArray;
 
-  MutableTomlArray() {
-    this(false);
+  MutableTomlArray(boolean isTableArray) {
+    this.isTableArray = isTableArray;
   }
 
-  MutableTomlArray(boolean definedAsLiteral) {
-    this.definedAsLiteral = definedAsLiteral;
+  boolean isTableArray() {
+    return isTableArray;
   }
 
-  boolean wasDefinedAsLiteral() {
-    return definedAsLiteral;
+  @Override
+  public boolean containsStrings() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
+  }
+
+  @Override
+  public boolean containsLongs() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
+  }
+
+  @Override
+  public boolean containsDoubles() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
+  }
+
+  @Override
+  public boolean containsBooleans() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
+  }
+
+  @Override
+  public boolean containsOffsetDateTimes() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
+  }
+
+  @Override
+  public boolean containsLocalDateTimes() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
+  }
+
+  @Override
+  public boolean containsLocalDates() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
+  }
+
+  @Override
+  public boolean containsLocalTimes() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
+  }
+
+  @Override
+  public boolean containsArrays() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
+  }
+
+  @Override
+  public boolean containsTables() {
+    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
   }
 
   @Override
@@ -55,57 +106,7 @@ final class MutableTomlArray implements TomlArray {
 
   @Override
   public boolean isEmpty() {
-    return type == null;
-  }
-
-  @Override
-  public boolean containsStrings() {
-    return type == null || type == TomlType.STRING;
-  }
-
-  @Override
-  public boolean containsLongs() {
-    return type == null || type == TomlType.INTEGER;
-  }
-
-  @Override
-  public boolean containsDoubles() {
-    return type == null || type == TomlType.FLOAT;
-  }
-
-  @Override
-  public boolean containsBooleans() {
-    return type == null || type == TomlType.BOOLEAN;
-  }
-
-  @Override
-  public boolean containsOffsetDateTimes() {
-    return type == null || type == TomlType.OFFSET_DATE_TIME;
-  }
-
-  @Override
-  public boolean containsLocalDateTimes() {
-    return type == null || type == TomlType.LOCAL_DATE_TIME;
-  }
-
-  @Override
-  public boolean containsLocalDates() {
-    return type == null || type == TomlType.LOCAL_DATE;
-  }
-
-  @Override
-  public boolean containsLocalTimes() {
-    return type == null || type == TomlType.LOCAL_TIME;
-  }
-
-  @Override
-  public boolean containsArrays() {
-    return type == null || type == TomlType.ARRAY;
-  }
-
-  @Override
-  public boolean containsTables() {
-    return type == null || type == TomlType.TABLE;
+    return elements.isEmpty();
   }
 
   @Override
@@ -119,31 +120,15 @@ final class MutableTomlArray implements TomlArray {
   }
 
   MutableTomlArray append(Object value, TomlPosition position) {
-    requireNonNull(value);
     if (value instanceof Integer) {
       value = ((Integer) value).longValue();
     }
 
-    TomlType origType = type;
-    Optional<TomlType> valueType = TomlType.typeFor(value);
-    if (!valueType.isPresent()) {
+    if (!TomlType.typeFor(value).isPresent()) {
       throw new IllegalArgumentException("Unsupported type " + value.getClass().getSimpleName());
     }
-    if (type != null) {
-      if (valueType.get() != type) {
-        throw new TomlInvalidTypeException(
-            "Cannot add a " + TomlType.typeNameFor(value) + " to an array containing " + type.typeName() + "s");
-      }
-    } else {
-      type = valueType.get();
-    }
 
-    try {
-      elements.add(new Element(value, position));
-    } catch (Throwable e) {
-      type = origType;
-      throw e;
-    }
+    elements.add(new Element(value, position));
     return this;
   }
 

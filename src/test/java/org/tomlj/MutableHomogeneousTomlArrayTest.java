@@ -20,11 +20,11 @@ import static org.tomlj.TomlPosition.positionAt;
 
 import org.junit.jupiter.api.Test;
 
-class MutableTomlArrayTest {
+class MutableHomogeneousTomlArrayTest {
 
   @Test
   void emptyArrayContainsAllTypes() {
-    TomlArray array = new MutableTomlArray();
+    TomlArray array = new MutableHomogeneousTomlArray(false);
     assertTrue(array.isEmpty());
     assertEquals(0, array.size());
     assertTrue(array.containsStrings());
@@ -41,7 +41,7 @@ class MutableTomlArrayTest {
 
   @Test
   void arrayContainsTypeAfterAddingItem() {
-    MutableTomlArray array = new MutableTomlArray().append("foo", positionAt(2, 3));
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false).append("foo", positionAt(2, 3));
     assertFalse(array.isEmpty());
     assertEquals(1, array.size());
     assertTrue(array.containsStrings());
@@ -58,14 +58,14 @@ class MutableTomlArrayTest {
 
   @Test
   void cannotAppendUnsupportedType() {
-    MutableTomlArray array = new MutableTomlArray();
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
     assertThrows(IllegalArgumentException.class, () -> array.append(this, positionAt(1, 1)));
     assertThrows(NullPointerException.class, () -> array.append(null, positionAt(1, 1)));
   }
 
   @Test
   void cannotAppendDifferentTypes() {
-    MutableTomlArray array = new MutableTomlArray();
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
     array.append("Foo", positionAt(1, 1));
     assertThrows(TomlInvalidTypeException.class, () -> array.append(1L, positionAt(1, 1)));
     array.append("Bar", positionAt(1, 1));
@@ -74,13 +74,13 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldReturnNullForUnknownIndex() {
-    MutableTomlArray array = new MutableTomlArray();
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
     assertThrows(IndexOutOfBoundsException.class, () -> array.get(0));
   }
 
   @Test
   void shouldReturnInputPosition() {
-    MutableTomlArray array = new MutableTomlArray();
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
     array.append("Foo", positionAt(4, 3));
     array.append("Bar", positionAt(9, 5));
     assertEquals(positionAt(4, 3), array.inputPositionOf(0));

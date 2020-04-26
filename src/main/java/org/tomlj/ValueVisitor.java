@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static org.tomlj.EmptyTomlArray.EMPTY_ARRAY;
+
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
@@ -27,10 +29,15 @@ import org.antlr.v4.runtime.ParserRuleContext;
 final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   private static final Pattern zeroFloat = Pattern.compile("[+-]?0+(\\.[+-]?0*)?([eE].*)?");
+  private final TomlVersion version;
+
+  ValueVisitor(TomlVersion version) {
+    this.version = version;
+  }
 
   @Override
   public Object visitString(TomlParser.StringContext ctx) {
-    return ctx.accept(new QuotedStringVisitor()).toString();
+    return ctx.accept(new QuotedStringVisitor(version)).toString();
   }
 
   @Override
@@ -130,18 +137,18 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
   public Object visitArray(TomlParser.ArrayContext ctx) {
     TomlParser.ArrayValuesContext valuesContext = ctx.arrayValues();
     if (valuesContext == null) {
-      return MutableTomlArray.EMPTY;
+      return EMPTY_ARRAY;
     }
-    return valuesContext.accept(new ArrayVisitor());
+    return valuesContext.accept(new ArrayVisitor(version));
   }
 
   @Override
   public Object visitInlineTable(TomlParser.InlineTableContext ctx) {
     TomlParser.InlineTableValuesContext valuesContext = ctx.inlineTableValues();
     if (valuesContext == null) {
-      return MutableTomlTable.EMPTY;
+      return EmptyTomlTable.EMPTY_TABLE;
     }
-    return valuesContext.accept(new InlineTableVisitor());
+    return valuesContext.accept(new InlineTableVisitor(version));
   }
 
   @Override

@@ -21,14 +21,16 @@ import java.util.List;
 
 final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
-  private final MutableTomlTable table = new MutableTomlTable();
-  private final ErrorReporter errorReporter;
   private final TomlVersion version;
-  private MutableTomlTable currentTable = table;
+  private final ErrorReporter errorReporter;
+  private final MutableTomlTable table;
+  private MutableTomlTable currentTable;
 
-  LineVisitor(ErrorReporter errorReporter, TomlVersion version) {
-    this.errorReporter = errorReporter;
+  LineVisitor(TomlVersion version, ErrorReporter errorReporter) {
     this.version = version;
+    this.errorReporter = errorReporter;
+    this.table = new MutableTomlTable(version);
+    this.currentTable = table;
   }
 
   @Override
@@ -39,7 +41,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       return table;
     }
     try {
-      List<String> path = keyContext.accept(new KeyVisitor());
+      List<String> path = keyContext.accept(new KeyVisitor(version));
       if (path == null || path.isEmpty()) {
         return table;
       }
@@ -47,7 +49,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       if (!version.after(V0_4_0) && path.size() > 1) {
         throw new TomlParseError("Dotted keys are not supported", new TomlPosition(keyContext));
       }
-      Object value = valContext.accept(new ValueVisitor());
+      Object value = valContext.accept(new ValueVisitor(version));
       if (value != null) {
         currentTable.set(path, value, new TomlPosition(ctx));
       }
@@ -65,7 +67,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
       return table;
     }
-    List<String> path = keyContext.accept(new KeyVisitor());
+    List<String> path = keyContext.accept(new KeyVisitor(version));
     if (path == null) {
       return table;
     }
@@ -84,12 +86,12 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
       return table;
     }
-    List<String> path = keyContext.accept(new KeyVisitor());
+    List<String> path = keyContext.accept(new KeyVisitor(version));
     if (path == null) {
       return table;
     }
     try {
-      currentTable = table.createArrayTable(path, new TomlPosition(ctx));
+      currentTable = table.createTableArray(path, new TomlPosition(ctx));
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
     }
