@@ -24,41 +24,45 @@ final class JsonSerializer {
 	private JsonSerializer() {
 	}
 
-	static void toJson(TomlTable table, Appendable appendable) throws IOException {
+	static void toJson(TomlTable table, Appendable appendable, Integer... optionalIndent) throws IOException {
+		Integer optIndent = ((optionalIndent.length > 0) ? (Integer)optionalIndent[0] : 2);
 		requireNonNull(table);
 		requireNonNull(appendable);
-		toJson(table, appendable, 0);
-		appendable.append(System.lineSeparator());
+		toJson(table, appendable, 0, optionalIndent);
+		if(optIndent > 0) {appendable.append(System.lineSeparator());}
 	}
 
-	private static void toJson(TomlTable table, Appendable appendable, int indent) throws IOException {
+	private static void toJson(TomlTable table, Appendable appendable, int indent, Integer... optionalIndent) throws IOException {
+		Integer optIndent = ((optionalIndent.length > 0) ? (Integer)optionalIndent[0] : 2);
 		if (table.isEmpty()) {
 			appendable.append("{}");
 			return;
 		}
-		appendLine(appendable, "{");
+		appendLine(appendable, "{", optIndent);
 		for (Iterator<Map.Entry<String, Object>> iterator = table.entrySet().stream().iterator(); iterator.hasNext();) {
 			Map.Entry<String, Object> entry = iterator.next();
 			String key = entry.getKey();
-			append(appendable, indent + 4, "\"" + escape(key) + "\": ");
+			append(appendable, indent + optIndent , "\"" + escape(key) + "\": ");
 			Object value = entry.getValue();
 			assert value != null;
-			appendTomlValue(value, appendable, indent);
+			appendTomlValue(value, appendable, indent, optionalIndent);
 			if (iterator.hasNext()) {
 				appendable.append(",");
-				appendable.append(System.lineSeparator());
+				if(optIndent > 0) {appendable.append(System.lineSeparator());}
 			}
 		}
-		appendable.append(System.lineSeparator());
+		if(optIndent > 0) {appendable.append(System.lineSeparator());}
 		append(appendable, indent, "}");
 	}
 
-	static void toJson(TomlArray array, Appendable appendable) throws IOException {
-		toJson(array, appendable, 0);
-		appendable.append(System.lineSeparator());
+	static void toJson(TomlArray array, Appendable appendable, Integer... optionalIndent) throws IOException {
+		Integer optIndent = ((optionalIndent.length > 0) ? (Integer)optionalIndent[0] : 2);
+		toJson(array, appendable, 0, optionalIndent);
+		if(optIndent > 0) {appendable.append(System.lineSeparator());}
 	}
 
-	private static void toJson(TomlArray array, Appendable appendable, int indent) throws IOException {
+	private static void toJson(TomlArray array, Appendable appendable, int indent, Integer... optionalIndent) throws IOException {
+		Integer optIndent = ((optionalIndent.length > 0) ? (Integer)optionalIndent[0] : 2);
 		if (array.isEmpty()) {
 			appendable.append("[]");
 			return;
@@ -66,28 +70,29 @@ final class JsonSerializer {
 		if (array.containsTables()) {
 			append(appendable, 0, "[");
 			for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext();) {
-				toJson((TomlTable) iterator.next(), appendable, indent);
+				toJson((TomlTable) iterator.next(), appendable, indent, optionalIndent);
 				if (iterator.hasNext()) {
 					appendable.append(",");
 				}
 			}
 			append(appendable, 0, "]");
 		} else {
-			appendLine(appendable, "[");
+			appendLine(appendable, "[", optIndent);
 			for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext();) {
-				indentLine(appendable, indent + 4);
-				appendTomlValue(iterator.next(), appendable, indent);
+				indentLine(appendable, indent + optIndent);
+				appendTomlValue(iterator.next(), appendable, indent, optionalIndent);
 				if (iterator.hasNext()) {
 					appendable.append(",");
-					appendable.append(System.lineSeparator());
+					if(optIndent > 0) {appendable.append(System.lineSeparator());}
 				}
 			}
-			appendable.append(System.lineSeparator());
+			if(optIndent > 0) {appendable.append(System.lineSeparator());}
 			append(appendable, indent, "]");
 		}
 	}
 
-	private static void appendTomlValue(Object value, Appendable appendable, int indent) throws IOException {
+	private static void appendTomlValue(Object value, Appendable appendable, int indent, Integer... optionalIndent) throws IOException {
+		Integer optIndent = ((optionalIndent.length > 0) ? (Integer)optionalIndent[0] : 2);
 		Optional<TomlType> tomlType = typeFor(value);
 		assert tomlType.isPresent();
 		switch (tomlType.get()) {
@@ -108,10 +113,10 @@ final class JsonSerializer {
 			append(appendable, 0, "\"" + value.toString() + "\"");
 			break;
 		case ARRAY:
-			toJson((TomlArray) value, appendable, indent + 4);
+			toJson((TomlArray) value, appendable, indent + optIndent, optionalIndent);
 			break;
 		case TABLE:
-			toJson((TomlTable) value, appendable, indent + 4);
+			toJson((TomlTable) value, appendable, indent + optIndent, optionalIndent);
 			break;
 		}
 	}
@@ -121,9 +126,10 @@ final class JsonSerializer {
 		appendable.append(line);
 	}
 
-	private static void appendLine(Appendable appendable, String line) throws IOException {
+	private static void appendLine(Appendable appendable, String line, Integer... optionalIndent) throws IOException {
+		Integer optIndent = ((optionalIndent.length > 0) ? (Integer)optionalIndent[0] : 2);
 		appendable.append(line);
-		appendable.append(System.lineSeparator());
+		if(optIndent > 0) {appendable.append(System.lineSeparator());}
 	}
 
 	private static void indentLine(Appendable appendable, int indent) throws IOException {

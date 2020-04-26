@@ -1394,14 +1394,17 @@ public interface TomlTable {
 
 	/**
 	 * Return a representation of this table using JSON.
-	 *
+	 * @param optionalIndent Optional integer argument to indent JSON. 
+	 * 	      If provided &  >0, JSON will indent with number of spaces mentioned.
+	 *        If provided & <=0, JSON will be serialized (no indents).
+	 *        If not provided, JSON will indent with default of 2 spaces.
 	 * @return A JSON representation of this table.
 	 * @throws Exception
 	 */
-	default String toJson() throws Exception {
+	default String toJson(Integer... optionalIndent) throws Exception {
 		StringBuilder builder = new StringBuilder();
 		try {
-			toJson(builder);
+			toJson(builder, optionalIndent);
 		} catch (JSONException e) {
 			throw new JSONException(e);
 		}
@@ -1426,12 +1429,14 @@ public interface TomlTable {
 	/**
 	 * Append a JSON representation of this table to the appendable output.
 	 *
-	 * @param appendable
-	 *            The appendable output.
-	 * @throws IOException
-	 *             If an IO error occurs.
+	 * @param appendable The appendable output.
+	 * @param optionalIndent Optional integer argument to indent JSON. 
+	 * 	      If provided &  >0, JSON will indent with number of spaces mentioned.
+	 *        If provided & <=0, JSON will be serialized (no indents).
+	 *        If not provided, JSON will indent with default of 2 spaces.
+	 * @throws IOException If an IO error occurs.
 	 */
-	default void toJson(Appendable appendable) throws IOException {
-		JsonSerializer.toJson(this, appendable);
+	default void toJson(Appendable appendable, Integer... optionalIndent) throws IOException {
+		JsonSerializer.toJson(this, appendable, optionalIndent);
 	}
 }
