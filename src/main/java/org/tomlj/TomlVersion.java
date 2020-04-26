@@ -35,9 +35,17 @@ public enum TomlVersion {
    */
   V0_5_0(null),
   /**
+   * The 1.0.0-rc.1 version of TOML.
+   *
+   * <p>
+   * This specification can be found at <a href=
+   * "https://github.com/toml-lang/toml/blob/e597958af54a9230a872fdab3e538490e8758eb0/versions/en/toml-v1.0.0-rc.1.md">https://github.com/toml-lang/toml/blob/e597958af54a9230a872fdab3e538490e8758eb0/versions/en/toml-v1.0.0-rc.1.md</a>.
+   */
+  V1_0_0_RC1(null),
+  /**
    * The latest stable specification of TOML.
    */
-  LATEST(V0_5_0),
+  LATEST(V1_0_0_RC1),
   /**
    * The head (development) specification of TOML.
    *

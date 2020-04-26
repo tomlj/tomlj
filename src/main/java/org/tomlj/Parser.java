@@ -35,7 +35,7 @@ final class Parser {
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
     parser.addErrorListener(errorListener);
     ParseTree tree = parser.toml();
-    TomlTable table = tree.accept(new LineVisitor(errorListener, version));
+    TomlTable table = tree.accept(new LineVisitor(version, errorListener));
 
     return new TomlParseResult() {
       @Override

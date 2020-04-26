@@ -373,6 +373,25 @@ class TomlTest {
   }
 
   @ParameterizedTest
+  @MethodSource("heterogeneousArraySupplier")
+  void shouldParseHeterogeneousArray(String input, Object[] expected) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    TomlArray array = result.getArray("foo");
+    assertNotNull(array);
+    assertEquals(expected.length, array.size());
+    assertTomlArrayEquals(expected, array);
+  }
+
+  static Stream<Arguments> heterogeneousArraySupplier() {
+    // @formatter:off
+    return Stream
+        .of(
+            Arguments.of("foo = [1, 'a']", new Object[] {1L, "a"}));
+    // @formatter:on
+  }
+
+  @ParameterizedTest
   @MethodSource("tableSupplier")
   void shouldParseTable(String input, String key, Object expected) {
     TomlParseResult result = Toml.parse(input);
@@ -539,7 +558,6 @@ class TomlTest {
 
         Arguments.of("foo = [", 1, 8, "Unexpected end of input, expected ], ', \", ''', \"\"\", a number, a boolean, a date/time, an array, a table, or a newline"),
         Arguments.of("foo = [ 1\n", 2, 1, "Unexpected end of input, expected ] or a newline"),
-        Arguments.of("foo = [ 1, 'bar' ]", 1, 12, "Cannot add a string to an array containing integers"),
         Arguments.of("foo = [ 1, 'bar ]\n", 1, 18, "Unexpected end of line, expected '"),
 
         Arguments.of("[]", 1, 1, "Empty table key"),
@@ -558,6 +576,25 @@ class TomlTest {
         Arguments.of("foo = []\n[[foo]]\nbar=2\n", 2, 1, "foo previously defined as a literal array at line 1, column 1"),
         Arguments.of("[[foo.bar]]\n[foo]\nbaz=2\nbar=3\n", 4, 1, "bar previously defined at line 1, column 1"),
         Arguments.of("[[foo]]\nbaz=1\n[[foo.bar]]\nbaz=2\n[foo.bar]\nbaz=3\n", 5, 1, "foo.bar previously defined at line 3, column 1")
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
+  @MethodSource("errorCaseSupplier_V0_5_0")
+  void shouldHandleParseErrors_V0_5_0(String input, int line, int column, String expected) {
+    TomlParseResult result = Toml.parse(input, TomlVersion.V0_5_0);
+    List<TomlParseError> errors = result.errors();
+    assertFalse(errors.isEmpty());
+    assertEquals(expected, errors.get(0).getMessage(), () -> joinErrors(result));
+    assertEquals(line, errors.get(0).position().line());
+    assertEquals(column, errors.get(0).position().column());
+  }
+
+  static Stream<Arguments> errorCaseSupplier_V0_5_0() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = [ 1, 'bar' ]", 1, 12, "Cannot add a string to an array containing integers")
     );
     // @formatter:on
   }

@@ -29,6 +29,11 @@ import org.antlr.v4.runtime.ParserRuleContext;
 final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   private static final Pattern zeroFloat = Pattern.compile("[+-]?0+(\\.[+-]?0*)?([eE].*)?");
+  private final TomlVersion version;
+
+  ValueVisitor(TomlVersion version) {
+    this.version = version;
+  }
 
   @Override
   public Object visitString(TomlParser.StringContext ctx) {
@@ -134,7 +139,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     if (valuesContext == null) {
       return EMPTY_ARRAY;
     }
-    return valuesContext.accept(new ArrayVisitor());
+    return valuesContext.accept(new ArrayVisitor(version));
   }
 
   @Override
@@ -143,7 +148,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     if (valuesContext == null) {
       return EmptyTomlTable.EMPTY_TABLE;
     }
-    return valuesContext.accept(new InlineTableVisitor());
+    return valuesContext.accept(new InlineTableVisitor(version));
   }
 
   @Override

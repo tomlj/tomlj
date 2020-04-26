@@ -37,51 +37,61 @@ public interface TomlArray {
 
   /**
    * @return {@code true} if the array contains strings.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsStrings();
 
   /**
    * @return {@code true} if the array contains longs.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsLongs();
 
   /**
    * @return {@code true} if the array contains doubles.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsDoubles();
 
   /**
    * @return {@code true} if the array contains booleans.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsBooleans();
 
   /**
    * @return {@code true} if the array contains {@link OffsetDateTime}s.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsOffsetDateTimes();
 
   /**
    * @return {@code true} if the array contains {@link LocalDateTime}s.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsLocalDateTimes();
 
   /**
    * @return {@code true} if the array contains {@link LocalDate}s.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsLocalDates();
 
   /**
    * @return {@code true} if the array contains {@link LocalTime}s.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsLocalTimes();
 
   /**
    * @return {@code true} if the array contains arrays.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsArrays();
 
   /**
    * @return {@code true} if the array contains tables.
+   * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsTables();
 
