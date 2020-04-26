@@ -32,7 +32,7 @@ final class InlineTableVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     TomlParser.KeyContext keyContext = ctx.key();
     TomlParser.ValContext valContext = ctx.val();
     if (keyContext != null && valContext != null) {
-      List<String> path = keyContext.accept(new KeyVisitor());
+      List<String> path = keyContext.accept(new KeyVisitor(version));
       if (path != null && !path.isEmpty()) {
         Object value = valContext.accept(new ValueVisitor(version));
         if (value != null) {

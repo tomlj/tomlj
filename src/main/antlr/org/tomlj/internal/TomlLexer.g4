@@ -125,7 +125,7 @@ ValueError : . -> type(Error), popMode;
 mode BasicStringMode;
 
 BasicStringEnd : '"' -> type(QuotationMark), popMode;
-BasicStringUnescaped : ~[\u0000-\u001F"\\\u007F] -> type(StringChar);
+BasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F"\\\u007F] -> type(StringChar);
 EscapeSequence
   : '\\' ~[\n]
   | '\\u' HexDig HexDig HexDig HexDig
@@ -139,7 +139,7 @@ mode MLBasicStringMode;
 
 MLBasicStringEnd : '"""' -> type(TripleQuotationMark), popMode;
 MLBasicStringLineEnd : '\\' [ \t]* NL { setText(System.lineSeparator()); } -> type(NewLine);
-MLBasicStringUnescaped : ~[\u0000-\u001F\\\u007F] -> type(StringChar);
+MLBasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F\\\u007F] -> type(StringChar);
 MLBasicStringEscape :
   ('\\u' HexDig HexDig HexDig HexDig
   | '\\U' HexDig HexDig HexDig HexDig HexDig HexDig HexDig HexDig

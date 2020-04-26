@@ -37,7 +37,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitString(TomlParser.StringContext ctx) {
-    return ctx.accept(new QuotedStringVisitor()).toString();
+    return ctx.accept(new QuotedStringVisitor(version)).toString();
   }
 
   @Override

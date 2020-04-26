@@ -95,6 +95,9 @@ class TomlTest {
                 "foo = \"bar \\b \\f \\n \\\\ \\u0053 \\U0010FfFf baz\"",
                 "bar \b \f \n \\ S \uDBFF\uDFFF baz"),
         Arguments.of(
+                "foo = \"I'm a string. \\\"You can quote me\\\". Name\tJos\\u00E9\\nLocation\\tSF.\"",
+                "I'm a string. \"You can quote me\". Name\tJosé\nLocation\tSF."),
+        Arguments.of(
                 "foo = \"\"\"\"\"\"",
                 ""),
         Arguments.of(
@@ -493,7 +496,6 @@ class TomlTest {
         Arguments.of("foo = 0b", 1, 8, "Unexpected 'b', expected a newline or end-of-input"),
         Arguments.of("foo = +", 1, 7, "Unexpected '+', expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
         Arguments.of("=", 1, 1, "Unexpected '=', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
-        Arguments.of("\"foo\tbar\" = 1", 1, 5, "Unexpected '\\t', expected \" or a character"),
         Arguments.of("\"foo \nbar\" = 1", 1, 6, "Unexpected end of line, expected \" or a character"),
         Arguments.of("foo = \"bar \\y baz\"", 1, 12, "Invalid escape sequence '\\y'"),
         Arguments.of("\u0011abc = 'foo'", 1, 1, "Unexpected '\\u0011', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
@@ -594,6 +596,7 @@ class TomlTest {
   static Stream<Arguments> errorCaseSupplier_V0_5_0() {
     // @formatter:off
     return Stream.of(
+        Arguments.of("\"foo\tbar\" = 1", 1, 5, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
         Arguments.of("foo = [ 1, 'bar' ]", 1, 12, "Cannot add a string to an array containing integers")
     );
     // @formatter:on

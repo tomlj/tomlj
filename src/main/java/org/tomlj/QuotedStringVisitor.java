@@ -12,31 +12,49 @@
  */
 package org.tomlj;
 
+import static org.tomlj.TomlVersion.V0_5_0;
+
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
+import org.antlr.v4.runtime.ParserRuleContext;
+
 final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
 
+  private final TomlVersion version;
   private final StringBuilder builder = new StringBuilder();
+
+  public QuotedStringVisitor(TomlVersion version) {
+    this.version = version;
+  }
 
   @Override
   public StringBuilder visitLiteralBody(TomlParser.LiteralBodyContext ctx) {
-    return builder.append(ctx.getText());
+    return appendText(ctx.getText(), ctx);
   }
 
   @Override
   public StringBuilder visitMlLiteralBody(TomlParser.MlLiteralBodyContext ctx) {
-    return builder.append(ctx.getText());
+    return appendText(ctx.getText(), ctx);
   }
 
   @Override
   public StringBuilder visitBasicUnescaped(TomlParser.BasicUnescapedContext ctx) {
-    return builder.append(ctx.getText());
+    return appendText(ctx.getText(), ctx);
   }
 
   @Override
   public StringBuilder visitMlBasicUnescaped(TomlParser.MlBasicUnescapedContext ctx) {
-    return builder.append(ctx.getText());
+    return appendText(ctx.getText(), ctx);
+  }
+
+  private StringBuilder appendText(String text, ParserRuleContext ctx) {
+    if (!(version.after(V0_5_0)) && text.indexOf('\t') != -1) {
+      throw new TomlParseError(
+          "Use \\t to represent a tab in a string (TOML versions before 1.0.0)",
+          new TomlPosition(ctx));
+    }
+    return builder.append(text);
   }
 
   @Override

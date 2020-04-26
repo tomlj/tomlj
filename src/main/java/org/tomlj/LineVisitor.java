@@ -41,7 +41,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       return table;
     }
     try {
-      List<String> path = keyContext.accept(new KeyVisitor());
+      List<String> path = keyContext.accept(new KeyVisitor(version));
       if (path == null || path.isEmpty()) {
         return table;
       }
@@ -67,7 +67,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
       return table;
     }
-    List<String> path = keyContext.accept(new KeyVisitor());
+    List<String> path = keyContext.accept(new KeyVisitor(version));
     if (path == null) {
       return table;
     }
@@ -86,7 +86,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
       return table;
     }
-    List<String> path = keyContext.accept(new KeyVisitor());
+    List<String> path = keyContext.accept(new KeyVisitor(version));
     if (path == null) {
       return table;
     }
