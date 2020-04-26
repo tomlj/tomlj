@@ -93,7 +93,7 @@ OctalInteger : '0o' Digit0_7 ('_'? Digit0_7)* -> popMode;
 BinaryInteger : '0b' Digit0_1 ('_'? Digit0_1)* -> popMode;
 
 // Float
-fragment Exp : [eE] DecInt;
+fragment Exp : [eE] '0'* DecInt;
 fragment Frac : '.' Digit ('_'? Digit)*;
 FloatingPoint : DecInt (Exp | Frac Exp?) -> popMode;
 FloatingPointInf: [-+]? 'inf' -> popMode;

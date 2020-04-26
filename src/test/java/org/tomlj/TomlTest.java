@@ -232,6 +232,7 @@ class TomlTest {
         Arguments.of("foo = 1.0", 1D),
         Arguments.of("foo = 43.55E34", 43.55E34D),
         Arguments.of("foo = 43.557_654E-34", 43.557654E-34D),
+        Arguments.of("foo = 1e06", 1E6),
         Arguments.of("foo = inf", Double.POSITIVE_INFINITY),
         Arguments.of("foo = +inf", Double.POSITIVE_INFINITY),
         Arguments.of("foo = -inf", Double.NEGATIVE_INFINITY),
