@@ -79,46 +79,90 @@ class TomlTest {
   void shouldParseString(String input, String expected) {
     TomlParseResult result = Toml.parse(input);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
-    assertEquals(expected, result.getString("foo"));
+    assertEquals(expected.replace("\n", System.lineSeparator()), result.getString("foo"));
   }
 
   static Stream<Arguments> stringSupplier() {
-    return Stream
-        .of(
-            Arguments.of("foo = \"\"", ""),
-            Arguments.of("foo = \"\\\"\"", "\""),
-            Arguments
-                .of("foo = \"bar \\b \\f \\n \\\\ \\u0053 \\U0010FfFf baz\"", "bar \b \f \n \\ S \uDBFF\uDFFF baz"),
-            Arguments.of("foo = \"\"\"\"\"\"", ""),
-            Arguments.of("foo = \"\"\"  foo\nbar\"\"\"", "  foo" + System.lineSeparator() + "bar"),
-            Arguments.of("foo = \"\"\"\n  foobar\"\"\"", "  foobar"),
-            Arguments.of("foo = \"\"\"\n  foo\nbar\"\"\"", "  foo" + System.lineSeparator() + "bar"),
-            Arguments.of("foo = \"\"\"\\n  foo\nbar\"\"\"", "\n  foo" + System.lineSeparator() + "bar"),
-            Arguments
-                .of(
-                    "foo = \"\"\"\n\n  foo\nbar\"\"\"",
-                    System.lineSeparator() + "  foo" + System.lineSeparator() + "bar"),
-            Arguments.of("foo = \"\"\"  foo \\  \nbar\"\"\"", "  foo " + System.lineSeparator() + "bar"),
-            Arguments.of("foo = \"\"\"  foo \\\nbar\"\"\"", "  foo " + System.lineSeparator() + "bar"),
-            Arguments.of("foo = \"\"\"  foo \\       \nbar\"\"\"", "  foo " + System.lineSeparator() + "bar"),
-            Arguments.of("foo = \"foobar#\" # comment", "foobar#"),
-            Arguments.of("foo = \"foobar#\"", "foobar#"),
-            Arguments.of("foo = \"foo \\\" bar #\" # \"baz\"", "foo \" bar #"),
-            Arguments.of("foo = ''", ""),
-            Arguments.of("foo = '\"'", "\""),
-            Arguments.of("foo = 'foobar \\'", "foobar \\"),
-            Arguments.of("foo = '''foobar \n'''", "foobar " + System.lineSeparator()),
-            Arguments.of("foo = '''\nfoobar \n'''", "foobar " + System.lineSeparator()),
-            Arguments.of("foo = '''\nfoobar \\    \n'''", "foobar \\    " + System.lineSeparator()),
-            Arguments.of("# I am a comment. Hear me roar. Roar.\nfoo = \"value\" # Yeah, you can do this.", "value"),
-            Arguments
-                .of(
-                    "foo = \"I'm a string. \\\"You can quote me\\\". Name\\tJos\\u00E9\\nLocation\\tSF.\"",
-                    "I'm a string. \"You can quote me\". Name\tJosé\nLocation\tSF."),
-            Arguments
-                .of(
-                    "foo=\"\"\"\nRoses are red\nViolets are blue\"\"\"",
-                    "Roses are red" + System.lineSeparator() + "Violets are blue"));
+    // @formatter:off
+    return Stream.of(
+        Arguments.of(
+                "foo = \"\"",
+                ""),
+        Arguments.of(
+                "foo = \"\\\"\"",
+                "\""),
+        Arguments.of(
+                "foo = \"bar \\b \\f \\n \\\\ \\u0053 \\U0010FfFf baz\"",
+                "bar \b \f \n \\ S \uDBFF\uDFFF baz"),
+        Arguments.of(
+                "foo = \"\"\"\"\"\"",
+                ""),
+        Arguments.of(
+                "foo = \"\"\"  foo\nbar\"\"\"",
+                "  foo\nbar"),
+        Arguments.of(
+                "foo = \"\"\"\n  foobar\"\"\"",
+                "  foobar"),
+        Arguments.of(
+                "foo = \"\"\"\n  foo\nbar\"\"\"",
+                "  foo\nbar"),
+        Arguments.of(
+                "foo = \"\"\"\\n  foo\nbar\"\"\"",
+                "\n  foo\nbar"),
+        Arguments.of(
+                "foo = \"\"\"\n\n  foo\nbar\"\"\"",
+                "\n  foo\nbar"),
+        Arguments.of(
+                "foo = \"\"\"  foo \\  \nbar\"\"\"",
+                "  foo \nbar"),
+        Arguments.of(
+                "foo = \"\"\"  foo \\\nbar\"\"\"",
+                "  foo \nbar"),
+        Arguments.of(
+                "foo = \"\"\"  foo \\       \nbar\"\"\"",
+                "  foo \nbar"),
+        Arguments.of(
+                "foo = \"foobar#\" # comment",
+                "foobar#"),
+        Arguments.of(
+                "foo = \"foobar#\"",
+                "foobar#"),
+        Arguments.of(
+                "foo = \"foobar #baz\"",
+                "foobar #baz"),
+        Arguments.of(
+                "foo = \"foo \\\" bar #\" # \"baz\"",
+                "foo \" bar #"),
+        Arguments.of(
+                "foo = ''",
+                ""),
+        Arguments.of(
+                "foo = '\"'",
+                "\""),
+        Arguments.of(
+                "foo = 'foobar \\'",
+                "foobar \\"),
+        Arguments.of(
+                "foo = '''foobar \n'''",
+                "foobar \n"),
+        Arguments.of(
+                "foo = '''\nfoobar \n'''",
+                "foobar \n"),
+        Arguments.of(
+                "foo = '''\nfoobar \\    \n'''",
+                "foobar \\    \n"),
+        Arguments.of(
+                "# I am a comment. Hear me roar. Roar.\n" +
+                "foo = \"value\" # Yeah, you can do this.",
+                "value"),
+        Arguments.of(
+                "foo = \"I'm a string. \\\"You can quote me\\\". Name\\tJos\\u00E9\\nLocation\\tSF.\"",
+                "I'm a string. \"You can quote me\". Name\tJosé\nLocation\tSF."),
+        Arguments.of(
+                "foo=\"\"\"\nRoses are red\nViolets are blue\"\"\"",
+                "Roses are red\nViolets are blue")
+        );
+    // @formatter:on
   }
 
   @Test
@@ -140,20 +184,22 @@ class TomlTest {
   }
 
   static Stream<Arguments> integerSupplier() {
-    return Stream
-        .of(
-            Arguments.of("foo = 1", 1L),
-            Arguments.of("foo = 0", 0L),
-            Arguments.of("foo = 100", 100L),
-            Arguments.of("foo = -9876", -9876L),
-            Arguments.of("foo = +5_433", 5433L),
-            Arguments.of("foo = 0xff", 255L),
-            Arguments.of("foo = 0xffbccd34", 4290563380L),
-            Arguments.of("foo = 0o7656", 4014L),
-            Arguments.of("foo = 0o0007_6543_21", 2054353L),
-            Arguments.of("foo = 0b11111100010101_0100000000111111111", 8466858495L),
-            Arguments.of("foo = 0b0000000_00000000000000000000000000", 0L),
-            Arguments.of("foo = 0b111111111111111111111111111111111", 8589934591L));
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = 1", 1L),
+        Arguments.of("foo = 0", 0L),
+        Arguments.of("foo = 100", 100L),
+        Arguments.of("foo = -9876", -9876L),
+        Arguments.of("foo = +5_433", 5433L),
+        Arguments.of("foo = 0xff", 255L),
+        Arguments.of("foo = 0xffbccd34", 4290563380L),
+        Arguments.of("foo = 0o7656", 4014L),
+        Arguments.of("foo = 0o0007_6543_21", 2054353L),
+        Arguments.of("foo = 0b11111100010101_0100000000111111111", 8466858495L),
+        Arguments.of("foo = 0b0000000_00000000000000000000000000", 0L),
+        Arguments.of("foo = 0b111111111111111111111111111111111", 8589934591L)
+    );
+    // @formatter:on
   }
 
   @ParameterizedTest
@@ -237,13 +283,15 @@ class TomlTest {
   }
 
   static Stream<Arguments> localDateTimeSupplier() {
-    return Stream
-        .of(
-            Arguments.of("foo = 1937-07-18T03:25:43", LocalDateTime.parse("1937-07-18T03:25:43")),
-            Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02")),
-            Arguments.of("foo = 0000-07-18 11:44:02.00", LocalDateTime.parse("0000-07-18T11:44:02")),
-            Arguments.of("foo = 1937-07-18 11:44:02.334543", LocalDateTime.parse("1937-07-18T11:44:02.334543")),
-            Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02")));
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = 1937-07-18T03:25:43", LocalDateTime.parse("1937-07-18T03:25:43")),
+        Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02")),
+        Arguments.of("foo = 0000-07-18 11:44:02.00", LocalDateTime.parse("0000-07-18T11:44:02")),
+        Arguments.of("foo = 1937-07-18 11:44:02.334543", LocalDateTime.parse("1937-07-18T11:44:02.334543")),
+        Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02"))
+    );
+    // @formatter:on
   }
 
   @ParameterizedTest
@@ -255,13 +303,15 @@ class TomlTest {
   }
 
   static Stream<Arguments> localDateSupplier() {
-    return Stream
-        .of(
-            Arguments.of("foo = 1937-07-18", LocalDate.parse("1937-07-18")),
-            Arguments.of("foo = 1937-07-18", LocalDate.parse("1937-07-18")),
-            Arguments.of("foo = 0000-07-18", LocalDate.parse("0000-07-18")),
-            Arguments.of("foo = 1937-07-18", LocalDate.parse("1937-07-18")),
-            Arguments.of("foo = 1937-07-18", LocalDate.parse("1937-07-18")));
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = 1937-07-18", LocalDate.parse("1937-07-18")),
+        Arguments.of("foo = 1937-07-18", LocalDate.parse("1937-07-18")),
+        Arguments.of("foo = 0000-07-18", LocalDate.parse("0000-07-18")),
+        Arguments.of("foo = 1937-07-18", LocalDate.parse("1937-07-18")),
+        Arguments.of("foo = 1937-07-18", LocalDate.parse("1937-07-18"))
+    );
+    // @formatter:on
   }
 
   @ParameterizedTest
@@ -273,13 +323,15 @@ class TomlTest {
   }
 
   static Stream<Arguments> localTimeSupplier() {
-    return Stream
-        .of(
-            Arguments.of("foo = 03:25:43", LocalTime.parse("03:25:43")),
-            Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02")),
-            Arguments.of("foo = 11:44:02.00", LocalTime.parse("11:44:02")),
-            Arguments.of("foo = 11:44:02.334543", LocalTime.parse("11:44:02.334543")),
-            Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02")));
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = 03:25:43", LocalTime.parse("03:25:43")),
+        Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02")),
+        Arguments.of("foo = 11:44:02.00", LocalTime.parse("11:44:02")),
+        Arguments.of("foo = 11:44:02.334543", LocalTime.parse("11:44:02.334543")),
+        Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02"))
+    );
+    // @formatter:on
   }
 
   @ParameterizedTest
@@ -295,29 +347,28 @@ class TomlTest {
 
   static Stream<Arguments> arraySupplier() {
     // @formatter:off
-    return Stream
-        .of(
-            Arguments.of("foo = []", new Object[0]),
-            Arguments.of("foo = [\n]", new Object[0]),
-            Arguments.of("foo = [1]", new Object[] {1L}),
-            Arguments.of("foo = [ \"bar\"\n]", new Object[] {"bar"}),
-            Arguments.of("foo = [11:44:02]", new Object[] {LocalTime.parse("11:44:02")}),
-            Arguments.of("foo = [1993-08-04]", new Object[] {LocalDate.of(1993, 8, 4)}),
-            Arguments.of("foo = [11:44:02,]", new Object[] {LocalTime.parse("11:44:02")}),
-            Arguments.of("foo = [\n'bar', #baz\n]", new Object[] {"bar"}),
-            Arguments.of("foo = ['bar', 'baz']", new Object[] {"bar", "baz"}),
-            Arguments.of("foo = [1993-08-04,1993-08-04]",
-                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
-            Arguments.of("foo = [1993-08-04,1993-08-04,]",
-                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
-            Arguments.of("foo = [1993-08-04,1993-08-04   ]",
-                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
-            Arguments.of("foo = [ 1993-08-04 , 1993-08-04   ]",
-                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
-            Arguments.of("foo = [ 1993-08-04 , 1993-08-04   , ]",
-                    new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
-            Arguments.of("foo = [\n'''bar\nbaz''',\n'baz'\n]", new Object[] {"bar" + System.lineSeparator() + "baz", "baz"}),
-            Arguments.of("foo = [['bar']]", new Object[] {new Object[] {"bar"}}));
+    return Stream.of(
+        Arguments.of("foo = []", new Object[0]),
+        Arguments.of("foo = [\n]", new Object[0]),
+        Arguments.of("foo = [1]", new Object[] {1L}),
+        Arguments.of("foo = [ \"bar\"\n]", new Object[] {"bar"}),
+        Arguments.of("foo = [11:44:02]", new Object[] {LocalTime.parse("11:44:02")}),
+        Arguments.of("foo = [1993-08-04]", new Object[] {LocalDate.of(1993, 8, 4)}),
+        Arguments.of("foo = [11:44:02,]", new Object[] {LocalTime.parse("11:44:02")}),
+        Arguments.of("foo = [\n'bar', #baz\n]", new Object[] {"bar"}),
+        Arguments.of("foo = ['bar', 'baz']", new Object[] {"bar", "baz"}),
+        Arguments.of("foo = [1993-08-04,1993-08-04]",
+                new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+        Arguments.of("foo = [1993-08-04,1993-08-04,]",
+                new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+        Arguments.of("foo = [1993-08-04,1993-08-04   ]",
+                new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+        Arguments.of("foo = [ 1993-08-04 , 1993-08-04   ]",
+                new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+        Arguments.of("foo = [ 1993-08-04 , 1993-08-04   , ]",
+                new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
+        Arguments.of("foo = [\n'''bar\nbaz''',\n'baz'\n]", new Object[] {"bar" + System.lineSeparator() + "baz", "baz"}),
+        Arguments.of("foo = [['bar']]", new Object[] {new Object[] {"bar"}}));
     // @formatter:on
   }
 
@@ -330,12 +381,13 @@ class TomlTest {
   }
 
   static Stream<Arguments> tableSupplier() {
-    return Stream
-        .of(
-            Arguments.of("[foo]\nbar = 'baz'", "foo.bar", "baz"),
-            Arguments.of("[foo] #foo.bar\nbar = 'baz'", "foo.bar", "baz"),
-            Arguments.of("[foo]\n[foo.bar]\nbaz = 'buz'", "foo.bar.baz", "buz"),
-            Arguments.of("[foo.bar]\nbaz=1\n[foo]\nbaz=2", "foo.baz", 2L));
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("[foo]\nbar = 'baz'", "foo.bar", "baz"),
+        Arguments.of("[foo] #foo.bar\nbar = 'baz'", "foo.bar", "baz"),
+        Arguments.of("[foo]\n[foo.bar]\nbaz = 'buz'", "foo.bar.baz", "buz"),
+        Arguments.of("[foo.bar]\nbaz=1\n[foo]\nbaz=2", "foo.baz", 2L));
+    // @formatter:on
   }
 
   @ParameterizedTest
@@ -347,14 +399,16 @@ class TomlTest {
   }
 
   static Stream<Arguments> inlineTableSupplier() {
-    return Stream
-        .of(
-            Arguments.of("foo = {}", "foo.bar", null),
-            Arguments.of("foo = { bar = 'baz' }", "foo.bar", "baz"),
-            Arguments.of("foo = { bar = 'baz', baz.buz = 2 }", "foo.baz.buz", 2L),
-            Arguments.of("foo = { bar = ['baz', 'buz']   , baz  .   buz = 2 }", "foo.baz.buz", 2L),
-            Arguments.of("foo = { bar = ['baz',\n'buz'\n], baz.buz = 2 }", "foo.baz.buz", 2L),
-            Arguments.of("bar = { bar = ['baz',\n'buz'\n], baz.buz = 2 }\nfoo=2\n", "foo", 2L));
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = {}", "foo.bar", null),
+        Arguments.of("foo = { bar = 'baz' }", "foo.bar", "baz"),
+        Arguments.of("foo = { bar = 'baz', baz.buz = 2 }", "foo.baz.buz", 2L),
+        Arguments.of("foo = { bar = ['baz', 'buz']   , baz  .   buz = 2 }", "foo.baz.buz", 2L),
+        Arguments.of("foo = { bar = ['baz',\n'buz'\n], baz.buz = 2 }", "foo.baz.buz", 2L),
+        Arguments.of("bar = { bar = ['baz',\n'buz'\n], baz.buz = 2 }\nfoo=2\n", "foo", 2L)
+    );
+    // @formatter:on
   }
 
   @ParameterizedTest
@@ -379,26 +433,24 @@ class TomlTest {
   }
 
   static Stream<Arguments> arrayTableSupplier() {
-    return Stream
-        .of(
-            Arguments.of("[[foo]]\nbar = 'baz'", new Object[] {"foo", 0, "bar"}, "baz"),
-            Arguments.of("[[foo]] #foo.bar\nbar = 'baz'", new Object[] {"foo", 0, "bar"}, "baz"),
-            Arguments.of("[[foo]] \n   bar = 'buz'\nbuz=1\n", new Object[] {"foo", 0, "buz"}, 1L),
-            Arguments.of("[[foo]] \n   bar = 'buz'\n[[foo]]\nbar=1\n", new Object[] {"foo", 0, "bar"}, "buz"),
-            Arguments.of("[[foo]] \n   bar = 'buz'\n[[foo]]\nbar=1\n", new Object[] {"foo", 1, "bar"}, 1L),
-            Arguments.of("[[foo]]\nbar=1\n[[foo]]\nbar=2\n", new Object[] {"foo", 0, "bar"}, 1L),
-            Arguments.of("[[foo]]\nbar=1\n[[foo]]\nbar=2\n", new Object[] {"foo", 1, "bar"}, 2L),
-            Arguments.of("[[foo]]\n\n[foo.bar]\n\nbaz=2\n\n", new Object[] {"foo", 0, "bar", "baz"}, 2L),
-            Arguments
-                .of(
-                    "[[foo]]\n[[foo.bar]]\n[[foo.baz]]\n[foo.bar.baz]\nbuz=2\n[foo.baz.buz]\nbiz=3\n",
-                    new Object[] {"foo", 0, "bar", 0, "baz", "buz"},
-                    2L),
-            Arguments
-                .of(
-                    "[[foo]]\n[[foo.bar]]\n[[foo.baz]]\n[foo.bar.baz]\nbuz=2\n[foo.baz.buz]\nbiz=3\n",
-                    new Object[] {"foo", 0, "baz", 0, "buz", "biz"},
-                    3L));
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("[[foo]]\nbar = 'baz'", new Object[] {"foo", 0, "bar"}, "baz"),
+        Arguments.of("[[foo]] #foo.bar\nbar = 'baz'", new Object[] {"foo", 0, "bar"}, "baz"),
+        Arguments.of("[[foo]] \n   bar = 'buz'\nbuz=1\n", new Object[] {"foo", 0, "buz"}, 1L),
+        Arguments.of("[[foo]] \n   bar = 'buz'\n[[foo]]\nbar=1\n", new Object[] {"foo", 0, "bar"}, "buz"),
+        Arguments.of("[[foo]] \n   bar = 'buz'\n[[foo]]\nbar=1\n", new Object[] {"foo", 1, "bar"}, 1L),
+        Arguments.of("[[foo]]\nbar=1\n[[foo]]\nbar=2\n", new Object[] {"foo", 0, "bar"}, 1L),
+        Arguments.of("[[foo]]\nbar=1\n[[foo]]\nbar=2\n", new Object[] {"foo", 1, "bar"}, 2L),
+        Arguments.of("[[foo]]\n\n[foo.bar]\n\nbaz=2\n\n", new Object[] {"foo", 0, "bar", "baz"}, 2L),
+        Arguments.of(
+                "[[foo]]\n[[foo.bar]]\n[[foo.baz]]\n[foo.bar.baz]\nbuz=2\n[foo.baz.buz]\nbiz=3\n",
+                new Object[] {"foo", 0, "bar", 0, "baz", "buz"}, 2L),
+        Arguments.of(
+                "[[foo]]\n[[foo.bar]]\n[[foo.baz]]\n[foo.bar.baz]\nbuz=2\n[foo.baz.buz]\nbiz=3\n",
+                new Object[] {"foo", 0, "baz", 0, "buz", "biz"}, 3L)
+    );
+    // @formatter:on
   }
 
   @ParameterizedTest
