@@ -3,7 +3,7 @@
 TomlJ is a complete [TOML](https://github.com/toml-lang/toml) parser with the
 following attributes:
 
-* Supports the latest TOML specification version (0.5.0).
+* Supports the latest TOML specification version (1.0.0-rc.1).
 * Provides detailed error reporting, including error position.
 * Performs error recovery, allowing parsing to continue after an error.
 
