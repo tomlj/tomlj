@@ -65,12 +65,13 @@ final class JsonSerializer {
     }
 
     appendable.append("[");
+    Optional<TomlType> tomlType = Optional.empty();
     for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext();) {
       Object tomlValue = iterator.next();
-      Optional<TomlType> tomlType = typeFor(tomlValue);
+      tomlType = typeFor(tomlValue);
       assert tomlType.isPresent();
       if (tomlType.get().equals(TABLE)) {
-        toJson((TomlTable) iterator.next(), appendable, indent);
+        toJson((TomlTable) tomlValue, appendable, indent);
       } else {
         appendable.append(System.lineSeparator());
         indentLine(appendable, indent + 2);
@@ -83,7 +84,11 @@ final class JsonSerializer {
         appendable.append(System.lineSeparator());
       }
     }
-    append(appendable, indent, "]");
+    if (tomlType.isPresent() && tomlType.get().equals(TABLE)) {
+      appendable.append("]");
+    } else {
+      append(appendable, indent, "]");
+    }
   }
 
   private static void appendTomlValue(Object value, Appendable appendable, int indent) throws IOException {

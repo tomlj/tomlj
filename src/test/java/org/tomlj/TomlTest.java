@@ -661,6 +661,19 @@ class TomlTest {
   }
 
   @Test
+  void testArrayTables() throws Exception {
+    String expectedJson =
+        new Scanner(this.getClass().getResourceAsStream("/org/tomlj/array_table_example.json"), "UTF-8")
+            .useDelimiter("\\A")
+            .next();
+    InputStream is = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.toml");
+    assertNotNull(is);
+    TomlParseResult result = Toml.parse(is);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
+  }
+
+  @Test
   void testDottedKeyOrder() throws Exception {
     TomlParseResult result1 = Toml.parse("[dog.\"tater.man\"]\ntype.name = \"pug\"");
     assertFalse(result1.hasErrors(), () -> joinErrors(result1));
