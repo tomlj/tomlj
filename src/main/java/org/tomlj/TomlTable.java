@@ -1239,4 +1239,30 @@ public interface TomlTable {
   default void toJson(Appendable appendable) throws IOException {
     JsonSerializer.toJson(this, appendable);
   }
+
+  /**
+   * Return a representation of this table using TOML.
+   *
+   * @return A TOML representation of this table.
+   */
+  default String toToml() {
+    StringBuilder builder = new StringBuilder();
+    try {
+      toToml(builder);
+    } catch (IOException e) {
+      // not reachable
+      throw new UncheckedIOException(e);
+    }
+    return builder.toString();
+  }
+
+  /**
+   * Append a TOML representation of this table to the appendable output.
+   *
+   * @param appendable The appendable output.
+   * @throws IOException If an IO error occurs.
+   */
+  default void toToml(Appendable appendable) throws IOException {
+    TomlSerializer.toToml(this, appendable);
+  }
 }
