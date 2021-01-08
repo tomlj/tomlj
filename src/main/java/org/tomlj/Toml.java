@@ -216,6 +216,14 @@ public final class Toml {
         out.append("\\'");
         continue;
       }
+      if (ch == '\"') {
+        out.append("\\\"");
+        continue;
+      }
+      if (ch == '\\') {
+        out.append("\\\\");
+        continue;
+      }
       if (ch >= 0x20 && ch < 0x7F) {
         out.append(ch);
         continue;
