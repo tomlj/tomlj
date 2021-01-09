@@ -17,6 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.tomlj.TomlType.ARRAY;
+import static org.tomlj.TomlType.TABLE;
+import static org.tomlj.TomlType.typeFor;
 
 import java.io.InputStream;
 import java.time.LocalDate;
@@ -26,6 +29,8 @@ import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -764,5 +769,89 @@ class TomlTest {
         assertEquals(expected[i], obj);
       }
     }
+  }
+
+  private static boolean arrayEquals(TomlArray array, TomlArray array2) {
+    if (array.size() != array2.size()) {
+      return false;
+    }
+
+    for (int i = 0; i < array.size(); i++) {
+      Object value1 = array.get(i);
+      Object value2 = array2.get(i);
+
+      Optional<TomlType> tomlType = typeFor(value1);
+      assert tomlType.isPresent();
+
+      Optional<TomlType> tomlType2 = typeFor(value2);
+      assert tomlType2.isPresent();
+
+      if (tomlType.get() != tomlType2.get()) {
+        return false;
+      }
+
+      if (tomlType.get().equals(TABLE)) {
+        if (!tableEquals((TomlTable) value1, (TomlTable) value2)) {
+          return false;
+        }
+      } else if (tomlType.get().equals(ARRAY)) {
+        if (!arrayEquals((TomlArray) value1, (TomlArray) value2)) {
+          return false;
+        }
+      } else {
+        if (!value1.equals(value2)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  private static boolean tableEquals(TomlTable table, TomlTable table2) {
+    if (table.entrySet().size() != table2.entrySet().size()) {
+      return false;
+    }
+    for (Map.Entry<String, Object> entry : table.entrySet()) {
+      String key = entry.getKey();
+      if (!table2.keySet().contains(key)) {
+        return false;
+      }
+
+      Object value1 = entry.getValue();
+      Optional<Map.Entry<String, Object>> value2Entry =
+          table2.entrySet().stream().filter(entry2 -> entry2.getKey().equals(key)).findFirst();
+
+      if (!value2Entry.isPresent()) {
+        return false;
+      }
+
+      Object value2 = value2Entry.get().getValue();
+
+      Optional<TomlType> tomlType = typeFor(value1);
+      assert tomlType.isPresent();
+
+      Optional<TomlType> tomlType2 = typeFor(value2);
+      assert tomlType2.isPresent();
+
+      if (tomlType.get() != tomlType2.get()) {
+        return false;
+      }
+
+      if (tomlType.get().equals(TABLE)) {
+        if (!tableEquals((TomlTable) value1, (TomlTable) value2)) {
+          return false;
+        }
+      } else if (tomlType.get().equals(ARRAY)) {
+        if (!arrayEquals((TomlArray) value1, (TomlArray) value2)) {
+          return false;
+        }
+      } else {
+        if (!value1.equals(value2)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 }
