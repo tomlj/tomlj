@@ -21,7 +21,9 @@ import static org.tomlj.TomlType.ARRAY;
 import static org.tomlj.TomlType.TABLE;
 import static org.tomlj.TomlType.typeFor;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -753,6 +755,21 @@ class TomlTest {
     TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
     assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
+  }
+
+  @Test
+  void testSerializerArrayTables() throws Exception {
+    InputStream is = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.toml");
+    assertNotNull(is);
+    TomlParseResult result = Toml.parse(is);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+
+    String serializedToml = result.toToml();
+    TomlParseResult resultReparse =
+        Toml.parse(new ByteArrayInputStream(serializedToml.getBytes(StandardCharsets.UTF_8)));
+    assertFalse(resultReparse.hasErrors(), () -> joinErrors(result));
+
+    assertTrue(tableEquals(result, resultReparse));
   }
 
   private String joinErrors(TomlParseResult result) {
