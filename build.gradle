@@ -180,11 +180,15 @@ dependencies {
 //////
 // Packaging
 
+ext.moduleName = "org.tomlj"
+
 jar {
   destinationDir = file("${rootProject.buildDir}/libs")
+  inputs.property("moduleName", moduleName)
   manifest {
     attributes('Implementation-Title': project.name,
-    'Implementation-Version': project.version)
+    'Implementation-Version': project.version,
+    'Automatic-Module-Name': moduleName)
   }
 }
 
