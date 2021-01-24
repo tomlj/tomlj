@@ -169,7 +169,7 @@ dependencies {
   antlr 'org.antlr:antlr4'
 
   compile 'org.antlr:antlr4-runtime'
-  compile 'com.google.code.findbugs:jsr305'
+  compile 'org.checkerframework:checker-qual:3.9.1'
 
   testCompile 'org.junit.jupiter:junit-jupiter-api'
   testCompile 'org.junit.jupiter:junit-jupiter-params'

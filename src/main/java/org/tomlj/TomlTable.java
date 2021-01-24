@@ -32,7 +32,8 @@ import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
+
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * An interface for accessing data stored in Tom's Obvious, Minimal Language (TOML).
