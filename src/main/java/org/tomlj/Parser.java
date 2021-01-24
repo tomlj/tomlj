@@ -18,12 +18,12 @@ import org.tomlj.internal.TomlParser;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 final class Parser {
   private Parser() {}

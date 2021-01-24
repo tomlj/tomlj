@@ -12,7 +12,7 @@
  */
 package org.tomlj;
 
-import javax.annotation.Nullable;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Supported TOML specification versions.

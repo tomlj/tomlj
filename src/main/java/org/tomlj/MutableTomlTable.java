@@ -26,7 +26,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.annotation.Nullable;
+
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 final class MutableTomlTable implements TomlTable {
 
