@@ -9,7 +9,6 @@ plugins {
   id 'signing'
   id 'com.diffplug.spotless' version '6.11.0'
   id "com.github.hierynomus.license-report" version "0.16.1"
-  id 'com.jfrog.bintray' version '1.8.5'
   id 'io.spring.dependency-management' version '1.0.14.RELEASE'
   id 'net.ltgt.errorprone' version '3.0.1'
 }
@@ -301,42 +300,3 @@ model {
   }
   tasks.publishMavenDeploymentPublicationToMavenLocal { dependsOn project.tasks.signArchives }
 }
-
-def artifactIdMatcher = Pattern.compile("(.*)-\\d.*")
-bintray {
-  user = System.getenv('BINTRAY_USER')
-  key = System.getenv('BINTRAY_KEY')
-  publications = ['MavenDeployment']
-  filesSpec {
-    project.extensions.getByType(PublishingExtension).publications.all { publication ->
-      publication.getArtifacts().all {
-        def ascFile = new File(it.file.getParentFile(), it.file.getName() + '.asc')
-        if (ascFile.exists()) {
-          def matcher = artifactIdMatcher.matcher(it.file.getName())
-          matcher.find()
-          def artifactId = matcher.group(1)
-          from ascFile.getAbsolutePath()
-          into publication.groupId.replaceAll('\\.', '/') + '/' + artifactId + '/' + publication.version + '/'
-        }
-      }
-    }
-  }
-  dryRun = !(System.getenv('BINTRAY_DEPLOY') == 'true')
-  publish = true
-  pkg {
-    userOrg = 'tomlj'
-    repo = 'tomlj'
-    name = 'tomlj'
-    websiteUrl = 'https://github.com/tomlj/tomlj'
-    vcsUrl = 'https://github.com/tomlj/tomlj'
-    licenses = ['Apache-2.0']
-    version {
-      name = project.version
-      desc = 'A parser for Tom\'s Obvious, Minimal Language (TOML).'
-      released = new Date()
-      vcsTag = project.version
-    }
-  }
-}
-
-deploy.dependsOn bintrayUpload
