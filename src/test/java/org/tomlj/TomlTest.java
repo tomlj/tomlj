@@ -844,6 +844,26 @@ class TomlTest {
     assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
   }
 
+  @Test
+  void testTableEquality() throws Exception {
+    InputStream is = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.toml");
+    assertNotNull(is);
+    TomlParseResult result = Toml.parse(is);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    assertTrue(Toml.tableEquals(result, result));
+  }
+
+  @Test
+  void testTableInequality() throws Exception {
+    TomlParseResult result1 = Toml.parse("[test]\nfoo='bar'\nfruit=['apple','banana']");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+
+    TomlParseResult result2 = Toml.parse("[test]\nfoo='baz'\nfruit=['strawberry','raspberry']");
+    assertFalse(result2.hasErrors(), () -> joinErrors(result2));
+
+    assertFalse(Toml.tableEquals(result1, result2));
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }
