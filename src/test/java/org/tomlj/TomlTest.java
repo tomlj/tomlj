@@ -910,6 +910,21 @@ class TomlTest {
     assertTrue(Toml.equals(result, resultReparse));
   }
 
+  @Test
+  void testSerializerHardExample() throws Exception {
+    InputStream is = this.getClass().getResourceAsStream("/org/tomlj/hard_example.toml");
+    assertNotNull(is);
+    TomlParseResult result = Toml.parse(is);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+
+    String serializedToml = result.toToml();
+    TomlParseResult resultReparse =
+        Toml.parse(new ByteArrayInputStream(serializedToml.getBytes(StandardCharsets.UTF_8)));
+    assertFalse(resultReparse.hasErrors(), () -> joinErrors(result));
+
+    assertTrue(Toml.equals(result, resultReparse));
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }
