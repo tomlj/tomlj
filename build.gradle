@@ -278,13 +278,15 @@ publishing {
       }
     }
   }
-  repositories {
-    maven {
-      credentials {
-        username = "$ossrhUsername"
-        password = "$ossrhPassword"
+  if (System.getenv('MAVEN_CENTRAL_DEPLOY') == 'true') {
+    repositories {
+      maven {
+        credentials {
+          username = "$ossrhUsername"
+          password = "$ossrhPassword"
+        }
+        url "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
       }
-      url "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
     }
   }
 }
