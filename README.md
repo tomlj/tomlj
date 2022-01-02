@@ -35,7 +35,7 @@ To include using Maven:
 </dependency>
 ```
 
-To include using Gradle: `compile 'org.tomlj:tomlj:1.0.0'`
+To include using Gradle: `implementation 'org.tomlj:tomlj:1.0.0'`
 
 Snapshot versions are also published to the [bintray repository](https://bintray.com/tomlj/tomlj/tomlj).
 
