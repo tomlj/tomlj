@@ -169,7 +169,7 @@ dependencies {
   antlr 'org.antlr:antlr4'
 
   compile 'org.antlr:antlr4-runtime'
-  compile 'org.checkerframework:checker-qual:3.9.1'
+  implementation 'org.checkerframework:checker-qual:3.9.1'
 
   testImplementation 'org.junit.jupiter:junit-jupiter-api'
   testImplementation 'org.junit.jupiter:junit-jupiter-params'
