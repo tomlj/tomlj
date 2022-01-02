@@ -31,6 +31,8 @@ public final class TomlParseError extends RuntimeException {
   }
 
   /**
+   * The position in the input where the error occurred.
+   *
    * @return The position in the input where the error occurred.
    */
   public TomlPosition position() {
