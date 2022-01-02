@@ -7,11 +7,11 @@ plugins {
   id 'jacoco'
   id 'maven-publish'
   id 'signing'
-  id 'com.diffplug.gradle.spotless' version '3.23.0'
-  id "com.github.hierynomus.license-report" version "0.15.0"
-  id 'com.jfrog.bintray' version '1.8.4'
-  id 'io.spring.dependency-management' version '1.0.7.RELEASE'
-  id 'net.ltgt.errorprone' version '0.7'
+  id 'com.diffplug.spotless' version '6.1.0'
+  id "com.github.hierynomus.license-report" version "0.16.1"
+  id 'com.jfrog.bintray' version '1.8.5'
+  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+  id 'net.ltgt.errorprone' version '2.0.2'
 }
 
 description = 'A parser for Tom\'s Obvious, Minimal Language (TOML).'
@@ -37,7 +37,7 @@ static String buildTag() {
 //////
 // Dependencies and licensing checks
 
-repositories { jcenter() }
+repositories { mavenCentral() }
 
 apply from: "${rootDir}/dependency-versions.gradle"
 apply from: "${rootDir}/gradle/check-licenses.gradle"
@@ -103,7 +103,7 @@ configurations {
 sourceCompatibility = '1.8'
 targetCompatibility = '1.8'
 
-jacoco { toolVersion = '0.8.2' }
+jacoco { toolVersion = '0.8.7' }
 
 tasks.withType(JavaCompile) {
   // Until https://github.com/gradle/gradle/issues/2510 is resolved and
@@ -124,7 +124,7 @@ tasks.withType(JavaCompile) {
   ]
 
   options.errorprone {
-    excludedPaths '.*/generated-src/.*'
+    excludedPaths = '.*/generated-src/.*'
     check('UnnecessaryParentheses', CheckSeverity.OFF)
     disableWarningsInGeneratedCode = true
   }
@@ -143,9 +143,9 @@ test { useJUnitPlatform() }
 
 task jacocoRootTestReport(type: JacocoReport) {
   reports {
-    html.enabled = true
-    xml.enabled = true
-    csv.enabled = false
+    html.required = true
+    xml.required = true
+    csv.required = false
   }
   doFirst {
     executionData = files(executionData.findAll { it.exists() })
@@ -169,19 +169,19 @@ dependencies {
   antlr 'org.antlr:antlr4'
 
   compile 'org.antlr:antlr4-runtime'
-  compile 'com.google.code.findbugs:jsr305'
+  implementation 'com.google.code.findbugs:jsr305'
 
-  testCompile 'org.junit.jupiter:junit-jupiter-api'
-  testCompile 'org.junit.jupiter:junit-jupiter-params'
+  testImplementation 'org.junit.jupiter:junit-jupiter-api'
+  testImplementation 'org.junit.jupiter:junit-jupiter-params'
 
-  testRuntime 'org.junit.jupiter:junit-jupiter-engine'
+  testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
 }
 
 //////
 // Packaging
 
 jar {
-  destinationDir = file("${rootProject.buildDir}/libs")
+  destinationDirectory = file("${rootProject.buildDir}/libs")
   manifest {
     attributes('Implementation-Title': project.name,
     'Implementation-Version': project.version)
@@ -189,13 +189,13 @@ jar {
 }
 
 task sourcesJar(type: Jar, dependsOn: classes) {
-  destinationDir = file("${rootProject.buildDir}/src")
+  destinationDirectory = file("${rootProject.buildDir}/src")
   classifier = 'sources'
   from sourceSets.main.allSource
 }
 
 task javadocJar(type: Jar, dependsOn: javadoc) {
-  destinationDir = file("${rootProject.buildDir}/docs")
+  destinationDirectory = file("${rootProject.buildDir}/docs")
   classifier = 'javadoc'
   from javadoc.destinationDir
 }
@@ -219,10 +219,10 @@ publishing {
       artifact sourcesJar { classifier 'sources' }
       artifact javadocJar { classifier 'javadoc' }
       groupId 'org.tomlj'
-      artifactId project.jar.baseName
+      artifactId project.archivesBaseName
       version project.version
       pom {
-        name = project.jar.baseName
+        name = project.archivesBaseName
         description = project.description
         url = 'https://github.com/tomlj/tomlj'
         licenses {
