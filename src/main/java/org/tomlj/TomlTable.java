@@ -40,11 +40,15 @@ import javax.annotation.Nullable;
 public interface TomlTable {
 
   /**
+   * Return the number of entries in tis table.
+   *
    * @return The number of entries in tis table.
    */
   int size();
 
   /**
+   * {@code true} if there are no entries in this table.
+   *
    * @return {@code true} if there are no entries in this table.
    */
   boolean isEmpty();

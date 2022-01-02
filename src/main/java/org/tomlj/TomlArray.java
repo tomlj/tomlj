@@ -26,70 +26,94 @@ import java.util.List;
 public interface TomlArray {
 
   /**
+   * The size of the array.
+   *
    * @return The size of the array.
    */
   int size();
 
   /**
+   * {@code true} if the array is empty.
+   *
    * @return {@code true} if the array is empty.
    */
   boolean isEmpty();
 
   /**
+   * {@code true} if the array contains strings.
+   *
    * @return {@code true} if the array contains strings.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsStrings();
 
   /**
+   * {@code true} if the array contains longs.
+   *
    * @return {@code true} if the array contains longs.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsLongs();
 
   /**
+   * {@code true} if the array contains doubles.
+   *
    * @return {@code true} if the array contains doubles.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsDoubles();
 
   /**
+   * {@code true} if the array contains booleans.
+   *
    * @return {@code true} if the array contains booleans.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsBooleans();
 
   /**
+   * {@code true} if the array contains {@link OffsetDateTime}s.
+   *
    * @return {@code true} if the array contains {@link OffsetDateTime}s.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsOffsetDateTimes();
 
   /**
+   * {@code true} if the array contains {@link LocalDateTime}s.
+   *
    * @return {@code true} if the array contains {@link LocalDateTime}s.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsLocalDateTimes();
 
   /**
+   * {@code true} if the array contains {@link LocalDate}s.
+   *
    * @return {@code true} if the array contains {@link LocalDate}s.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsLocalDates();
 
   /**
+   * {@code true} if the array contains {@link LocalTime}s.
+   *
    * @return {@code true} if the array contains {@link LocalTime}s.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsLocalTimes();
 
   /**
+   * {@code true} if the array contains arrays.
+   *
    * @return {@code true} if the array contains arrays.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
   boolean containsArrays();
 
   /**
+   * {@code true} if the array contains tables.
+   *
    * @return {@code true} if the array contains tables.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
