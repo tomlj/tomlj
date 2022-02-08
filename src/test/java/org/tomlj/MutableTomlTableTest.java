@@ -78,7 +78,6 @@ class MutableTomlTableTest {
     table.set("foo.bar", "one", positionAt(1, 3));
     TomlParseError e = assertThrows(TomlParseError.class,
             () -> table.set("foo.bar", "two", positionAt(2, 5)));
-
     assertEquals("foo.bar previously defined at line 1, column 3", e.getMessage());
   }
 
