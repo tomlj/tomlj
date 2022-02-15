@@ -15,6 +15,7 @@ package org.tomlj;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -63,6 +64,13 @@ class TomlTest {
     assertFalse(result.hasErrors(), () -> joinErrors(result));
     assertEquals(Long.valueOf(10), result.getLong(Arrays.asList("foo", " bar\t", "-baz")));
   }
+
+  @Test
+  void shouldThrowExceptionForInvalidDottedKey() {
+    Exception exception =
+        assertThrows(IllegalArgumentException.class, () -> Toml.parseDottedKey(" foo  . bar@ . -baz"));
+    assertEquals("Invalid key: Unexpected '@', expected . or end-of-input", exception.getMessage());
+  }  
 
   @Test
   void shouldNotParseDottedKeysAtV0_4_0OrEarlier() {
