@@ -16,7 +16,7 @@ package org.tomlj;
  * An error that occurred while parsing.
  */
 @SuppressWarnings("OverrideThrowableToString")
-public final class TomlParseError extends RuntimeException {
+public class TomlParseError extends RuntimeException {
 
   private final TomlPosition position;
 

@@ -12,12 +12,6 @@
  */
 package org.tomlj;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,9 +25,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 class TomlTest {
 
@@ -66,7 +63,8 @@ class TomlTest {
 
   @Test
   void shouldNotParseDottedKeysAtV0_4_0OrEarlier() {
-    TomlParseResult result = Toml.parse("[foo]\n bar.baz = 1", TomlVersion.V0_4_0);
+    TomlParseSettings settings = new TomlParseSettings(TomlVersion.V0_4_0, false);
+    TomlParseResult result = Toml.parse("[foo]\n bar.baz = 1", settings);
     assertTrue(result.hasErrors());
     TomlParseError error = result.errors().get(0);
     assertEquals("Dotted keys are not supported", error.getMessage());
@@ -594,7 +592,8 @@ class TomlTest {
   @ParameterizedTest
   @MethodSource("errorCaseSupplier_V0_5_0")
   void shouldHandleParseErrors_V0_5_0(String input, int line, int column, String expected) {
-    TomlParseResult result = Toml.parse(input, TomlVersion.V0_5_0);
+    TomlParseSettings settings = new TomlParseSettings(TomlVersion.V0_5_0, false);
+    TomlParseResult result = Toml.parse(input, settings);
     List<TomlParseError> errors = result.errors();
     assertFalse(errors.isEmpty());
     assertEquals(expected, errors.get(0).getMessage(), () -> joinErrors(result));
@@ -615,7 +614,8 @@ class TomlTest {
   void testTomlV0_4_0Example() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/example-v0.4.0.toml");
     assertNotNull(is);
-    TomlParseResult result = Toml.parse(is, TomlVersion.V0_4_0);
+    TomlParseSettings settings = new TomlParseSettings(TomlVersion.V0_4_0, false);
+    TomlParseResult result = Toml.parse(is, settings);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
 
     assertEquals("value", result.getString("table.key"));
@@ -631,7 +631,8 @@ class TomlTest {
   void testHardExample() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/hard_example.toml");
     assertNotNull(is);
-    TomlParseResult result = Toml.parse(is, TomlVersion.V0_4_0);
+    TomlParseSettings settings = new TomlParseSettings(TomlVersion.V0_4_0, false);
+    TomlParseResult result = Toml.parse(is, settings);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
 
     assertEquals("You'll hate me after this - #", result.getString("the.test_string"));
@@ -643,7 +644,8 @@ class TomlTest {
   void testHardExampleUnicode() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/hard_example_unicode.toml");
     assertNotNull(is);
-    TomlParseResult result = Toml.parse(is, TomlVersion.V0_4_0);
+    TomlParseSettings settings = new TomlParseSettings(TomlVersion.V0_4_0, false);
+    TomlParseResult result = Toml.parse(is, settings);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
 
     assertEquals("Ýôú'ℓℓ λáƭè ₥è áƒƭèř ƭλïƨ - #", result.getString("the.test_string"));
@@ -653,9 +655,10 @@ class TomlTest {
 
   @Test
   void testSpecExample() throws Exception {
+    TomlParseSettings settings = new TomlParseSettings(TomlVersion.V0_4_0, false);
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.toml");
     assertNotNull(is);
-    TomlParseResult result = Toml.parse(is, TomlVersion.V0_4_0);
+    TomlParseResult result = Toml.parse(is, settings);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
 
     assertEquals("Tom Preston-Werner", result.getString("owner.name"));
@@ -748,6 +751,14 @@ class TomlTest {
     TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
     assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
+  }
+
+  @Test
+  void shouldThrowParseErrorForDuplicatedKeys() {
+    TomlParseSettings settings = new TomlParseSettings(TomlVersion.LATEST, true);
+    Executable executable = () -> Toml.parse("foo=1\nfoo=2", settings);
+    TomlDuplicatedKeyException exception = assertThrows(TomlDuplicatedKeyException.class, executable);
+    assertEquals("foo previously defined at line 1, column 1", exception.getMessage());
   }
 
   private String joinErrors(TomlParseResult result) {

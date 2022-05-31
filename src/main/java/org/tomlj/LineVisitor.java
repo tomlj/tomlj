@@ -26,11 +26,14 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   private final MutableTomlTable table;
   private MutableTomlTable currentTable;
 
-  LineVisitor(TomlVersion version, ErrorReporter errorReporter) {
+  private boolean throwException;
+
+  LineVisitor(TomlVersion version, ErrorReporter errorReporter, boolean throwException) {
     this.version = version;
     this.errorReporter = errorReporter;
     this.table = new MutableTomlTable(version);
     this.currentTable = table;
+    this.throwException = throwException;
   }
 
   @Override
@@ -55,7 +58,10 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       }
       return table;
     } catch (TomlParseError e) {
-      errorReporter.reportError(e);
+      if (throwException)
+        throw new TomlDuplicatedKeyException(e);
+      else
+        errorReporter.reportError(e);
       return table;
     }
   }
@@ -74,7 +80,10 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     try {
       currentTable = table.createTable(path, new TomlPosition(ctx));
     } catch (TomlParseError e) {
-      errorReporter.reportError(e);
+      if (throwException)
+        throw new TomlDuplicatedKeyException(e);
+      else
+        errorReporter.reportError(e);
     }
     return table;
   }
@@ -93,7 +102,10 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     try {
       currentTable = table.createTableArray(path, new TomlPosition(ctx));
     } catch (TomlParseError e) {
-      errorReporter.reportError(e);
+      if (throwException)
+        throw new TomlDuplicatedKeyException(e);
+      else
+        errorReporter.reportError(e);
     }
     return table;
   }
