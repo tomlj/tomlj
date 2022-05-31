@@ -681,7 +681,9 @@ class TomlTest {
     assertNotNull(is);
     TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
-    assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
+    String expected = expectedJson.replace(System.lineSeparator(), "\n");
+    String actual = result.toJson().replace(System.lineSeparator(), "\n");
+    assertEquals(expected, actual);
   }
 
   @Test
@@ -750,7 +752,9 @@ class TomlTest {
     assertNotNull(is);
     TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
-    assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
+    String expected = expectedJson.replace(System.lineSeparator(), "\n");
+    String actual = result.toJson().replace(System.lineSeparator(), "\n");
+    assertEquals(expected, actual);
   }
 
   @Test
