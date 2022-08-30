@@ -9,8 +9,8 @@ package org.tomlj.internal;
 }
 
 @members {
-  private final IntegerStack arrayDepthStack = new IntegerStack();
-  private int arrayDepth = 0;
+  public final IntegerStack arrayDepthStack = new IntegerStack();
+  public int arrayDepth = 0;
 
   private void resetArrayDepth() {
     arrayDepthStack.clear();
