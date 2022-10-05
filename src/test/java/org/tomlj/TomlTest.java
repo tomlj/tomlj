@@ -70,7 +70,7 @@ class TomlTest {
     Exception exception =
         assertThrows(IllegalArgumentException.class, () -> Toml.parseDottedKey(" foo  . bar@ . -baz"));
     assertEquals("Invalid key: Unexpected '@', expected . or end-of-input", exception.getMessage());
-  }  
+  }
 
   @Test
   void shouldNotParseDottedKeysAtV0_4_0OrEarlier() {
