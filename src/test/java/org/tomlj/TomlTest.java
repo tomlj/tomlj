@@ -690,7 +690,7 @@ class TomlTest {
   }
 
   @Test
-  void testDottedKeyOrder() throws Exception {
+  void testDottedKeyOrder() {
     TomlParseResult result1 = Toml.parse("[dog.\"tater.man\"]\ntype.name = \"pug\"");
     assertFalse(result1.hasErrors(), () -> joinErrors(result1));
     TomlParseResult result2 = Toml.parse("a.b.c = 1\na.d = 2\n");
@@ -700,7 +700,7 @@ class TomlTest {
   }
 
   @Test
-  void testSpacesInKeys() throws Exception {
+  void testSpacesInKeys() {
     TomlParseResult result1 = Toml.parse("\"Dog type\" = \"pug\"");
     assertFalse(result1.hasErrors(), () -> joinErrors(result1));
     assertEquals("pug", result1.getString("\"Dog type\""));
@@ -720,7 +720,7 @@ class TomlTest {
   }
 
   @Test
-  void testQuotesInJson() throws Exception {
+  void testQuotesInJson() {
     TomlParseResult result1 = Toml.parse("key = \"this is 'a test' with single quotes\"");
     assertFalse(result1.hasErrors(), () -> joinErrors(result1));
     String expected1 = "{\n  \"key\" : \"this is 'a test' with single quotes\"\n}\n";
@@ -738,7 +738,7 @@ class TomlTest {
   }
 
   @Test
-  void testBackslashesInJson() throws Exception {
+  void testBackslashesInJson() {
     TomlParseResult result1 = Toml.parse("path = 'C:\\Users\\dog\\catsihate'");
     assertFalse(result1.hasErrors(), () -> joinErrors(result1));
     String expected = "{\n  \"path\" : \"C:\\\\Users\\\\dog\\\\catsihate\"\n}\n";

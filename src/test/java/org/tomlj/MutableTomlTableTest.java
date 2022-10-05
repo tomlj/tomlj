@@ -76,10 +76,7 @@ class MutableTomlTableTest {
   void cannotReplaceProperty() {
     MutableTomlTable table = new MutableTomlTable(HEAD);
     table.set("foo.bar", "one", positionAt(1, 3));
-    TomlParseError e = assertThrows(TomlParseError.class, () -> {
-      table.set("foo.bar", "two", positionAt(2, 5));
-    });
-
+    TomlParseError e = assertThrows(TomlParseError.class, () -> table.set("foo.bar", "two", positionAt(2, 5)));
     assertEquals("foo.bar previously defined at line 1, column 3", e.getMessage());
   }
 
@@ -88,9 +85,7 @@ class MutableTomlTableTest {
   void quotesComplexKeysInError(List<String> path, String expected) {
     MutableTomlTable table = new MutableTomlTable(HEAD);
     table.set(path, "one", positionAt(1, 3));
-    TomlParseError e = assertThrows(TomlParseError.class, () -> {
-      table.set(path, "two", positionAt(2, 5));
-    });
+    TomlParseError e = assertThrows(TomlParseError.class, () -> table.set(path, "two", positionAt(2, 5)));
     assertEquals(expected + " previously defined at line 1, column 3", e.getMessage());
   }
 
@@ -106,10 +101,7 @@ class MutableTomlTableTest {
   void cannotTreatNonTableAsTable() {
     MutableTomlTable table = new MutableTomlTable(HEAD);
     table.set("foo.bar", "one", positionAt(5, 3));
-    TomlParseError e = assertThrows(TomlParseError.class, () -> {
-      table.set("foo.bar.baz", "two", positionAt(2, 5));
-    });
-
+    TomlParseError e = assertThrows(TomlParseError.class, () -> table.set("foo.bar.baz", "two", positionAt(2, 5)));
     assertEquals("foo.bar is not a table (previously defined at line 5, column 3)", e.getMessage());
   }
 
@@ -125,9 +117,7 @@ class MutableTomlTableTest {
   @Test
   void throwsForInvalidKey() {
     MutableTomlTable table = new MutableTomlTable(HEAD);
-    IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> {
-      table.get("foo.=bar");
-    });
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> table.get("foo.=bar"));
     assertEquals("Invalid key: Unexpected '=', expected a-z, A-Z, 0-9, ', or \"", e.getMessage());
   }
 
