@@ -7,7 +7,7 @@ plugins {
   id 'jacoco'
   id 'maven-publish'
   id 'signing'
-  id 'com.diffplug.spotless' version '6.1.0'
+  id 'com.diffplug.spotless' version '6.2.1'
   id "com.github.hierynomus.license-report" version "0.16.1"
   id 'com.jfrog.bintray' version '1.8.5'
   id 'io.spring.dependency-management' version '1.0.11.RELEASE'
@@ -169,7 +169,7 @@ dependencies {
   antlr 'org.antlr:antlr4'
 
   compile 'org.antlr:antlr4-runtime'
-  implementation 'org.checkerframework:checker-qual:3.9.1'
+  implementation 'org.checkerframework:checker-qual:3.21.2'
 
   testImplementation 'org.junit.jupiter:junit-jupiter-api'
   testImplementation 'org.junit.jupiter:junit-jupiter-params'
