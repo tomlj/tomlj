@@ -736,6 +736,11 @@ class TomlTest {
     assertFalse(result3.hasErrors(), () -> joinErrors(result3));
     String expected3 = "{\n  \"key\" : \"this is \\\"a test\\\" with double quotes\"\n}\n";
     assertEquals(expected3.replace("\n", System.lineSeparator()), result3.toJson());
+
+    TomlParseResult result4 = Toml.parse("key = '{\"msg\":\"This is a test\"}'");
+    assertFalse(result4.hasErrors(), () -> joinErrors(result3));
+    String expected4 = "{\n  \"key\" : \"{\\\"msg\\\":\\\"This is a test\\\"}\"\n}\n";
+    assertEquals(expected4.replace("\n", System.lineSeparator()), result4.toJson());
   }
 
   @Test
