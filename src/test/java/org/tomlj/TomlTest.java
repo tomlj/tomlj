@@ -580,6 +580,8 @@ class TomlTest {
         Arguments.of("foo = [ 1\n", 2, 1, "Unexpected end of input, expected ] or a newline"),
         Arguments.of("foo = [ 1, 'bar ]\n", 1, 18, "Unexpected end of line, expected '"),
 
+        Arguments.of("foo = 1\nfoo = 2\n", 2, 1, "foo previously defined at line 1, column 1"),
+
         Arguments.of("[]", 1, 1, "Empty table key"),
         Arguments.of("[foo] bar='baz'", 1, 7, "Unexpected 'bar', expected a newline or end-of-input"),
         Arguments.of("foo='bar'\n[foo]\nbar='baz'", 2, 1, "foo previously defined at line 1, column 1"),
