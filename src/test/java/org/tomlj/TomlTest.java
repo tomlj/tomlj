@@ -425,7 +425,9 @@ class TomlTest {
         Arguments.of("[foo]\nbar = 'baz'", "foo.bar", "baz"),
         Arguments.of("[foo] #foo.bar\nbar = 'baz'", "foo.bar", "baz"),
         Arguments.of("[foo]\n[foo.bar]\nbaz = 'buz'", "foo.bar.baz", "buz"),
-        Arguments.of("[foo.bar]\nbaz=1\n[foo]\nbaz=2", "foo.baz", 2L));
+        Arguments.of("[foo.bar]\nbaz=1\n[foo]\nbaz=2", "foo.baz", 2L),
+        Arguments.of("[group.child]\nb=\"B\"\n\n[group]\na=\"A\"\n", "group.a", "A")
+    );
     // @formatter:on
   }
 
