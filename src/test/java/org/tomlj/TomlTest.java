@@ -245,6 +245,7 @@ class TomlTest {
         Arguments.of("foo = 43.557_654E-34", 43.557654E-34D),
         Arguments.of("foo = 43.557_654E-034", 43.557654E-34D),
         Arguments.of("foo = 43.557_654E-0034", 43.557654E-34D),
+        Arguments.of("foo = 224_617.445_991_228", 224617.445991228),
         Arguments.of("foo = 1e06", 1E6),
         Arguments.of("foo = 1e006", 1E6),
         Arguments.of("foo = 1e+06", 1E6),
@@ -407,7 +408,8 @@ class TomlTest {
     // @formatter:off
     return Stream
         .of(
-            Arguments.of("foo = [1, 'a']", new Object[] {1L, "a"}));
+            Arguments.of("foo = [1, 'a']", new Object[] {1L, "a"})
+        );
     // @formatter:on
   }
 
@@ -523,6 +525,9 @@ class TomlTest {
 
         Arguments.of("foo = 1234567891234567891233456789", 1, 7, "Integer is too large"),
 
+        Arguments.of("invalid_float = .7", 1, 17, "Unexpected '.', expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
+        Arguments.of("invalid_float = 7.", 1, 18, "Unexpected '.', expected a newline or end-of-input"),
+        Arguments.of("invalid_float = 3.e+20", 1, 18, "Unexpected '.', expected a newline or end-of-input"),
         Arguments.of("\n\nfoo    =    \t    +1E1000", 3, 18, "Float is too large"),
         Arguments.of("foo = +1E-1000", 1, 7, "Float is too small"),
         Arguments.of("foo = 0.000000000000000000000000000000000000000000"
