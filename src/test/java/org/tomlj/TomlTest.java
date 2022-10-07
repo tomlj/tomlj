@@ -688,13 +688,12 @@ class TomlTest {
 
   @Test
   void testArrayTables() throws Exception {
-    String expectedJson =
-        new Scanner(this.getClass().getResourceAsStream("/org/tomlj/array_table_example.json"), "UTF-8")
-            .useDelimiter("\\A")
-            .next();
-    InputStream is = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.toml");
-    assertNotNull(is);
-    TomlParseResult result = Toml.parse(is);
+    InputStream jsonStream = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.json");
+    assertNotNull(jsonStream);
+    String expectedJson = new Scanner(jsonStream, "UTF-8").useDelimiter("\\A").next();
+    InputStream tomlStream = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.toml");
+    assertNotNull(tomlStream);
+    TomlParseResult result = Toml.parse(tomlStream);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
     assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
   }
@@ -761,14 +760,21 @@ class TomlTest {
   }
 
   @Test
+  void testDatesInJson() {
+    TomlParseResult result = Toml.parse("day = 1987-07-05T17:45:00Z");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    String expected = "{\n  \"day\" : \"1987-07-05T17:45:00Z\"\n}\n";
+    assertEquals(expected.replace("\n", System.lineSeparator()), result.toJson());
+  }
+
+  @Test
   void testOrderPreservationInJson() throws Exception {
-    String expectedJson =
-        new Scanner(this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.json"), "UTF-8")
-            .useDelimiter("\\A")
-            .next();
-    InputStream is = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.toml");
-    assertNotNull(is);
-    TomlParseResult result = Toml.parse(is);
+    InputStream jsonStream = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.json");
+    assertNotNull(jsonStream);
+    String expectedJson = new Scanner(jsonStream, "UTF-8").useDelimiter("\\A").next();
+    InputStream tomlStream = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.toml");
+    assertNotNull(tomlStream);
+    TomlParseResult result = Toml.parse(tomlStream, TomlVersion.V0_5_0);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
     assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
   }
