@@ -13,6 +13,8 @@
 package org.tomlj;
 
 import static java.util.Objects.requireNonNull;
+import static org.tomlj.JsonOptions.ALL_VALUES_AS_STRINGS;
+import static org.tomlj.JsonOptions.VALUES_AS_OBJECTS_WITH_TYPE;
 import static org.tomlj.TomlType.TABLE;
 import static org.tomlj.TomlType.typeFor;
 
@@ -25,18 +27,20 @@ import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 final class JsonSerializer {
   private JsonSerializer() {}
 
-  static void toJson(TomlTable table, Appendable appendable) throws IOException {
+  static void toJson(TomlTable table, Appendable appendable, Set<JsonOptions> options) throws IOException {
     requireNonNull(table);
     requireNonNull(appendable);
-    toJson(table, appendable, 0);
+    toJson(table, appendable, options, 0);
     appendable.append(System.lineSeparator());
   }
 
-  private static void toJson(TomlTable table, Appendable appendable, int indent) throws IOException {
+  private static void toJson(TomlTable table, Appendable appendable, Set<JsonOptions> options, int indent)
+      throws IOException {
     if (table.isEmpty()) {
       appendable.append("{}");
       return;
@@ -48,7 +52,7 @@ final class JsonSerializer {
       append(appendable, indent + 2, "\"" + escape(key) + "\" : ");
       Object value = entry.getValue();
       assert value != null;
-      appendTomlValue(value, appendable, indent);
+      appendTomlValue(value, appendable, options, indent);
       if (iterator.hasNext()) {
         appendable.append(",");
         appendable.append(System.lineSeparator());
@@ -58,12 +62,13 @@ final class JsonSerializer {
     append(appendable, indent, "}");
   }
 
-  static void toJson(TomlArray array, Appendable appendable) throws IOException {
-    toJson(array, appendable, 0);
+  static void toJson(TomlArray array, Appendable appendable, Set<JsonOptions> options) throws IOException {
+    toJson(array, appendable, options, 0);
     appendable.append(System.lineSeparator());
   }
 
-  private static void toJson(TomlArray array, Appendable appendable, int indent) throws IOException {
+  private static void toJson(TomlArray array, Appendable appendable, Set<JsonOptions> options, int indent)
+      throws IOException {
     if (array.isEmpty()) {
       appendable.append("[]");
       return;
@@ -76,11 +81,11 @@ final class JsonSerializer {
       tomlType = typeFor(tomlValue);
       assert tomlType.isPresent();
       if (tomlType.get().equals(TABLE)) {
-        toJson((TomlTable) tomlValue, appendable, indent);
+        toJson((TomlTable) tomlValue, appendable, options, indent);
       } else {
         appendable.append(System.lineSeparator());
         indentLine(appendable, indent + 2);
-        appendTomlValue(tomlValue, appendable, indent);
+        appendTomlValue(tomlValue, appendable, options, indent);
       }
 
       if (iterator.hasNext()) {
@@ -96,19 +101,73 @@ final class JsonSerializer {
     }
   }
 
-  private static void appendTomlValue(Object value, Appendable appendable, int indent) throws IOException {
+  private static void appendTomlValue(Object value, Appendable appendable, Set<JsonOptions> options, int indent)
+      throws IOException {
     Optional<TomlType> tomlType = typeFor(value);
     assert tomlType.isPresent();
     switch (tomlType.get()) {
+      case ARRAY:
+        toJson((TomlArray) value, appendable, options, indent + 2);
+        return;
+      case TABLE:
+        toJson((TomlTable) value, appendable, options, indent + 2);
+        return;
+      default:
+        // continue
+    }
+
+    if (options.contains(VALUES_AS_OBJECTS_WITH_TYPE)) {
+      appendable.append("{ \"type\": \"");
+      appendable.append(typeName(tomlType.get()));
+      appendable.append("\", \"value\": ");
+      appendTomlValueLiteral(tomlType.get(), value, appendable, options);
+      appendable.append(" }");
+    } else {
+      appendTomlValueLiteral(tomlType.get(), value, appendable, options);
+    }
+  }
+
+  private static String typeName(TomlType tomlType) {
+    switch (tomlType) {
+      case BOOLEAN:
+        return "bool";
+      case OFFSET_DATE_TIME:
+        return "datetime";
+      case LOCAL_DATE_TIME:
+        return "datetime-local";
+      case LOCAL_DATE:
+        return "date-local";
+      case LOCAL_TIME:
+        return "time-local";
+      default:
+        return tomlType.typeName();
+    }
+  }
+
+  private static void appendTomlValueLiteral(
+      TomlType tomlType,
+      Object value,
+      Appendable appendable,
+      Set<JsonOptions> options) throws IOException {
+    switch (tomlType) {
       case STRING:
         appendable.append('"');
         appendable.append(escape((String) value));
         appendable.append('"');
         break;
       case INTEGER:
+        if (options.contains(ALL_VALUES_AS_STRINGS)) {
+          appendable.append('"');
+        }
         appendable.append(value.toString());
+        if (options.contains(ALL_VALUES_AS_STRINGS)) {
+          appendable.append('"');
+        }
         break;
       case FLOAT:
+        if (options.contains(ALL_VALUES_AS_STRINGS)) {
+          appendable.append('"');
+        }
         if (Double.isNaN((Double) value)) {
           appendable.append("nan");
         } else if ((Double) value == Double.POSITIVE_INFINITY) {
@@ -118,9 +177,18 @@ final class JsonSerializer {
         } else {
           appendable.append(value.toString());
         }
+        if (options.contains(ALL_VALUES_AS_STRINGS)) {
+          appendable.append('"');
+        }
         break;
       case BOOLEAN:
+        if (options.contains(ALL_VALUES_AS_STRINGS)) {
+          appendable.append('"');
+        }
         appendable.append(((Boolean) value) ? "true" : "false");
+        if (options.contains(ALL_VALUES_AS_STRINGS)) {
+          appendable.append('"');
+        }
         break;
       case OFFSET_DATE_TIME:
         appendable.append('"');
@@ -142,12 +210,8 @@ final class JsonSerializer {
         appendable.append(((LocalTime) value).format(DateTimeFormatter.ISO_TIME));
         appendable.append('"');
         break;
-      case ARRAY:
-        toJson((TomlArray) value, appendable, indent + 2);
-        break;
-      case TABLE:
-        toJson((TomlTable) value, appendable, indent + 2);
-        break;
+      default:
+        throw new AssertionError("Attempted to output literal form of non-literal type " + tomlType.typeName());
     }
   }
 

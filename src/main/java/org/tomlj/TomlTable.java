@@ -22,11 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.util.AbstractMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
@@ -1222,12 +1218,23 @@ public interface TomlTable {
   /**
    * Return a representation of this table using JSON.
    *
+   * @param options Options for the JSON encoder.
    * @return A JSON representation of this table.
    */
-  default String toJson() {
+  default String toJson(JsonOptions... options) {
+    return toJson(new HashSet<>(Arrays.asList(options)));
+  }
+
+  /**
+   * Return a representation of this table using JSON.
+   *
+   * @param options Options for the JSON encoder.
+   * @return A JSON representation of this table.
+   */
+  default String toJson(Set<JsonOptions> options) {
     StringBuilder builder = new StringBuilder();
     try {
-      toJson(builder);
+      toJson(builder, options);
     } catch (IOException e) {
       // not reachable
       throw new UncheckedIOException(e);
@@ -1239,9 +1246,21 @@ public interface TomlTable {
    * Append a JSON representation of this table to the appendable output.
    *
    * @param appendable The appendable output.
+   * @param options Options for the JSON encoder.
    * @throws IOException If an IO error occurs.
    */
-  default void toJson(Appendable appendable) throws IOException {
-    JsonSerializer.toJson(this, appendable);
+  default void toJson(Appendable appendable, JsonOptions... options) throws IOException {
+    toJson(appendable, new HashSet<>(Arrays.asList(options)));
+  }
+
+  /**
+   * Append a JSON representation of this table to the appendable output.
+   *
+   * @param appendable The appendable output.
+   * @param options Options for the JSON encoder.
+   * @throws IOException If an IO error occurs.
+   */
+  default void toJson(Appendable appendable, Set<JsonOptions> options) throws IOException {
+    JsonSerializer.toJson(this, appendable, options);
   }
 }
