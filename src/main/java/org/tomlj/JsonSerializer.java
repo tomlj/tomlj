@@ -101,10 +101,12 @@ final class JsonSerializer {
     assert tomlType.isPresent();
     switch (tomlType.get()) {
       case STRING:
-        append(appendable, 0, "\"" + escape((String) value) + "\"");
+        appendable.append('"');
+        appendable.append(escape((String) value));
+        appendable.append('"');
         break;
       case INTEGER:
-        append(appendable, 0, value.toString());
+        appendable.append(value.toString());
         break;
       case FLOAT:
         if (Double.isNaN((Double) value)) {
@@ -118,7 +120,7 @@ final class JsonSerializer {
         }
         break;
       case BOOLEAN:
-        append(appendable, 0, ((Boolean) value) ? "true" : "false");
+        appendable.append(((Boolean) value) ? "true" : "false");
         break;
       case OFFSET_DATE_TIME:
         appendable.append('"');
