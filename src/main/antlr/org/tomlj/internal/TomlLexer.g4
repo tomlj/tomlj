@@ -173,7 +173,7 @@ Dash : '-';
 Plus : '+';
 Colon : ':';
 DateDot : '.' -> type(Dot);
-Z : 'Z';
+Z : ('Z' | 'z');
 TimeDelimiter : [Tt] | (' ' { _input.LA(1) >= '0' && _input.LA(1) <= '9' }?);
 DateDigits : Digit+;
 

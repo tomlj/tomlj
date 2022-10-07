@@ -290,7 +290,8 @@ class TomlTest {
             OffsetDateTime.parse("1979-05-27T00:32:00-07:00")),
         Arguments.of("foo = 1937-07-18 11:44:02.334543+18:00",
             OffsetDateTime.parse("1937-07-18T11:44:02.334543+18:00")),
-        Arguments.of("foo = 1937-07-18 11:44:02Z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00"))
+        Arguments.of("foo = 1937-07-18 11:44:02Z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00")),
+        Arguments.of("foo = 1937-07-18 11:44:02z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00"))
     );
     // @formatter:on
   }
