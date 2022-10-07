@@ -104,8 +104,18 @@ final class JsonSerializer {
         append(appendable, 0, "\"" + escape((String) value) + "\"");
         break;
       case INTEGER:
-      case FLOAT:
         append(appendable, 0, value.toString());
+        break;
+      case FLOAT:
+        if (Double.isNaN((Double) value)) {
+          appendable.append("nan");
+        } else if ((Double) value == Double.POSITIVE_INFINITY) {
+          appendable.append("+inf");
+        } else if ((Double) value == Double.NEGATIVE_INFINITY) {
+          appendable.append("-inf");
+        } else {
+          appendable.append(value.toString());
+        }
         break;
       case BOOLEAN:
         append(appendable, 0, ((Boolean) value) ? "true" : "false");
