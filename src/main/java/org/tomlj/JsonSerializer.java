@@ -17,6 +17,11 @@ import static org.tomlj.TomlType.TABLE;
 import static org.tomlj.TomlType.typeFor;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
@@ -106,10 +111,24 @@ final class JsonSerializer {
         append(appendable, 0, ((Boolean) value) ? "true" : "false");
         break;
       case OFFSET_DATE_TIME:
+        appendable.append('"');
+        appendable.append(((OffsetDateTime) value).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+        appendable.append('"');
+        break;
       case LOCAL_DATE_TIME:
+        appendable.append('"');
+        appendable.append(((LocalDateTime) value).format(DateTimeFormatter.ISO_DATE_TIME));
+        appendable.append('"');
+        break;
       case LOCAL_DATE:
+        appendable.append('"');
+        appendable.append(((LocalDate) value).format(DateTimeFormatter.ISO_DATE));
+        appendable.append('"');
+        break;
       case LOCAL_TIME:
-        append(appendable, 0, "\"" + value.toString() + "\"");
+        appendable.append('"');
+        appendable.append(((LocalTime) value).format(DateTimeFormatter.ISO_TIME));
+        appendable.append('"');
         break;
       case ARRAY:
         toJson((TomlArray) value, appendable, indent + 2);
