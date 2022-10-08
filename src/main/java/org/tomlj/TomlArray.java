@@ -18,10 +18,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * An array of TOML values.
@@ -318,7 +315,7 @@ public interface TomlArray {
    * @return A JSON representation of this table.
    */
   default String toJson(JsonOptions... options) {
-    return toJson(new HashSet<>(Arrays.asList(options)));
+    return toJson(JsonOptions.setFrom(options));
   }
 
   /**
@@ -327,7 +324,7 @@ public interface TomlArray {
    * @param options Options for the JSON encoder.
    * @return A JSON representation of this table.
    */
-  default String toJson(Set<JsonOptions> options) {
+  default String toJson(EnumSet<JsonOptions> options) {
     StringBuilder builder = new StringBuilder();
     try {
       toJson(builder, options);
@@ -346,7 +343,7 @@ public interface TomlArray {
    * @throws IOException If an IO error occurs.
    */
   default void toJson(Appendable appendable, JsonOptions... options) throws IOException {
-    toJson(appendable, new HashSet<>(Arrays.asList(options)));
+    toJson(appendable, JsonOptions.setFrom(options));
   }
 
   /**
@@ -356,7 +353,7 @@ public interface TomlArray {
    * @param options Options for the JSON encoder.
    * @throws IOException If an IO error occurs.
    */
-  default void toJson(Appendable appendable, Set<JsonOptions> options) throws IOException {
+  default void toJson(Appendable appendable, EnumSet<JsonOptions> options) throws IOException {
     JsonSerializer.toJson(this, appendable, options);
   }
 }
