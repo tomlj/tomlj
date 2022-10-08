@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static org.tomlj.TomlVersion.V0_5_0;
+
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
@@ -36,7 +38,7 @@ final class InlineTableVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       if (path != null && !path.isEmpty()) {
         Object value = valContext.accept(new ValueVisitor(version));
         if (value != null) {
-          table.set(path, value, new TomlPosition(ctx));
+          table.set(path, value, new TomlPosition(ctx), !version.after(V0_5_0));
         }
       }
     }

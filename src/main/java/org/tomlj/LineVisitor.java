@@ -13,6 +13,7 @@
 package org.tomlj;
 
 import static org.tomlj.TomlVersion.V0_4_0;
+import static org.tomlj.TomlVersion.V0_5_0;
 
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
@@ -51,7 +52,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       }
       Object value = valContext.accept(new ValueVisitor(version));
       if (value != null) {
-        currentTable.set(path, value, new TomlPosition(ctx));
+        currentTable.set(path, value, new TomlPosition(ctx), !version.after(V0_5_0));
       }
       return table;
     } catch (TomlParseError e) {

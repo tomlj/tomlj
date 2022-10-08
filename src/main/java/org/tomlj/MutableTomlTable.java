@@ -181,7 +181,7 @@ final class MutableTomlTable implements TomlTable {
     }
 
     int depth = path.size();
-    final MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true);
+    final MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true);
 
     String key = path.get(depth - 1);
     Element element = table.properties.get(key);
@@ -208,7 +208,7 @@ final class MutableTomlTable implements TomlTable {
     }
 
     int depth = path.size();
-    MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true);
+    MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true);
 
     String key = path.get(depth - 1);
     Element element =
@@ -228,10 +228,18 @@ final class MutableTomlTable implements TomlTable {
   }
 
   MutableTomlTable set(String keyPath, Object value, TomlPosition position) {
-    return set(parseDottedKey(keyPath), value, position);
+    return set(keyPath, value, position, false);
+  }
+
+  MutableTomlTable set(String keyPath, Object value, TomlPosition position, boolean implicitKeyParents) {
+    return set(parseDottedKey(keyPath), value, position, implicitKeyParents);
   }
 
   MutableTomlTable set(List<String> path, Object value, TomlPosition position) {
+    return set(path, value, position, false);
+  }
+
+  MutableTomlTable set(List<String> path, Object value, TomlPosition position, boolean implicitKeyParents) {
     int depth = path.size();
     assert (depth > 0);
     if (value instanceof Integer) {
@@ -239,7 +247,7 @@ final class MutableTomlTable implements TomlTable {
     }
     assert (typeFor(value).isPresent()) : "Unexpected value of type " + value.getClass();
 
-    MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, false);
+    MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, false, implicitKeyParents);
     Element prevElem = table.properties.putIfAbsent(path.get(depth - 1), new Element(value, position));
     if (prevElem != null) {
       String pathString = Toml.joinKeyPath(path);
@@ -255,15 +263,20 @@ final class MutableTomlTable implements TomlTable {
    * @param path The path to ensure exists (as a table)
    * @param position The input position.
    * @param followTableArrays If `true`, path walking is permitted via the last element of array tables.
+   * @param implicitDefinitions If `true`, any tables created are considered implicitly defined
    * @return The table at that path.
    * @throws TomlParseError If the table cannot be created.
    */
-  private MutableTomlTable ensureTable(List<String> path, TomlPosition position, boolean followTableArrays) {
+  private MutableTomlTable ensureTable(
+      List<String> path,
+      TomlPosition position,
+      boolean followTableArrays,
+      boolean implicitDefinitions) {
     MutableTomlTable table = this;
     int depth = path.size();
     for (int i = 0; i < depth; ++i) {
       Element element = table.properties
-          .computeIfAbsent(path.get(i), k -> new Element(new MutableTomlTable(version, true), position));
+          .computeIfAbsent(path.get(i), k -> new Element(new MutableTomlTable(version, implicitDefinitions), position));
       if (element.value instanceof MutableTomlTable) {
         table = (MutableTomlTable) element.value;
         continue;
