@@ -35,23 +35,23 @@ public enum TomlVersion {
    */
   V0_5_0(null),
   /**
-   * The 1.0.0-rc.1 version of TOML.
+   * The 1.0.0 version of TOML.
    *
    * <p>
    * This specification can be found at <a href=
-   * "https://github.com/toml-lang/toml/blob/e597958af54a9230a872fdab3e538490e8758eb0/versions/en/toml-v1.0.0-rc.1.md">https://github.com/toml-lang/toml/blob/e597958af54a9230a872fdab3e538490e8758eb0/versions/en/toml-v1.0.0-rc.1.md</a>.
+   * "https://github.com/toml-lang/toml/blob/1.0.0/toml.md">https://github.com/toml-lang/toml/blob/1.0.0/toml.md</a>.
    */
-  V1_0_0_RC1(null),
+  V1_0_0(null),
   /**
    * The latest stable specification of TOML.
    */
-  LATEST(V1_0_0_RC1),
+  LATEST(V1_0_0),
   /**
    * The head (development) specification of TOML.
    *
    * <p>
    * The latest specification can be found at <a href=
-   * "https://github.com/toml-lang/toml/blob/master/README.md">https://github.com/toml-lang/toml/blob/master/README.md</a>.
+   * "https://github.com/toml-lang/toml/blob/master/toml.md">https://github.com/toml-lang/toml/blob/master/toml.md</a>.
    *
    * <p>
    * Note: As the specification is under active development, this implementation may not match the latest changes.
