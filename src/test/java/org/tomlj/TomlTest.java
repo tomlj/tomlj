@@ -434,6 +434,23 @@ class TomlTest {
     // @formatter:on
   }
 
+
+  @Test
+  void testImplicitAndExplicitAfter() throws Exception {
+    TomlParseResult result = Toml.parse("[a.b.c]\nanswer = 42\n\n[a]\nbetter = 43\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    String expected = "{\n  \"a\" : {\n"
+        + "    \"b\" : {\n"
+        + "      \"c\" : {\n"
+        + "        \"answer\" : 42\n"
+        + "      }\n"
+        + "    },\n"
+        + "    \"better\" : 43\n"
+        + "  }\n"
+        + "}\n";
+    assertEquals(expected.replace("\n", System.lineSeparator()), result.toJson());
+  }
+
   @ParameterizedTest
   @MethodSource("inlineTableSupplier")
   void shouldParseInlineTable(String input, String key, Object expected) {

@@ -181,21 +181,21 @@ final class MutableTomlTable implements TomlTable {
     }
 
     int depth = path.size();
-    MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true);
+    final MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true);
 
     String key = path.get(depth - 1);
     Element element = table.properties.get(key);
     if (element == null) {
-      MutableTomlTable newTable = new MutableTomlTable(version);
+      final MutableTomlTable newTable = new MutableTomlTable(version);
       table.properties.put(key, new Element(newTable, position));
       return newTable;
     }
     if (element.value instanceof MutableTomlTable) {
-      table = (MutableTomlTable) element.value;
-      if (table.implicitlyDefined) {
-        table.implicitlyDefined = false;
-        table.properties.put(key, new Element(table, position));
-        return table;
+      final MutableTomlTable subTable = (MutableTomlTable) element.value;
+      if (subTable.implicitlyDefined) {
+        subTable.implicitlyDefined = false;
+        table.properties.put(key, new Element(subTable, position));
+        return subTable;
       }
     }
     String message = Toml.joinKeyPath(path) + " previously defined at " + element.position;
