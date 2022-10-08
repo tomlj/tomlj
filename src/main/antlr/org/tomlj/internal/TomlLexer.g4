@@ -137,7 +137,8 @@ BasicStringError : . -> type(Error), popMode;
 
 mode MLBasicStringMode;
 
-MLBasicStringEnd : '"""' -> type(TripleQuotationMark), popMode;
+MLBasicStringSextEnd : '"""' { _input.LA(1) == '"' && _input.LA(2) == '"' && _input.LA(3) == '"' }? -> type(TripleQuotationMark), popMode;
+MLBasicStringEnd : '"""' { _input.LA(1) != '"' }? -> type(TripleQuotationMark), popMode;
 MLBasicStringLineEnd : '\\' [ \t]* NL { setText(System.lineSeparator()); } -> type(NewLine);
 MLBasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F\\\u007F] -> type(StringChar);
 MLBasicStringEscape :
@@ -160,7 +161,8 @@ LiteralStringError : . -> type(Error), popMode;
 
 mode MLLiteralStringMode;
 
-MLLiteralStringEnd : '\'\'\'' -> type(TripleApostrophe), popMode;
+MLLiteralStringSextEnd : '\'\'\'' { _input.LA(1) == '\'' && _input.LA(2) == '\'' && _input.LA(3) == '\'' }? -> type(TripleApostrophe), popMode;
+MLLiteralStringEnd : '\'\'\'' { _input.LA(1) != '\'' }? -> type(TripleApostrophe), popMode;
 MLLiteralStringChar : ~[\u0000-\u0008\u000A-\u001F\u007F] -> type(StringChar);
 MLLiteralStringNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine);
 

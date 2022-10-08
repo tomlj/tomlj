@@ -83,6 +83,10 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
       case TomlLexer.EOF:
         return "end of input";
       default:
+        String text = token.getText();
+        if (isOnlyQuotes(text)) {
+          return text;
+        }
         return "'" + Toml.tomlEscape(token.getText()) + '\'';
     }
   }
@@ -118,5 +122,22 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     }
 
     return builder.toString();
+  }
+
+  private static boolean isOnlyQuotes(String text) {
+    int length = text.length();
+    if (length == 0) {
+      return false;
+    }
+    char first = text.charAt(0);
+    if (first != '\'' && first != '\"') {
+      return false;
+    }
+    for (int i = 1; i < length; ++i) {
+      if (text.charAt(i) != first) {
+        return false;
+      }
+    }
+    return true;
   }
 }

@@ -171,7 +171,13 @@ class TomlTest {
                 "I'm a string. \"You can quote me\". Name\tJosé\nLocation\tSF."),
         Arguments.of(
                 "foo=\"\"\"\nRoses are red\nViolets are blue\"\"\"",
-                "Roses are red\nViolets are blue")
+                "Roses are red\nViolets are blue"),
+        Arguments.of(
+                "foo = ''''foobar''''",
+                "'foobar'"),
+        Arguments.of(
+                "foo = \"\"\"\"This,\" she said, \"is just a pointless statement.\"\"\"\"",
+                "\"This,\" she said, \"is just a pointless statement.\"")
         );
     // @formatter:on
   }
@@ -569,6 +575,8 @@ class TomlTest {
         Arguments.of("foo = \"bar \\y baz\"", 1, 12, "Invalid escape sequence '\\y'"),
         Arguments.of("\u0011abc = 'foo'", 1, 1, "Unexpected '\\u0011', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
         Arguments.of(" \uDBFF\uDFFFAAabc='foo'", 1, 2, "Unexpected '\\U0010ffff', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
+        Arguments.of("foo = '''Here are fifteen apostrophes: ''''''''''''''''''", 1, 43, "Unexpected ', expected a newline or end-of-input"),
+        Arguments.of("foo = \"\"\"Here are three quotation marks: \"\"\".\"\"\"", 1, 45, "Unexpected '.', expected a newline or end-of-input"),
         Arguments.of("foo = 2bar", 1, 8, "Unexpected 'bar', expected a newline or end-of-input"),
 
         Arguments.of("foo = 1234567891234567891233456789", 1, 7, "Integer is too large"),
