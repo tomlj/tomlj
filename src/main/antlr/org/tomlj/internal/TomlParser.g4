@@ -149,8 +149,8 @@ second : DateDigits;
 
 
 // Array
-array : ArrayStart (arrayValues Comma?)? NewLine* ArrayEnd;
-arrayValues : arrayValue (Comma arrayValue)*;
+array : ArrayStart (arrayValues NewLine* Comma?)? NewLine* ArrayEnd;
+arrayValues : arrayValue (NewLine* Comma arrayValue)*;
 arrayValue : NewLine* val;
 
 

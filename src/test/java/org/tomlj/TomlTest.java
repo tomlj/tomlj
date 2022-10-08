@@ -390,7 +390,9 @@ class TomlTest {
         Arguments.of("foo = [ 1993-08-04 , 1993-08-04   , ]",
                 new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
         Arguments.of("foo = [\n'''bar\nbaz''',\n'baz'\n]", new Object[] {"bar" + System.lineSeparator() + "baz", "baz"}),
-        Arguments.of("foo = [['bar']]", new Object[] {new Object[] {"bar"}}));
+        Arguments.of("foo = [['bar']]", new Object[] {new Object[] {"bar"}}),
+        Arguments.of("foo = [ 1,\n2\n,3,4]", new Object[] {1L, 2L, 3L, 4L})
+    );
     // @formatter:on
   }
 
@@ -630,7 +632,7 @@ class TomlTest {
         Arguments.of("\nfoo = 13:55:02 , ", 2, 16, "Unexpected ',', expected a newline or end-of-input"),
 
         Arguments.of("foo = [", 1, 8, "Unexpected end of input, expected ], ', \", ''', \"\"\", a number, a boolean, a date/time, an array, a table, or a newline"),
-        Arguments.of("foo = [ 1\n", 2, 1, "Unexpected end of input, expected ] or a newline"),
+        Arguments.of("foo = [ 1\n", 2, 1, "Unexpected end of input, expected ], a comma, or a newline"),
         Arguments.of("foo = [ 1, 'bar ]\n", 1, 18, "Unexpected end of line, expected '"),
 
         Arguments.of("foo = 1\nfoo = 2\n", 2, 1, "foo previously defined at line 1, column 1"),
