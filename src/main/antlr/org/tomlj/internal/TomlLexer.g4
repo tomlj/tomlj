@@ -29,7 +29,7 @@ package org.tomlj.internal;
 
 fragment WSChar : [ \t];
 fragment NL : '\r'? '\n';
-fragment COMMENT : '#' (~'\n')*;
+fragment COMMENT : '#' (~[\u0000-\u0008\u000A-\u001F\u007F])*;
 fragment Alpha : [A-Za-z];
 fragment Digit : [0-9];
 fragment Digit1_9 : [1-9];

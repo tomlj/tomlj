@@ -642,6 +642,8 @@ class TomlTest {
         Arguments.of("\nfoo = 13:55:02,", 2, 15, "Unexpected ',', expected a newline or end-of-input"),
         Arguments.of("\nfoo = 13:55:02 , ", 2, 16, "Unexpected ',', expected a newline or end-of-input"),
 
+        Arguments.of("foo = \"Carriage return in comment\" # \ra=1", 1, 38, "Unexpected '\\r', expected a newline or end-of-input"),
+
         Arguments.of("foo = [", 1, 8, "Unexpected end of input, expected ], ', \", ''', \"\"\", a number, a boolean, a date/time, an array, a table, or a newline"),
         Arguments.of("foo = [ 1\n", 2, 1, "Unexpected end of input, expected ], a comma, or a newline"),
         Arguments.of("foo = [ 1, 'bar ]\n", 1, 18, "Unexpected end of line, expected '"),
