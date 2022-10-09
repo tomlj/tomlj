@@ -581,6 +581,7 @@ class TomlTest {
         Arguments.of("foo = '''Here are fifteen apostrophes: ''''''''''''''''''", 1, 43, "Unexpected ', expected a newline or end-of-input"),
         Arguments.of("foo = \"\"\"Here are three quotation marks: \"\"\".\"\"\"", 1, 45, "Unexpected '.', expected a newline or end-of-input"),
         Arguments.of("foo = 2bar", 1, 8, "Unexpected 'bar', expected a newline or end-of-input"),
+        Arguments.of("foo = \"Bad unicode \\uD801\"", 1, 20, "Invalid unicode escape sequence"),
 
         Arguments.of("foo = 1234567891234567891233456789", 1, 7, "Integer is too large"),
 

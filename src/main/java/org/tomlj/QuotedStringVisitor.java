@@ -95,7 +95,11 @@ final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
 
   private char[] convertUnicodeEscape(String hexChars, TomlParser.EscapedContext ctx) {
     try {
-      return Character.toChars(Integer.parseInt(hexChars, 16));
+      char[] characters = Character.toChars(Integer.parseInt(hexChars, 16));
+      if (characters.length == 1 && Character.isSurrogate(characters[0])) {
+        throw new IllegalArgumentException();
+      }
+      return characters;
     } catch (IllegalArgumentException e) {
       throw new TomlParseError("Invalid unicode escape sequence", new TomlPosition(ctx));
     }
