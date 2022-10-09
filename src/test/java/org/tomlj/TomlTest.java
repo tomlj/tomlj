@@ -125,13 +125,16 @@ class TomlTest {
                 "\n  foo\nbar"),
         Arguments.of(
                 "foo = \"\"\"  foo \\  \nbar\"\"\"",
-                "  foo \nbar"),
+                "  foo bar"),
         Arguments.of(
                 "foo = \"\"\"  foo \\\nbar\"\"\"",
-                "  foo \nbar"),
+                "  foo bar"),
         Arguments.of(
                 "foo = \"\"\"  foo \\       \nbar\"\"\"",
-                "  foo \nbar"),
+                "  foo bar"),
+        Arguments.of(
+                "foo = \"\"\"  foo \\       \n    \nbar\"\"\"",
+                "  foo bar"),
         Arguments.of(
                 "foo = \"foobar#\" # comment",
                 "foobar#"),

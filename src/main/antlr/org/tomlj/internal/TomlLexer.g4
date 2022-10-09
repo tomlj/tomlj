@@ -139,13 +139,13 @@ mode MLBasicStringMode;
 
 MLBasicStringSextEnd : '"""' { _input.LA(1) == '"' && _input.LA(2) == '"' && _input.LA(3) == '"' }? -> type(TripleQuotationMark), popMode;
 MLBasicStringEnd : '"""' { _input.LA(1) != '"' }? -> type(TripleQuotationMark), popMode;
-MLBasicStringLineEnd : '\\' [ \t]* NL { setText(System.lineSeparator()); } -> type(NewLine);
+MLBasicStringLineEndBackslash : '\\' WSChar* NL (WSChar | NL)* -> type(NewLine), channel(WHITESPACE);
 MLBasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F\\\u007F] -> type(StringChar);
 MLBasicStringEscape :
   ('\\u' HexDig HexDig HexDig HexDig
   | '\\U' HexDig HexDig HexDig HexDig HexDig HexDig HexDig HexDig
   | '\\' .) -> type(EscapeSequence);
-MLBasicStringNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine);
+MLBasicStringNewLine: NL { setText(System.lineSeparator()); } -> type(StringChar);
 
 MLBasicStringError : . -> type(Error), popMode;
 
@@ -164,7 +164,7 @@ mode MLLiteralStringMode;
 MLLiteralStringSextEnd : '\'\'\'' { _input.LA(1) == '\'' && _input.LA(2) == '\'' && _input.LA(3) == '\'' }? -> type(TripleApostrophe), popMode;
 MLLiteralStringEnd : '\'\'\'' { _input.LA(1) != '\'' }? -> type(TripleApostrophe), popMode;
 MLLiteralStringChar : ~[\u0000-\u0008\u000A-\u001F\u007F] -> type(StringChar);
-MLLiteralStringNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine);
+MLLiteralStringNewLine: NL { setText(System.lineSeparator()); } -> type(StringChar);
 
 MLLiteralStringError : . -> type(Error), popMode;
 

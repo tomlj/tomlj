@@ -70,7 +70,7 @@ mlBasicString : TripleQuotationMark mlBasicChar* TripleQuotationMark;
 mlBasicChar
   : mlBasicUnescaped
   | escaped;
-mlBasicUnescaped : StringChar | NewLine;
+mlBasicUnescaped : StringChar;
 
 
 // Literal String
@@ -80,7 +80,7 @@ literalBody : StringChar*;
 
 // Multiline Literal String
 mlLiteralString : TripleApostrophe mlLiteralBody TripleApostrophe;
-mlLiteralBody : (StringChar | NewLine)*;
+mlLiteralBody : StringChar*;
 
 
 // Integer
