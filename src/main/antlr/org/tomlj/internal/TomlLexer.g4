@@ -9,8 +9,9 @@ package org.tomlj.internal;
 }
 
 @members {
-  private final IntegerStack arrayDepthStack = new IntegerStack();
-  private int arrayDepth = 0;
+  // State is made public to allow incremental lexers to save and restore it (e.g. NetBeans)
+  public final IntegerStack arrayDepthStack = new IntegerStack();
+  public int arrayDepth = 0;
 
   private void resetArrayDepth() {
     arrayDepthStack.clear();
