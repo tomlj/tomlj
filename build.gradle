@@ -7,11 +7,11 @@ plugins {
   id 'jacoco'
   id 'maven-publish'
   id 'signing'
-  id 'com.diffplug.spotless' version '6.2.1'
+  id 'com.diffplug.spotless' version '6.11.0'
   id "com.github.hierynomus.license-report" version "0.16.1"
   id 'com.jfrog.bintray' version '1.8.5'
-  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
-  id 'net.ltgt.errorprone' version '2.0.2'
+  id 'io.spring.dependency-management' version '1.0.14.RELEASE'
+  id 'net.ltgt.errorprone' version '3.0.1'
 }
 
 description = 'A parser for Tom\'s Obvious, Minimal Language (TOML).'
