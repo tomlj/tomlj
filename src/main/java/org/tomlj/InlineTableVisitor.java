@@ -12,21 +12,23 @@
  */
 package org.tomlj;
 
-import static org.tomlj.TomlVersion.V0_5_0;
-
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 final class InlineTableVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
   private final TomlVersion version;
   private final MutableTomlTable table;
+  private final Map<MutableTomlTable, TomlPosition> openTables;
 
-  public InlineTableVisitor(TomlVersion version) {
+  public InlineTableVisitor(TomlVersion version, TomlPosition position) {
     this.version = version;
-    this.table = new MutableTomlTable(version);
+    this.table = new MutableTomlTable(version, position);
+    this.openTables = new HashMap<>();
   }
 
   @Override
@@ -38,7 +40,9 @@ final class InlineTableVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       if (path != null && !path.isEmpty()) {
         Object value = valContext.accept(new ValueVisitor(version));
         if (value != null) {
-          table.set(path, value, new TomlPosition(ctx), !version.after(V0_5_0));
+          table
+              .set(path, value, new TomlPosition(ctx))
+              .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
         }
       }
     }
@@ -53,5 +57,10 @@ final class InlineTableVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   @Override
   protected MutableTomlTable defaultResult() {
     return table;
+  }
+
+  public void defineOpenTables() {
+    openTables.forEach(MutableTomlTable::define);
+    openTables.clear();
   }
 }

@@ -463,20 +463,7 @@ class TomlTest {
   }
 
   @Test
-  void testDottedKeysAreImplicit_V0_5_0() throws Exception {
-    TomlParseResult result = Toml
-        .parse(
-            "[fruit]\n"
-                + "apple.color = \"red\"\n"
-                + "apple.taste.sweet = true\n"
-                + "\n"
-                + "[fruit.apple]  # ALLOWED BEFORE V1.0.0",
-            TomlVersion.V0_5_0);
-    assertFalse(result.hasErrors(), () -> joinErrors(result));
-  }
-
-  @Test
-  void testDottedKeysAreNotImplicit() throws Exception {
+  void testIntermediateTablesInDottedKeysAreDefined() throws Exception {
     TomlParseResult result = Toml
         .parse(
             "[fruit]\n" + "apple.color = \"red\"\n" + "apple.taste.sweet = true\n" + "\n" + "[fruit.apple]  # INVALID");
@@ -487,6 +474,22 @@ class TomlTest {
         errors.get(0).getMessage(),
         () -> joinErrors(result));
     assertEquals(5, errors.get(0).position().line());
+    assertEquals(1, errors.get(0).position().column());
+  }
+
+  @Test
+  void testIntermediateTablesInLiteralTableDottedKeysAreDefined() throws Exception {
+    TomlParseResult result = Toml
+        .parse(
+            "apple = { color.skin = \"red\", color.flesh = \"white\", color.stem = \"brown\" }\n"
+                + "[apple.color]  # INVALID");
+    List<TomlParseError> errors = result.errors();
+    assertFalse(errors.isEmpty());
+    assertEquals(
+        "apple.color previously defined at line 1, column 11",
+        errors.get(0).getMessage(),
+        () -> joinErrors(result));
+    assertEquals(2, errors.get(0).position().line());
     assertEquals(1, errors.get(0).position().column());
   }
 

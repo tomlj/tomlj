@@ -13,25 +13,26 @@
 package org.tomlj;
 
 import static org.tomlj.TomlVersion.V0_4_0;
-import static org.tomlj.TomlVersion.V0_5_0;
 
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
-import java.util.List;
+import java.util.*;
 
 final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
   private final TomlVersion version;
   private final ErrorReporter errorReporter;
-  private final MutableTomlTable table;
+  private final MutableTomlTable rootTable;
   private MutableTomlTable currentTable;
+  private final Map<MutableTomlTable, TomlPosition> openTables;
 
   LineVisitor(TomlVersion version, ErrorReporter errorReporter) {
     this.version = version;
     this.errorReporter = errorReporter;
-    this.table = new MutableTomlTable(version);
-    this.currentTable = table;
+    this.rootTable = new MutableTomlTable(version, TomlPosition.positionAt(1, 1));
+    this.currentTable = rootTable;
+    this.openTables = new HashMap<>();
   }
 
   @Override
@@ -39,12 +40,12 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     TomlParser.KeyContext keyContext = ctx.key();
     TomlParser.ValContext valContext = ctx.val();
     if (keyContext == null || valContext == null) {
-      return table;
+      return rootTable;
     }
     try {
       List<String> path = keyContext.accept(new KeyVisitor(version));
       if (path == null || path.isEmpty()) {
-        return table;
+        return rootTable;
       }
       // TOML 0.4.0 doesn't support dotted keys
       if (!version.after(V0_4_0) && path.size() > 1) {
@@ -52,51 +53,55 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       }
       Object value = valContext.accept(new ValueVisitor(version));
       if (value != null) {
-        currentTable.set(path, value, new TomlPosition(ctx), !version.after(V0_5_0));
+        currentTable
+            .set(path, value, new TomlPosition(ctx))
+            .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
       }
-      return table;
+      return rootTable;
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
-      return table;
+      return rootTable;
     }
   }
 
   @Override
   public MutableTomlTable visitStandardTable(TomlParser.StandardTableContext ctx) {
+    defineOpenTables();
     TomlParser.KeyContext keyContext = ctx.key();
     if (keyContext == null) {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
-      return table;
+      return rootTable;
     }
     List<String> path = keyContext.accept(new KeyVisitor(version));
     if (path == null) {
-      return table;
+      return rootTable;
     }
     try {
-      currentTable = table.createTable(path, new TomlPosition(ctx));
+      currentTable = rootTable.createTable(path, new TomlPosition(ctx));
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
     }
-    return table;
+    return rootTable;
   }
 
   @Override
   public MutableTomlTable visitArrayTable(TomlParser.ArrayTableContext ctx) {
+    defineOpenTables();
     TomlParser.KeyContext keyContext = ctx.key();
     if (keyContext == null) {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
-      return table;
+      return rootTable;
     }
     List<String> path = keyContext.accept(new KeyVisitor(version));
     if (path == null) {
-      return table;
+      return rootTable;
     }
     try {
-      currentTable = table.createTableArray(path, new TomlPosition(ctx));
+      currentTable = rootTable.createTableArray(path, new TomlPosition(ctx));
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
     }
-    return table;
+    return rootTable;
   }
 
   @Override
@@ -106,6 +111,11 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
   @Override
   protected MutableTomlTable defaultResult() {
-    return table;
+    return rootTable;
+  }
+
+  private void defineOpenTables() {
+    openTables.forEach(MutableTomlTable::define);
+    openTables.clear();
   }
 }

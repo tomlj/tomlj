@@ -148,7 +148,10 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     if (valuesContext == null) {
       return EmptyTomlTable.EMPTY_TABLE;
     }
-    return valuesContext.accept(new InlineTableVisitor(version));
+    InlineTableVisitor visitor = new InlineTableVisitor(version, new TomlPosition(ctx));
+    MutableTomlTable result = valuesContext.accept(visitor);
+    visitor.defineOpenTables();
+    return result;
   }
 
   @Override

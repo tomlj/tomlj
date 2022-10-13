@@ -43,15 +43,24 @@ final class MutableTomlTable implements TomlTable {
 
   private final Map<String, Element> properties = new LinkedHashMap<>();
   private final TomlVersion version;
-  private boolean implicitlyDefined;
+  private TomlPosition definedAt;
 
-  MutableTomlTable(TomlVersion version) {
-    this(version, false);
+  MutableTomlTable(TomlVersion version, TomlPosition definedAt) {
+    this.version = version;
+    this.definedAt = definedAt;
   }
 
-  private MutableTomlTable(TomlVersion version, boolean implicitlyDefined) {
+  MutableTomlTable(TomlVersion version) {
     this.version = version;
-    this.implicitlyDefined = implicitlyDefined;
+    this.definedAt = null;
+  }
+
+  boolean isDefined() {
+    return definedAt != null;
+  }
+
+  void define(TomlPosition position) {
+    definedAt = position;
   }
 
   @Override
@@ -181,19 +190,19 @@ final class MutableTomlTable implements TomlTable {
     }
 
     int depth = path.size();
-    final MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true);
+    final MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true).table;
 
     String key = path.get(depth - 1);
     Element element = table.properties.get(key);
     if (element == null) {
-      final MutableTomlTable newTable = new MutableTomlTable(version);
+      final MutableTomlTable newTable = new MutableTomlTable(version, position);
       table.properties.put(key, new Element(newTable, position));
       return newTable;
     }
     if (element.value instanceof MutableTomlTable) {
       final MutableTomlTable subTable = (MutableTomlTable) element.value;
-      if (subTable.implicitlyDefined) {
-        subTable.implicitlyDefined = false;
+      if (!subTable.isDefined()) {
+        subTable.define(position);
         table.properties.put(key, new Element(subTable, position));
         return subTable;
       }
@@ -208,7 +217,7 @@ final class MutableTomlTable implements TomlTable {
     }
 
     int depth = path.size();
-    MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true);
+    final MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true).table;
 
     String key = path.get(depth - 1);
     Element element =
@@ -227,19 +236,17 @@ final class MutableTomlTable implements TomlTable {
     return newTable;
   }
 
-  MutableTomlTable set(String keyPath, Object value, TomlPosition position) {
-    return set(keyPath, value, position, false);
+  List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> set(
+      String keyPath,
+      Object value,
+      TomlPosition position) {
+    return set(parseDottedKey(keyPath), value, position);
   }
 
-  MutableTomlTable set(String keyPath, Object value, TomlPosition position, boolean implicitKeyParents) {
-    return set(parseDottedKey(keyPath), value, position, implicitKeyParents);
-  }
-
-  MutableTomlTable set(List<String> path, Object value, TomlPosition position) {
-    return set(path, value, position, false);
-  }
-
-  MutableTomlTable set(List<String> path, Object value, TomlPosition position, boolean implicitKeyParents) {
+  List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> set(
+      List<String> path,
+      Object value,
+      TomlPosition position) {
     int depth = path.size();
     assert (depth > 0);
     if (value instanceof Integer) {
@@ -247,14 +254,28 @@ final class MutableTomlTable implements TomlTable {
     }
     assert (typeFor(value).isPresent()) : "Unexpected value of type " + value.getClass();
 
-    MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, false, implicitKeyParents);
+    final EnsureTableResult result = ensureTable(path.subList(0, depth - 1), position, false, false);
+    final MutableTomlTable table = result.table;
+
     Element prevElem = table.properties.putIfAbsent(path.get(depth - 1), new Element(value, position));
     if (prevElem != null) {
       String pathString = Toml.joinKeyPath(path);
       String message = pathString + " previously defined at " + prevElem.position;
       throw new TomlParseError(message, position);
     }
-    return this;
+    return result.intermediates;
+  }
+
+  private static class EnsureTableResult {
+    final MutableTomlTable table;
+    final List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> intermediates;
+
+    private EnsureTableResult(
+        MutableTomlTable table,
+        List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> intermediates) {
+      this.table = table;
+      this.intermediates = intermediates;
+    }
   }
 
   /**
@@ -263,22 +284,33 @@ final class MutableTomlTable implements TomlTable {
    * @param path The path to ensure exists (as a table)
    * @param position The input position.
    * @param followTableArrays If `true`, path walking is permitted via the last element of array tables.
-   * @param implicitDefinitions If `true`, any tables created are considered implicitly defined
-   * @return The table at that path.
+   * @param followDefinedTables Allow path walking through defined tables.
+   * @return The
    * @throws TomlParseError If the table cannot be created.
    */
-  private MutableTomlTable ensureTable(
+  private EnsureTableResult ensureTable(
       List<String> path,
       TomlPosition position,
       boolean followTableArrays,
-      boolean implicitDefinitions) {
+      boolean followDefinedTables) {
     MutableTomlTable table = this;
     int depth = path.size();
+
+    if (depth == 0) {
+      return new EnsureTableResult(table, Collections.emptyList());
+    }
+
+    ArrayList<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> elements = new ArrayList<>();
     for (int i = 0; i < depth; ++i) {
-      Element element = table.properties
-          .computeIfAbsent(path.get(i), k -> new Element(new MutableTomlTable(version, implicitDefinitions), position));
+      Element element =
+          table.properties.computeIfAbsent(path.get(i), k -> new Element(new MutableTomlTable(version), position));
       if (element.value instanceof MutableTomlTable) {
         table = (MutableTomlTable) element.value;
+        if (!followDefinedTables && table.definedAt != null) {
+          String message = Toml.joinKeyPath(path.subList(0, i + 1)) + " already defined at " + table.definedAt;
+          throw new TomlParseError(message, position);
+        }
+        elements.add(new AbstractMap.SimpleEntry<>(table, element.position));
         continue;
       }
       if (element.value instanceof TomlTable) {
@@ -293,6 +325,7 @@ final class MutableTomlTable implements TomlTable {
         if (array.isTableArray()) {
           assert !array.isEmpty();
           table = (MutableTomlTable) array.get(array.size() - 1);
+          elements.add(new AbstractMap.SimpleEntry<>(table, element.position));
           continue;
         }
       }
@@ -300,6 +333,6 @@ final class MutableTomlTable implements TomlTable {
           Toml.joinKeyPath(path.subList(0, i + 1)) + " is not a table (previously defined at " + element.position + ")";
       throw new TomlParseError(message, position);
     }
-    return table;
+    return new EnsureTableResult(table, elements);
   }
 }

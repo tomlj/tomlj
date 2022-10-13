@@ -12,11 +12,7 @@
  */
 package org.tomlj;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.tomlj.EmptyTomlArray.EMPTY_ARRAY;
 import static org.tomlj.EmptyTomlTable.EMPTY_TABLE;
 import static org.tomlj.TomlPosition.positionAt;
@@ -67,9 +63,13 @@ class MutableTomlTableTest {
   @Test
   void shouldCreateParentTables() {
     MutableTomlTable table = new MutableTomlTable(HEAD);
-    table.set("foo.bar", "one", positionAt(1, 1));
+    List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> intermediates =
+        table.set("foo.bar", "one", positionAt(1, 1));
     assertTrue(table.isTable("foo"));
     assertNotNull(table.getTable("foo"));
+    MutableTomlTable firstIntermediate = intermediates.get(0).getKey();
+    assertEquals(table.get("foo"), firstIntermediate);
+    assertFalse(firstIntermediate.isDefined());
   }
 
   @Test
