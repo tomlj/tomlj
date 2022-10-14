@@ -264,6 +264,13 @@ public final class Toml {
     return out;
   }
 
+  /**
+   * Performs a deep comparison between two arrays to determine if they are equivalent.
+   * 
+   * @param array First array
+   * @param array2 Second array
+   * @return Returns true if the arrays are equivalent, else false.
+   */
   public static boolean arrayEquals(TomlArray array, TomlArray array2) {
     if (array.size() != array2.size()) {
       return false;
@@ -301,6 +308,13 @@ public final class Toml {
     return true;
   }
 
+  /**
+   * Performs a deep comparison between two tables to determine if they are equivalent.
+   * 
+   * @param table First table
+   * @param table2 Second table
+   * @return Returns true if the tables are equivalent, else false.
+   */
   public static boolean tableEquals(TomlTable table, TomlTable table2) {
     if (table.entrySet().size() != table2.entrySet().size()) {
       return false;
