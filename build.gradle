@@ -232,6 +232,7 @@ publishing {
         name = project.archivesBaseName
         description = project.description
         url = 'https://github.com/tomlj/tomlj'
+        packaging = 'jar'
         licenses {
           license {
             name = "The Apache License, Version 2.0"
