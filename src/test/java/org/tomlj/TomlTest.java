@@ -850,7 +850,7 @@ class TomlTest {
     assertNotNull(is);
     TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
-    assertTrue(Toml.tableEquals(result, result));
+    assertTrue(Toml.equals(result, result));
   }
 
   @Test
@@ -861,7 +861,7 @@ class TomlTest {
     TomlParseResult result2 = Toml.parse("[test]\nfoo='baz'\nfruit=['strawberry','raspberry']");
     assertFalse(result2.hasErrors(), () -> joinErrors(result2));
 
-    assertFalse(Toml.tableEquals(result1, result2));
+    assertFalse(Toml.equals(result1, result2));
   }
 
   @Test
@@ -876,7 +876,7 @@ class TomlTest {
     assertNotNull(array1);
     TomlArray array2 = result2.getArray("food");
     assertNotNull(array2);
-    assertTrue(Toml.arrayEquals(array1, array2));
+    assertTrue(Toml.equals(array1, array2));
   }
 
   @Test
@@ -891,7 +891,7 @@ class TomlTest {
     assertNotNull(array1);
     TomlArray array2 = result2.getArray("food");
     assertNotNull(array2);
-    assertFalse(Toml.arrayEquals(array1, array2));
+    assertFalse(Toml.equals(array1, array2));
   }
 
   private String joinErrors(TomlParseResult result) {

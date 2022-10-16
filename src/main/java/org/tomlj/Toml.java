@@ -271,7 +271,7 @@ public final class Toml {
    * @param array2 Second array
    * @return Returns true if the arrays are equivalent, else false.
    */
-  public static boolean arrayEquals(TomlArray array1, TomlArray array2) {
+  public static boolean equals(TomlArray array1, TomlArray array2) {
     if (array1.size() != array2.size()) {
       return false;
     }
@@ -291,11 +291,11 @@ public final class Toml {
       }
 
       if (tomlType1.get().equals(TABLE)) {
-        if (!tableEquals((TomlTable) value1, (TomlTable) value2)) {
+        if (!equals((TomlTable) value1, (TomlTable) value2)) {
           return false;
         }
       } else if (tomlType1.get().equals(ARRAY)) {
-        if (!arrayEquals((TomlArray) value1, (TomlArray) value2)) {
+        if (!equals((TomlArray) value1, (TomlArray) value2)) {
           return false;
         }
       } else {
@@ -315,7 +315,7 @@ public final class Toml {
    * @param table2 Second table
    * @return Returns true if the tables are equivalent, else false.
    */
-  public static boolean tableEquals(TomlTable table1, TomlTable table2) {
+  public static boolean equals(TomlTable table1, TomlTable table2) {
     if (table1.entrySet().size() != table2.entrySet().size()) {
       return false;
     }
@@ -346,11 +346,11 @@ public final class Toml {
       }
 
       if (tomlType1.get().equals(TABLE)) {
-        if (!tableEquals((TomlTable) value1, (TomlTable) value2)) {
+        if (!equals((TomlTable) value1, (TomlTable) value2)) {
           return false;
         }
       } else if (tomlType1.get().equals(ARRAY)) {
-        if (!arrayEquals((TomlArray) value1, (TomlArray) value2)) {
+        if (!equals((TomlArray) value1, (TomlArray) value2)) {
           return false;
         }
       } else {
