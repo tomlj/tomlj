@@ -844,6 +844,56 @@ class TomlTest {
     assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
   }
 
+  @Test
+  void testTableEquality() throws Exception {
+    InputStream is = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.toml");
+    assertNotNull(is);
+    TomlParseResult result = Toml.parse(is);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    assertTrue(Toml.equals(result, result));
+  }
+
+  @Test
+  void testTableInequality() throws Exception {
+    TomlParseResult result1 = Toml.parse("[test]\nfoo='bar'\nfruit=['apple','banana']");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+
+    TomlParseResult result2 = Toml.parse("[test]\nfoo='baz'\nfruit=['strawberry','raspberry']");
+    assertFalse(result2.hasErrors(), () -> joinErrors(result2));
+
+    assertFalse(Toml.equals(result1, result2));
+  }
+
+  @Test
+  void testArrayEquality() throws Exception {
+    TomlParseResult result1 = Toml.parse("fruit=['apple','banana']");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+
+    TomlParseResult result2 = Toml.parse("food=['apple','banana']");
+    assertFalse(result2.hasErrors(), () -> joinErrors(result2));
+
+    TomlArray array1 = result1.getArray("fruit");
+    assertNotNull(array1);
+    TomlArray array2 = result2.getArray("food");
+    assertNotNull(array2);
+    assertTrue(Toml.equals(array1, array2));
+  }
+
+  @Test
+  void testArrayInequality() throws Exception {
+    TomlParseResult result1 = Toml.parse("fruit=['apple','banana']");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+
+    TomlParseResult result2 = Toml.parse("food=['strawberry','raspberry']");
+    assertFalse(result2.hasErrors(), () -> joinErrors(result2));
+
+    TomlArray array1 = result1.getArray("fruit");
+    assertNotNull(array1);
+    TomlArray array2 = result2.getArray("food");
+    assertNotNull(array2);
+    assertFalse(Toml.equals(array1, array2));
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }

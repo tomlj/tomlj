@@ -13,6 +13,9 @@
 package org.tomlj;
 
 import static java.util.Objects.requireNonNull;
+import static org.tomlj.TomlType.ARRAY;
+import static org.tomlj.TomlType.TABLE;
+import static org.tomlj.TomlType.typeFor;
 
 import java.io.*;
 import java.nio.channels.ReadableByteChannel;
@@ -22,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
 
@@ -257,5 +262,103 @@ public final class Toml {
       }
     }
     return out;
+  }
+
+  /**
+   * Performs a deep comparison between two arrays to determine if they are equivalent.
+   * 
+   * @param array1 First array
+   * @param array2 Second array
+   * @return Returns true if the arrays are equivalent, else false.
+   */
+  public static boolean equals(TomlArray array1, TomlArray array2) {
+    if (array1.size() != array2.size()) {
+      return false;
+    }
+
+    for (int i = 0; i < array1.size(); i++) {
+      Object value1 = array1.get(i);
+      Object value2 = array2.get(i);
+
+      Optional<TomlType> tomlType1 = typeFor(value1);
+      assert tomlType1.isPresent();
+
+      Optional<TomlType> tomlType2 = typeFor(value2);
+      assert tomlType2.isPresent();
+
+      if (tomlType1.get() != tomlType2.get()) {
+        return false;
+      }
+
+      if (tomlType1.get().equals(TABLE)) {
+        if (!equals((TomlTable) value1, (TomlTable) value2)) {
+          return false;
+        }
+      } else if (tomlType1.get().equals(ARRAY)) {
+        if (!equals((TomlArray) value1, (TomlArray) value2)) {
+          return false;
+        }
+      } else {
+        if (!value1.equals(value2)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Performs a deep comparison between two tables to determine if they are equivalent.
+   * 
+   * @param table1 First table
+   * @param table2 Second table
+   * @return Returns true if the tables are equivalent, else false.
+   */
+  public static boolean equals(TomlTable table1, TomlTable table2) {
+    if (table1.entrySet().size() != table2.entrySet().size()) {
+      return false;
+    }
+    for (Map.Entry<String, Object> entry : table1.entrySet()) {
+      String key = entry.getKey();
+      if (!table2.keySet().contains(key)) {
+        return false;
+      }
+
+      Object value1 = entry.getValue();
+      Optional<Map.Entry<String, Object>> value2Entry =
+          table2.entrySet().stream().filter(entry2 -> entry2.getKey().equals(key)).findFirst();
+
+      if (!value2Entry.isPresent()) {
+        return false;
+      }
+
+      Object value2 = value2Entry.get().getValue();
+
+      Optional<TomlType> tomlType1 = typeFor(value1);
+      assert tomlType1.isPresent();
+
+      Optional<TomlType> tomlType2 = typeFor(value2);
+      assert tomlType2.isPresent();
+
+      if (tomlType1.get() != tomlType2.get()) {
+        return false;
+      }
+
+      if (tomlType1.get().equals(TABLE)) {
+        if (!equals((TomlTable) value1, (TomlTable) value2)) {
+          return false;
+        }
+      } else if (tomlType1.get().equals(ARRAY)) {
+        if (!equals((TomlArray) value1, (TomlArray) value2)) {
+          return false;
+        }
+      } else {
+        if (!value1.equals(value2)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 }
