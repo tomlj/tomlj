@@ -267,34 +267,34 @@ public final class Toml {
   /**
    * Performs a deep comparison between two arrays to determine if they are equivalent.
    * 
-   * @param array First array
+   * @param array1 First array
    * @param array2 Second array
    * @return Returns true if the arrays are equivalent, else false.
    */
-  public static boolean arrayEquals(TomlArray array, TomlArray array2) {
-    if (array.size() != array2.size()) {
+  public static boolean arrayEquals(TomlArray array1, TomlArray array2) {
+    if (array1.size() != array2.size()) {
       return false;
     }
 
-    for (int i = 0; i < array.size(); i++) {
-      Object value1 = array.get(i);
+    for (int i = 0; i < array1.size(); i++) {
+      Object value1 = array1.get(i);
       Object value2 = array2.get(i);
 
-      Optional<TomlType> tomlType = typeFor(value1);
-      assert tomlType.isPresent();
+      Optional<TomlType> tomlType1 = typeFor(value1);
+      assert tomlType1.isPresent();
 
       Optional<TomlType> tomlType2 = typeFor(value2);
       assert tomlType2.isPresent();
 
-      if (tomlType.get() != tomlType2.get()) {
+      if (tomlType1.get() != tomlType2.get()) {
         return false;
       }
 
-      if (tomlType.get().equals(TABLE)) {
+      if (tomlType1.get().equals(TABLE)) {
         if (!tableEquals((TomlTable) value1, (TomlTable) value2)) {
           return false;
         }
-      } else if (tomlType.get().equals(ARRAY)) {
+      } else if (tomlType1.get().equals(ARRAY)) {
         if (!arrayEquals((TomlArray) value1, (TomlArray) value2)) {
           return false;
         }
@@ -311,15 +311,15 @@ public final class Toml {
   /**
    * Performs a deep comparison between two tables to determine if they are equivalent.
    * 
-   * @param table First table
+   * @param table1 First table
    * @param table2 Second table
    * @return Returns true if the tables are equivalent, else false.
    */
-  public static boolean tableEquals(TomlTable table, TomlTable table2) {
-    if (table.entrySet().size() != table2.entrySet().size()) {
+  public static boolean tableEquals(TomlTable table1, TomlTable table2) {
+    if (table1.entrySet().size() != table2.entrySet().size()) {
       return false;
     }
-    for (Map.Entry<String, Object> entry : table.entrySet()) {
+    for (Map.Entry<String, Object> entry : table1.entrySet()) {
       String key = entry.getKey();
       if (!table2.keySet().contains(key)) {
         return false;
@@ -335,21 +335,21 @@ public final class Toml {
 
       Object value2 = value2Entry.get().getValue();
 
-      Optional<TomlType> tomlType = typeFor(value1);
-      assert tomlType.isPresent();
+      Optional<TomlType> tomlType1 = typeFor(value1);
+      assert tomlType1.isPresent();
 
       Optional<TomlType> tomlType2 = typeFor(value2);
       assert tomlType2.isPresent();
 
-      if (tomlType.get() != tomlType2.get()) {
+      if (tomlType1.get() != tomlType2.get()) {
         return false;
       }
 
-      if (tomlType.get().equals(TABLE)) {
+      if (tomlType1.get().equals(TABLE)) {
         if (!tableEquals((TomlTable) value1, (TomlTable) value2)) {
           return false;
         }
-      } else if (tomlType.get().equals(ARRAY)) {
+      } else if (tomlType1.get().equals(ARRAY)) {
         if (!arrayEquals((TomlArray) value1, (TomlArray) value2)) {
           return false;
         }
