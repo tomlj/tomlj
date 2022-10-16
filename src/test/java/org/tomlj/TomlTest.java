@@ -864,6 +864,36 @@ class TomlTest {
     assertFalse(Toml.tableEquals(result1, result2));
   }
 
+  @Test
+  void testArrayEquality() throws Exception {
+    TomlParseResult result1 = Toml.parse("fruit=['apple','banana']");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+
+    TomlParseResult result2 = Toml.parse("food=['apple','banana']");
+    assertFalse(result2.hasErrors(), () -> joinErrors(result2));
+
+    TomlArray array1 = result1.getArray("fruit");
+    assertNotNull(array1);
+    TomlArray array2 = result2.getArray("food");
+    assertNotNull(array2);
+    assertTrue(Toml.arrayEquals(array1, array2));
+  }
+
+  @Test
+  void testArrayInequality() throws Exception {
+    TomlParseResult result1 = Toml.parse("fruit=['apple','banana']");
+    assertFalse(result1.hasErrors(), () -> joinErrors(result1));
+
+    TomlParseResult result2 = Toml.parse("food=['strawberry','raspberry']");
+    assertFalse(result2.hasErrors(), () -> joinErrors(result2));
+
+    TomlArray array1 = result1.getArray("fruit");
+    assertNotNull(array1);
+    TomlArray array2 = result2.getArray("food");
+    assertNotNull(array2);
+    assertFalse(Toml.arrayEquals(array1, array2));
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }
