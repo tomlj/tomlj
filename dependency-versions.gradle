@@ -6,6 +6,7 @@ dependencyManagement {
       entry 'antlr4'
       entry 'antlr4-runtime'
     }
+    dependency('org.checkerframework:checker-qual:3.21.2')
     dependencySet(group: 'org.junit.jupiter', version: '5.9.1') {
       entry 'junit-jupiter-api'
       entry 'junit-jupiter-engine'

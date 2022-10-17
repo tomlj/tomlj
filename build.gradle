@@ -172,7 +172,7 @@ dependencies {
   antlr 'org.antlr:antlr4'
 
   implementation 'org.antlr:antlr4-runtime'
-  implementation 'org.checkerframework:checker-qual:3.21.2'
+  implementation 'org.checkerframework:checker-qual'
 
   testImplementation 'org.junit.jupiter:junit-jupiter-api'
   testImplementation 'org.junit.jupiter:junit-jupiter-params'
@@ -219,6 +219,12 @@ signing {
 
 task deploy() { }
 
+dependencyManagement {
+  generatedPomCustomization {
+    enabled = false
+  }
+}
+
 publishing {
   publications {
     MavenDeployment(MavenPublication) {
@@ -228,6 +234,14 @@ publishing {
       groupId 'org.tomlj'
       artifactId project.archivesBaseName
       version project.version
+      versionMapping {
+        usage('java-api') {
+          fromResolutionOf('runtimeClasspath')
+        }
+        usage('java-runtime') {
+          fromResolutionResult()
+        }
+      }
       pom {
         name = project.archivesBaseName
         description = project.description
