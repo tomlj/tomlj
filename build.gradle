@@ -317,7 +317,7 @@ publishing {
           username = "$ossrhUsername"
           password = "$ossrhPassword"
         }
-        url "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+        url "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
       }
     }
   }
@@ -331,5 +331,6 @@ model {
   tasks.generatePomFileForDistributionPublication {
     destination = file("$buildDir/generated-pom.xml")
   }
+  tasks.publishDistributionPublicationToMavenRepository { dependsOn project.tasks.signArchives }
   tasks.publishDistributionPublicationToMavenLocal { dependsOn project.tasks.signArchives }
 }
