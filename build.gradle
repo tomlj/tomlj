@@ -331,6 +331,11 @@ model {
   tasks.generatePomFileForDistributionPublication {
     destination = file("$buildDir/generated-pom.xml")
   }
-  tasks.publishDistributionPublicationToMavenRepository { dependsOn project.tasks.signArchives }
   tasks.publishDistributionPublicationToMavenLocal { dependsOn project.tasks.signArchives }
+}
+
+if (System.getenv('MAVEN_CENTRAL_DEPLOY') == 'true') {
+  model {
+    tasks.publishDistributionPublicationToMavenRepository { dependsOn project.tasks.signArchives }
+  }
 }
