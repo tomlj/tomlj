@@ -107,6 +107,13 @@ compileJava.options.encoding = 'UTF-8'
 compileTestJava.options.encoding = 'UTF-8'
 javadoc.options.encoding = 'UTF-8'
 
+java {
+  withJavadocJar()
+  withSourcesJar()
+}
+
+sourcesJar.dependsOn generateGrammarSource
+
 jacoco { toolVersion = '0.8.7' }
 
 tasks.withType(JavaCompile) {
@@ -196,18 +203,6 @@ jar {
   }
 }
 
-task sourcesJar(type: Jar, dependsOn: classes) {
-  destinationDirectory = file("${rootProject.buildDir}/src")
-  classifier = 'sources'
-  from sourceSets.main.allSource
-}
-
-task javadocJar(type: Jar, dependsOn: javadoc) {
-  destinationDirectory = file("${rootProject.buildDir}/docs")
-  classifier = 'javadoc'
-  from javadoc.destinationDir
-}
-
 shadowJar {
   configurations = [
     project.configurations.compileClasspath
@@ -224,17 +219,6 @@ shadowJar {
   }
 }
 
-artifacts {
-  archives sourcesJar
-  archives javadocJar
-  archives shadowJar
-}
-
-signing {
-  useGpgCmd()
-  sign configurations.archives
-}
-
 task deploy() { }
 
 dependencyManagement {
@@ -245,10 +229,8 @@ dependencyManagement {
 
 publishing {
   publications {
-    distribution(MavenPublication) {
+    tomljLibrary(MavenPublication) {
       from components.java
-      artifact sourcesJar { classifier 'sources' }
-      artifact javadocJar { classifier 'javadoc' }
       groupId 'org.tomlj'
       artifactId project.archivesBaseName
       version project.version
@@ -283,31 +265,6 @@ publishing {
           }
         }
       }
-      pom.withXml {
-        if (System.getenv('ENABLE_SIGNING') == 'true') {
-          def pomFile = file("${project.buildDir}/generated-pom.xml")
-          writeTo(pomFile)
-          def pomAscFile = signing.sign(pomFile).signatureFiles[0]
-          artifact(pomAscFile) {
-            classifier = null
-            extension = 'pom.asc'
-          }
-        }
-      }
-
-      if (System.getenv('ENABLE_SIGNING') == 'true') {
-        tasks.signArchives.signatureFiles.each {
-          artifact(it) {
-            def matcher = it.file =~ /-(sources|javadoc|all)\.jar\.asc$/
-            if (matcher.find()) {
-              classifier = matcher.group(1)
-            } else {
-              classifier = null
-            }
-            extension = 'jar.asc'
-          }
-        }
-      }
     }
   }
   if (System.getenv('MAVEN_CENTRAL_DEPLOY') == 'true') {
@@ -323,19 +280,21 @@ publishing {
   }
 }
 
+tasks.withType(GenerateModuleMetadata) {
+  enabled = false
+}
+
+signing {
+  useGpgCmd()
+  sign publishing.publications.tomljLibrary
+}
+
 tasks.withType(Sign) {
   onlyIf { System.getenv('ENABLE_SIGNING') == 'true' }
 }
 
 model {
-  tasks.generatePomFileForDistributionPublication {
+  tasks.generatePomFileForTomljLibraryPublication {
     destination = file("$buildDir/generated-pom.xml")
-  }
-  tasks.publishDistributionPublicationToMavenLocal { dependsOn project.tasks.signArchives }
-}
-
-if (System.getenv('MAVEN_CENTRAL_DEPLOY') == 'true') {
-  model {
-    tasks.publishDistributionPublicationToMavenRepository { dependsOn project.tasks.signArchives }
   }
 }
