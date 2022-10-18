@@ -68,6 +68,8 @@ final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
       return builder.append('\\');
     }
     switch (text.charAt(1)) {
+      case '\'':
+        return builder.append('\'');
       case '"':
         return builder.append('"');
       case '\\':

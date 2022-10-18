@@ -362,4 +362,30 @@ public interface TomlArray {
   default void toJson(Appendable appendable, EnumSet<JsonOptions> options) throws IOException {
     JsonSerializer.toJson(this, appendable, options);
   }
+
+  /**
+   * Return a representation of this array using TOML.
+   *
+   * @return A TOML representation of this array.
+   */
+  default String toToml() {
+    StringBuilder builder = new StringBuilder();
+    try {
+      toToml(builder);
+    } catch (IOException e) {
+      // not reachable
+      throw new UncheckedIOException(e);
+    }
+    return builder.toString();
+  }
+
+  /**
+   * Append a TOML representation of this array to the appendable output.
+   *
+   * @param appendable The appendable output.
+   * @throws IOException If an IO error occurs.
+   */
+  default void toToml(Appendable appendable) throws IOException {
+    TomlSerializer.toToml(this, appendable);
+  }
 }
