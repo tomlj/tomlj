@@ -224,6 +224,12 @@ shadowJar {
   }
 }
 
+artifacts {
+  archives sourcesJar
+  archives javadocJar
+  archives shadowJar
+}
+
 signing {
   useGpgCmd()
   sign configurations.archives
@@ -292,7 +298,7 @@ publishing {
       if (System.getenv('ENABLE_SIGNING') == 'true') {
         tasks.signArchives.signatureFiles.each {
           artifact(it) {
-            def matcher = it.file =~ /-(sources|javadoc)\.jar\.asc$/
+            def matcher = it.file =~ /-(sources|javadoc|all)\.jar\.asc$/
             if (matcher.find()) {
               classifier = matcher.group(1)
             } else {
