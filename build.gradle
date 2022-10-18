@@ -11,6 +11,7 @@ plugins {
   id "com.github.hierynomus.license-report" version "0.16.1"
   id 'io.spring.dependency-management' version '1.0.14.RELEASE'
   id 'net.ltgt.errorprone' version '3.0.1'
+  id 'com.github.johnrengelman.shadow' version '7.1.2'
 }
 
 description = 'A parser for Tom\'s Obvious, Minimal Language (TOML).'
@@ -207,9 +208,20 @@ task javadocJar(type: Jar, dependsOn: javadoc) {
   from javadoc.destinationDir
 }
 
-artifacts {
-  archives sourcesJar
-  archives javadocJar
+shadowJar {
+  configurations = [
+    project.configurations.compileClasspath
+  ]
+  dependencies {
+    exclude(dependency('org.checkerframework:checker-qual'))
+  }
+  exclude '**/pom.xml'
+  exclude '**/pom.properties'
+  relocate 'org.antlr', 'org.tomlj.internal.antlr'
+  minimize()
+  manifest {
+    attributes 'Description': 'This archive embeds a copy of the required ANTLR4 runtime library'
+  }
 }
 
 signing {
@@ -227,7 +239,7 @@ dependencyManagement {
 
 publishing {
   publications {
-    MavenDeployment(MavenPublication) {
+    distribution(MavenPublication) {
       from components.java
       artifact sourcesJar { classifier 'sources' }
       artifact javadocJar { classifier 'javadoc' }
@@ -310,8 +322,8 @@ tasks.withType(Sign) {
 }
 
 model {
-  tasks.generatePomFileForMavenDeploymentPublication {
+  tasks.generatePomFileForDistributionPublication {
     destination = file("$buildDir/generated-pom.xml")
   }
-  tasks.publishMavenDeploymentPublicationToMavenLocal { dependsOn project.tasks.signArchives }
+  tasks.publishDistributionPublicationToMavenLocal { dependsOn project.tasks.signArchives }
 }
