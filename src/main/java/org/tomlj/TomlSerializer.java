@@ -36,8 +36,7 @@ final class TomlSerializer {
     toToml(table, appendable, -2, "");
   }
 
-  private static void toToml(TomlTable table, Appendable appendable, int indent, String path)
-      throws IOException {
+  private static void toToml(TomlTable table, Appendable appendable, int indent, String path) throws IOException {
     for (Map.Entry<String, Object> entry : table.entrySet()) {
       String key = entry.getKey();
       Object value = entry.getValue();
@@ -61,7 +60,6 @@ final class TomlSerializer {
         append(appendable, indent + 2, key + "=");
       }
 
-      assert value != null;
       appendTomlValue(value, appendable, indent, newPath);
       if (!tomlType.get().equals(TABLE) && !isTableArray) {
         appendable.append(System.lineSeparator());
@@ -75,8 +73,7 @@ final class TomlSerializer {
     toToml(array, appendable, 0, "");
   }
 
-  private static void toToml(TomlArray array, Appendable appendable, int indent, String path)
-      throws IOException {
+  private static void toToml(TomlArray array, Appendable appendable, int indent, String path) throws IOException {
     boolean tableArray = isTableArray(array);
     if (!tableArray) {
       appendable.append("[");
@@ -85,10 +82,9 @@ final class TomlSerializer {
       }
     }
 
-    Optional<TomlType> tomlType = Optional.empty();
-    for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext(); ) {
+    for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext();) {
       Object tomlValue = iterator.next();
-      tomlType = typeFor(tomlValue);
+      Optional<TomlType> tomlType = typeFor(tomlValue);
       assert tomlType.isPresent();
       if (tomlType.get().equals(TABLE)) {
         append(appendable, indent, "[[" + path + "]]");
@@ -111,8 +107,7 @@ final class TomlSerializer {
     }
   }
 
-  private static void appendTomlValue(Object value, Appendable appendable, int indent, String path)
-      throws IOException {
+  private static void appendTomlValue(Object value, Appendable appendable, int indent, String path) throws IOException {
     Optional<TomlType> tomlType = typeFor(value);
     assert tomlType.isPresent();
     switch (tomlType.get()) {
@@ -124,8 +119,7 @@ final class TomlSerializer {
         append(appendable, 0, value.toString());
         break;
       case OFFSET_DATE_TIME:
-        append(
-            appendable, 0, DateTimeFormatter.ISO_OFFSET_DATE_TIME.format((OffsetDateTime) value));
+        append(appendable, 0, DateTimeFormatter.ISO_OFFSET_DATE_TIME.format((OffsetDateTime) value));
         break;
       case LOCAL_DATE_TIME:
         append(appendable, 0, DateTimeFormatter.ISO_LOCAL_DATE_TIME.format((LocalDateTime) value));
@@ -160,9 +154,8 @@ final class TomlSerializer {
   }
 
   private static boolean isTableArray(TomlArray array) {
-    Optional<TomlType> tomlType = Optional.empty();
     for (Object tomlValue : array.toList()) {
-      tomlType = typeFor(tomlValue);
+      Optional<TomlType> tomlType = typeFor(tomlValue);
       assert tomlType.isPresent();
       if (tomlType.get().equals(TABLE)) {
         return true;
