@@ -263,6 +263,10 @@ publishing {
             name = 'Chris Leishman'
             email = 'chris@leishman.org'
           }
+          developer {
+            name = 'Tobias Schmidt'
+            email = 'tobias.schmidt24080878@gmail.com'
+          }
         }
       }
     }
