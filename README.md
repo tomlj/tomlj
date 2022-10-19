@@ -3,7 +3,7 @@
 TomlJ is a complete [TOML](https://github.com/toml-lang/toml) parser with the
 following attributes:
 
-* Supports the latest TOML specification version (1.0.0-rc.1).
+* Supports the latest TOML specification version (1.0.0).
 * Provides detailed error reporting, including error position.
 * Performs error recovery, allowing parsing to continue after an error.
 
@@ -31,13 +31,11 @@ To include using Maven:
 <dependency>
   <groupId>org.tomlj</groupId>
   <artifactId>tomlj</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
 </dependency>
 ```
 
-To include using Gradle: `implementation 'org.tomlj:tomlj:1.0.0'`
-
-Snapshot versions are also published to the [bintray repository](https://bintray.com/tomlj/tomlj/tomlj).
+To include using Gradle: `implementation 'org.tomlj:tomlj:1.1.0'`
 
 ## Links
 
