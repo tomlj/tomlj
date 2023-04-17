@@ -737,6 +737,28 @@ class TomlTest {
   }
 
   @Test
+  void testCrateExample() throws Exception {
+    InputStream is = this.getClass().getResourceAsStream("/org/tomlj/crate-example.toml");
+    assertNotNull(is);
+    TomlParseResult result = Toml.parse(is, TomlVersion.V0_4_0);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+
+    assertEquals("a fun test case", result.getString("package.name"));
+    assertEquals("=0.99.17", result.getString("dependencies.derive_more.version"));
+
+    String serializedToml = result.toToml();
+
+    TomlParseResult resultReparse =
+        Toml.parse(new ByteArrayInputStream(serializedToml.getBytes(StandardCharsets.UTF_8)));
+    assertFalse(resultReparse.hasErrors(), () -> joinErrors(result));
+
+    serializedToml = resultReparse.toToml();
+    System.out.println(serializedToml);
+
+    assertTrue(Toml.equals(result, resultReparse));
+  }
+
+  @Test
   void testSpecExample() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.toml");
     assertNotNull(is);
