@@ -23,9 +23,12 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 final class TomlSerializer {
   private TomlSerializer() {}
@@ -36,8 +39,23 @@ final class TomlSerializer {
     toToml(table, appendable, -2, "");
   }
 
-  private static void toToml(TomlTable table, Appendable appendable, int indent, String path) throws IOException {
-    for (Map.Entry<String, Object> entry : table.entrySet()) {
+  private static void toToml(TomlTable table, Appendable appendable, int indent, String path)
+      throws IOException {
+    final List<Map.Entry<String, Object>> entryListSorted =
+        table.entrySet().stream()
+            .sorted(
+                Comparator.comparing(
+                    entry -> {
+                      final TomlType tomlType = typeFor(entry.getValue()).get();
+                      return tomlType.equals(TABLE)
+                              || (tomlType.equals(ARRAY)
+                                  && isTableArray((TomlArray) entry.getValue()))
+                          ? 1
+                          : 0;
+                    }))
+            .collect(Collectors.toList());
+
+    for (Map.Entry<String, Object> entry : entryListSorted) {
       String key = entry.getKey();
       Object value = entry.getValue();
 
