@@ -745,6 +745,7 @@ class TomlTest {
 
     assertEquals("a fun test case", result.getString("package.name"));
     assertEquals("=0.99.17", result.getString("dependencies.derive_more.version"));
+    assertEquals("FUN", result.getString("dependencies.alias"));
 
     String serializedToml = result.toToml();
 
