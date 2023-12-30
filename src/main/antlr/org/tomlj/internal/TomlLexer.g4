@@ -110,7 +110,8 @@ ValueDateStart : Digit+ { "-:".indexOf(_input.LA(1)) >= 0 }? -> type(DateDigits)
 // Array
 ArrayStart : '[' { arrayDepth++; } -> pushMode(ValueMode);
 ArrayEnd : ']' { arrayDepth--; } -> popMode;
-ArrayComma : ',' { arrayDepth > 0 }? -> type(Comma), pushMode(ValueMode);
+ArrayComma : ',' { arrayDepth > 0 && _input.LA(1) != ']' }? -> type(Comma), pushMode(ValueMode);
+ArrayTrailingComma : ',' (NL|WSChar)* { arrayDepth > 0 && _input.LA(1) == ']' }? -> type(Comma);
 
 // Table
 InlineTableStart : '{' { pushArrayDepth(); } -> mode(InlineTableMode);

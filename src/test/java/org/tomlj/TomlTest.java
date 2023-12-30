@@ -517,6 +517,31 @@ class TomlTest {
   }
 
   @ParameterizedTest
+  @MethodSource("arrayWithTrailingCommaWithinInlineTableSupplier")
+  void shouldParseArrayWithTrailingCommaWithinInlineTable(String input, Object[] expected) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    TomlArray array = result.getArray("foo.bar");
+    assertNotNull(array);
+    assertEquals(expected.length, array.size());
+    assertTomlArrayEquals(expected, array);
+  }
+
+  static Stream<Arguments> arrayWithTrailingCommaWithinInlineTableSupplier() {
+    // @formatter:off
+    return Stream.of(
+            Arguments.of("foo = { bar = ['baz'] , buz = 2 }", new Object[] {"baz"}),
+            Arguments.of("foo = { bar = ['baz',] , buz = 2 }", new Object[] {"baz"}),
+            Arguments.of("foo = { bar = ['baz', ] , buz = 2 }", new Object[] {"baz"}),
+            Arguments.of("foo = { bar = ['baz',\n] , buz = 2 }", new Object[] {"baz"}),
+            Arguments.of("foo = { bar = ['baz', \n ] , buz = 2 }", new Object[] {"baz"}),
+            Arguments.of("foo = { bar = ['baz',\n \n] , buz = 2 }", new Object[] {"baz"}),
+            Arguments.of("foo = { bar = ['baz'\n \n,] , buz = 2 }", new Object[] {"baz"})
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
   @MethodSource("arrayTableSupplier")
   void shouldParseArrayTable(String input, Object[] path, Object expected) {
     TomlParseResult result = Toml.parse(input);
