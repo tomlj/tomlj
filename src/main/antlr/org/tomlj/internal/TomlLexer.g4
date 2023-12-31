@@ -13,6 +13,16 @@ package org.tomlj.internal;
   public final IntegerStack arrayDepthStack = new IntegerStack();
   public int arrayDepth = 0;
 
+  private boolean inArray() {
+    return arrayDepth > 0;
+  }
+
+  private void pushValueModeIfInArray() {
+    if (inArray()) {
+        pushMode(ValueMode);
+    }
+  }
+
   private void resetArrayDepth() {
     arrayDepthStack.clear();
     arrayDepth = 0;
@@ -81,46 +91,44 @@ TomlKeyError : . -> type(Error);
 mode ValueMode;
 
 // Strings
-ValueQuotationMark : '"' -> type(QuotationMark), mode(BasicStringMode);
-ValueTripleQuotationMark : '"""' NL? -> type(TripleQuotationMark), mode(MLBasicStringMode);
-ValueApostrophe : '\'' -> type(Apostrophe), mode(LiteralStringMode);
-ValueTripleApostrophe : '\'\'\'' NL? -> type(TripleApostrophe), mode(MLLiteralStringMode);
+ValueQuotationMark : '"' { pushValueModeIfInArray(); } -> type(QuotationMark), mode(BasicStringMode);
+ValueTripleQuotationMark : '"""' NL? { pushValueModeIfInArray(); } -> type(TripleQuotationMark), mode(MLBasicStringMode);
+ValueApostrophe : '\'' { pushValueModeIfInArray(); } -> type(Apostrophe), mode(LiteralStringMode);
+ValueTripleApostrophe : '\'\'\'' NL? { pushValueModeIfInArray(); } -> type(TripleApostrophe), mode(MLLiteralStringMode);
 
 // Integers
 fragment DecInt : [-+]? (Digit | Digit1_9 ('_'? Digit)+);
-DecimalInteger : DecInt { "-:".indexOf(_input.LA(1)) < 0 }? -> popMode;
-HexInteger : '0x' HexDig ('_'? HexDig)* -> popMode;
-OctalInteger : '0o' Digit0_7 ('_'? Digit0_7)* -> popMode;
-BinaryInteger : '0b' Digit0_1 ('_'? Digit0_1)* -> popMode;
+DecimalInteger : DecInt { "-:".indexOf(_input.LA(1)) < 0 }? { pushValueModeIfInArray(); } -> popMode;
+HexInteger : '0x' HexDig ('_'? HexDig)* { pushValueModeIfInArray(); } -> popMode;
+OctalInteger : '0o' Digit0_7 ('_'? Digit0_7)* { pushValueModeIfInArray(); } -> popMode;
+BinaryInteger : '0b' Digit0_1 ('_'? Digit0_1)* { pushValueModeIfInArray(); } -> popMode;
 
 // Float
 fragment Exp : [eE] [-+]? Digit ('_'? Digit)*;
 fragment Frac : '.' Digit ('_'? Digit)*;
-FloatingPoint : DecInt (Exp | Frac Exp?) -> popMode;
-FloatingPointInf: [-+]? 'inf' -> popMode;
-FloatingPointNaN : [-+]? 'nan' -> popMode;
+FloatingPoint : DecInt (Exp | Frac Exp?) { pushValueModeIfInArray(); } -> popMode;
+FloatingPointInf: [-+]? 'inf' { pushValueModeIfInArray(); } -> popMode;
+FloatingPointNaN : [-+]? 'nan' { pushValueModeIfInArray(); } -> popMode;
 
 // Boolean
-TrueBoolean : 'true' -> popMode;
-FalseBoolean : 'false' -> popMode;
+TrueBoolean : 'true' { pushValueModeIfInArray(); } -> popMode;
+FalseBoolean : 'false' { pushValueModeIfInArray(); } -> popMode;
 
 // Date and Time
-ValueDateStart : Digit+ { "-:".indexOf(_input.LA(1)) >= 0 }? -> type(DateDigits), mode(DateMode);
+ValueDateStart : Digit+ { "-:".indexOf(_input.LA(1)) >= 0 }? { pushValueModeIfInArray(); } -> type(DateDigits), mode(DateMode);
 
 // Array
-ArrayStart : '[' { arrayDepth++; } -> pushMode(ValueMode);
-ArrayEnd : ']' { arrayDepth--; } -> popMode;
-ArrayComma : ',' { arrayDepth > 0 && _input.LA(1) != ']' }? -> type(Comma), pushMode(ValueMode);
-ArrayTrailingComma : ',' (NL|WSChar)* { arrayDepth > 0 && _input.LA(1) == ']' }? -> type(Comma);
+ArrayStart : '[' { arrayDepth++; };
+ArrayEnd : ']' { arrayDepth--; pushValueModeIfInArray(); } -> popMode;
+ArrayComma : ',' { inArray() }? -> type(Comma);
+ArrayNewLine: NL { inArray() }? -> type(NewLine);
 
 // Table
-InlineTableStart : '{' { pushArrayDepth(); } -> mode(InlineTableMode);
+InlineTableStart : '{' { pushValueModeIfInArray(); pushArrayDepth(); } -> mode(InlineTableMode);
 
 ValueWS : WSChar+ -> type(WS), channel(WHITESPACE);
 ValueComment : COMMENT -> type(Comment), channel(COMMENTS);
-ArrayNewLine: NL { arrayDepth > 0 }? -> type(NewLine);
 
-ValueNewLine: NL { arrayDepth == 0 }? -> type(NewLine), popMode;
 ValueError : . -> type(Error), popMode;
 
 
