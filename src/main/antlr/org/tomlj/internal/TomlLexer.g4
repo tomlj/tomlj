@@ -115,17 +115,17 @@ TrueBoolean : 'true' { pushValueModeIfInArray(); } -> popMode;
 FalseBoolean : 'false' { pushValueModeIfInArray(); } -> popMode;
 
 // Date and Time
-ValueDateStart : Digit+ { "-:".indexOf(_input.LA(1)) >= 0 }? { pushValueModeIfInArray(); } -> type(DateDigits), mode(DateMode);
+DateStart : Digit+ { "-:".indexOf(_input.LA(1)) >= 0 }? { pushValueModeIfInArray(); } -> type(DateDigits), mode(DateMode);
 
 // Array
 ArrayStart : '[' { arrayDepth++; };
-ArrayEnd : ']' { arrayDepth--; pushValueModeIfInArray(); } -> popMode;
-ArrayComma : ',' { inArray() }? -> type(Comma);
-ArrayNewLine: NL { inArray() }? -> type(NewLine);
+ArrayEnd : ']' { if (inArray()) { arrayDepth--; pushValueModeIfInArray(); } } -> popMode;
 
 // Table
 InlineTableStart : '{' { pushValueModeIfInArray(); pushArrayDepth(); } -> mode(InlineTableMode);
 
+ValueComma : ',' -> type(Comma);
+ValueNewLine: NL -> type(NewLine);
 ValueWS : WSChar+ -> type(WS), channel(WHITESPACE);
 ValueComment : COMMENT -> type(Comment), channel(COMMENTS);
 
@@ -192,8 +192,8 @@ DateDigits : Digit+;
 DateWS : WSChar+ -> type(WS), channel(WHITESPACE), popMode;
 DateComment : COMMENT -> type(Comment), channel(COMMENTS), popMode;
 DateNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine), popMode;
-DateComma: ',' { arrayDepth > 0 }? -> type(Comma), mode(ValueMode);
-DateArrayEnd : ']' { arrayDepth > 0 }? { arrayDepth--; } -> type(ArrayEnd), popMode;
+DateComma: ',' -> type(Comma), popMode;
+DateArrayEnd : ']' { if (inArray()) { arrayDepth--; } } -> type(ArrayEnd), popMode;
 DateError : . -> type(Error), popMode;
 
 
