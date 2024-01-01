@@ -24,7 +24,7 @@ String value = result.getString("a. dotted . key");
 
 ## Getting TomlJ
 
-TomlJ is published to a Maven and JCenter.
+TomlJ is published to a Maven Central.
 
 To include using Maven:
 ```xml
