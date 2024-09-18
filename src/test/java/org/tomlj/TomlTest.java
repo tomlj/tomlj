@@ -511,7 +511,8 @@ class TomlTest {
         Arguments.of("foo = { bar = 'baz', baz.buz = 2 }", "foo.baz.buz", 2L),
         Arguments.of("foo = { bar = ['baz', 'buz']   , baz  .   buz = 2 }", "foo.baz.buz", 2L),
         Arguments.of("foo = { bar = ['baz',\n'buz'\n], baz.buz = 2 }", "foo.baz.buz", 2L),
-        Arguments.of("bar = { bar = ['baz',\n'buz'\n], baz.buz = 2 }\nfoo=2\n", "foo", 2L)
+        Arguments.of("bar = { bar = ['baz',\n'buz'\n], baz.buz = 2 }\nfoo=2\n", "foo", 2L),
+        Arguments.of("foo = { bar = 2, baz = [] }", "foo.bar", 2L)
     );
     // @formatter:on
   }
