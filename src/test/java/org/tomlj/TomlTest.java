@@ -944,6 +944,7 @@ class TomlTest {
     assertFalse(Toml.equals(array1, array2));
   }
 
+  @Test
   void testSerializerArrayTables() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.toml");
     assertNotNull(is);
