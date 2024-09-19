@@ -51,6 +51,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains strings.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsStrings();
 
   /**
@@ -59,6 +60,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains longs.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsLongs();
 
   /**
@@ -67,6 +69,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains doubles.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsDoubles();
 
   /**
@@ -75,6 +78,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains booleans.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsBooleans();
 
   /**
@@ -83,6 +87,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains {@link OffsetDateTime}s.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsOffsetDateTimes();
 
   /**
@@ -91,6 +96,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains {@link LocalDateTime}s.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsLocalDateTimes();
 
   /**
@@ -99,6 +105,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains {@link LocalDate}s.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsLocalDates();
 
   /**
@@ -107,6 +114,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains {@link LocalTime}s.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsLocalTimes();
 
   /**
@@ -115,6 +123,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains arrays.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsArrays();
 
   /**
@@ -123,6 +132,7 @@ public interface TomlArray {
    * @return {@code true} if the array contains tables.
    * @deprecated Future releases will support heterogeneous arrays and this method will be removed.
    */
+  @Deprecated
   boolean containsTables();
 
   /**

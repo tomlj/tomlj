@@ -1,13 +1,13 @@
 dependencyManagement {
   dependencies {
-    dependency('com.google.errorprone:error_prone_core:2.16')
-    dependency('com.google.errorprone:javac:9-dev-r4023-3')
-    dependencySet(group: 'org.antlr', version: '4.11.1') {
+    dependency('com.google.errorprone:error_prone_core:2.32.0')
+    dependency('com.google.errorprone:javac:9+181-r4173-1')
+    dependencySet(group: 'org.antlr', version: '4.13.2') {
       entry 'antlr4'
       entry 'antlr4-runtime'
     }
-    dependency('org.checkerframework:checker-qual:3.21.2')
-    dependencySet(group: 'org.junit.jupiter', version: '5.9.1') {
+    dependency('org.checkerframework:checker-qual:3.47.0')
+    dependencySet(group: 'org.junit.jupiter', version: '5.11.0') {
       entry 'junit-jupiter-api'
       entry 'junit-jupiter-engine'
       entry 'junit-jupiter-params'

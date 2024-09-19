@@ -7,11 +7,11 @@ plugins {
   id 'jacoco'
   id 'maven-publish'
   id 'signing'
-  id 'com.diffplug.spotless' version '6.11.0'
+  id 'com.diffplug.spotless' version '6.25.0'
   id "com.github.hierynomus.license-report" version "0.16.1"
-  id 'io.spring.dependency-management' version '1.0.14.RELEASE'
-  id 'net.ltgt.errorprone' version '3.0.1'
-  id 'com.github.johnrengelman.shadow' version '7.1.2'
+  id 'io.spring.dependency-management' version '1.1.6'
+  id 'net.ltgt.errorprone' version '4.0.1'
+  id 'com.gradleup.shadow' version '8.3.2'
 }
 
 description = 'A parser for Tom\'s Obvious, Minimal Language (TOML).'
@@ -37,7 +37,10 @@ static String buildTag() {
 //////
 // Dependencies and licensing checks
 
-repositories { mavenCentral() }
+repositories {
+  mavenCentral()
+  gradlePluginPortal()
+}
 
 apply from: "${rootDir}/dependency-versions.gradle"
 apply from: "${rootDir}/gradle/check-licenses.gradle"
@@ -114,15 +117,10 @@ java {
 
 sourcesJar.dependsOn generateGrammarSource
 
-jacoco { toolVersion = '0.8.7' }
+jacoco { toolVersion = '0.8.12' }
 
 tasks.withType(JavaCompile) {
-  // Until https://github.com/gradle/gradle/issues/2510 is resolved and
-  // something like a `releaseCompability` property is added, we have to add
-  // the --release flag explicitly
-  if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
-    options.compilerArgs.addAll(['--release', '8'])
-  }
+  options.release = 9
   options.compilerArgs += [
     '-Xlint:unchecked',
     '-Xlint:cast',

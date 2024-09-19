@@ -22,6 +22,13 @@ import java.io.IOException;
  */
 public class TomlCommand {
 
+  private TomlCommand() {}
+
+  /**
+   * The main method.
+   *
+   * @param args Command line arguments (ignored).
+   **/
   public static void main(String[] args) {
     try {
       TomlParseResult result = Toml.parse(System.in);

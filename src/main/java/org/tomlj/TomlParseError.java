@@ -18,6 +18,9 @@ package org.tomlj;
 @SuppressWarnings("OverrideThrowableToString")
 public final class TomlParseError extends RuntimeException {
 
+  /**
+   * The position of the error.
+   */
   private final TomlPosition position;
 
   TomlParseError(String message, TomlPosition position) {

@@ -39,21 +39,13 @@ final class TomlSerializer {
     toToml(table, appendable, -2, "");
   }
 
-  private static void toToml(TomlTable table, Appendable appendable, int indent, String path)
-      throws IOException {
+  private static void toToml(TomlTable table, Appendable appendable, int indent, String path) throws IOException {
     final List<Map.Entry<String, Object>> entryListSorted =
-        table.entrySet().stream()
-            .sorted(
-                Comparator.comparing(
-                    entry -> {
-                      final TomlType tomlType = typeFor(entry.getValue()).get();
-                      return tomlType.equals(TABLE)
-                              || (tomlType.equals(ARRAY)
-                                  && isTableArray((TomlArray) entry.getValue()))
-                          ? 1
-                          : 0;
-                    }))
-            .collect(Collectors.toList());
+        table.entrySet().stream().sorted(Comparator.comparing(entry -> {
+          final TomlType tomlType = typeFor(entry.getValue()).get();
+          return tomlType.equals(TABLE) || (tomlType.equals(ARRAY) && isTableArray((TomlArray) entry.getValue())) ? 1
+              : 0;
+        })).collect(Collectors.toList());
 
     for (Map.Entry<String, Object> entry : entryListSorted) {
       String key = entry.getKey();

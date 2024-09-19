@@ -64,6 +64,7 @@ public enum TomlVersion {
     this.canonical = canonical != null ? canonical : this;
   }
 
+  @SuppressWarnings("EnumOrdinal")
   boolean after(TomlVersion other) {
     return this.ordinal() > other.ordinal();
   }
