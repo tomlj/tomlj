@@ -100,12 +100,12 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitTrueBool(TomlParser.TrueBoolContext ctx) {
-    return Boolean.TRUE;
+    return true;
   }
 
   @Override
   public Object visitFalseBool(TomlParser.FalseBoolContext ctx) {
-    return Boolean.FALSE;
+    return false;
   }
 
   @Override
