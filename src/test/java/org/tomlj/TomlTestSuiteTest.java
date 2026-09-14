@@ -54,7 +54,8 @@ import org.junit.jupiter.api.TestFactory;
 class TomlTestSuiteTest {
 
   /**
-   * Cases from the TOML 1.1.0 list that the parser is known to fail at {@link TomlVersion#HEAD}.
+   * Cases from the TOML 1.1.0 list that the parser is known to fail at {@link TomlVersion#V1_1_0} and
+   * {@link TomlVersion#HEAD}.
    *
    * <p>
    * Each case is asserted to still fail, so fixing the behaviour requires removing the case from this set.
@@ -82,6 +83,11 @@ class TomlTestSuiteTest {
 
   @TestFactory
   Stream<DynamicTest> toml_1_1_0() throws IOException {
+    return suite("files-toml-1.1.0", TomlVersion.V1_1_0, KNOWN_FAILURES_1_1_0);
+  }
+
+  @TestFactory
+  Stream<DynamicTest> toml_1_1_0_at_head() throws IOException {
     return suite("files-toml-1.1.0", TomlVersion.HEAD, KNOWN_FAILURES_1_1_0);
   }
 

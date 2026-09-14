@@ -111,8 +111,8 @@ interface as a `default` method, not to the implementations.
 
 ### Spec versions
 
-`TomlVersion` (`V0_4_0`, `V0_5_0`, `V1_0_0`, `LATEST` = alias of `V1_0_0`, `HEAD`) is threaded through every
-visitor. Behaviour that differs between spec versions is gated with `version.after(V0_x_0)` (dotted keys,
+`TomlVersion` (`V0_4_0`, `V0_5_0`, `V1_0_0`, `V1_1_0`, `LATEST` = alias of `V1_1_0`, `HEAD`) is threaded through
+every visitor. Behaviour that differs between spec versions is gated with `version.after(V0_x_0)` (dotted keys,
 heterogeneous arrays, tabs in strings). Add new version-dependent behaviour the same way rather than branching on
 equality.
 
@@ -127,8 +127,8 @@ normalised with `System.lineSeparator()`).
 `TomlTestSuiteTest` runs the official [toml-test](https://github.com/toml-lang/toml-test) suite. The
 `extractTomlTest` task (a dependency of `test`) fetches the tagged source archive, versioned in
 `dependency-versions.gradle` and resolved through an Ivy repository over GitHub, and extracts its `tests/` directory
-to `build/toml-test`. The test reads the `files-toml-1.0.0` and `files-toml-1.1.0` lists (parsed at `V1_0_0` and
-`HEAD`), compares valid cases against their tagged JSON with the same rules as the official runner, and asserts that
-invalid cases report errors. Cases the parser is known to fail are listed in the test's `KNOWN_FAILURES_*` sets and
+to `build/toml-test`. The test reads the `files-toml-1.0.0` list (parsed at `V1_0_0`) and the `files-toml-1.1.0`
+list (parsed at both `V1_1_0` and `HEAD`), compares valid cases against their tagged JSON with the same rules as the
+official runner, and asserts that invalid cases report errors. Cases the parser is known to fail are listed in the test's `KNOWN_FAILURES_*` sets and
 asserted to still fail, so remove the entry when fixing the behaviour. When bumping the suite version, expect to
 update those sets.
