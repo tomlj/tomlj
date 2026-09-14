@@ -39,6 +39,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 class TomlTest {
 
+  static final String INVALID_KEY_HINT =
+      ". Keys containing characters other than A-Z, a-z, 0-9, '_' and '-' must be quoted (e.g. \"@key\"), or use the List<String> key path overloads.";
+
   @Test
   void shouldParseEmptyDocument() {
     TomlParseResult result = Toml.parse("\n");
@@ -70,7 +73,27 @@ class TomlTest {
   void shouldThrowExceptionForInvalidDottedKey() {
     Exception exception =
         assertThrows(IllegalArgumentException.class, () -> Toml.parseDottedKey(" foo  . bar@ . -baz"));
-    assertEquals("Invalid key: Unexpected '@', expected . or end-of-input", exception.getMessage());
+    assertEquals("Invalid key: Unexpected '@', expected . or end-of-input" + INVALID_KEY_HINT, exception.getMessage());
+  }
+
+  @Test
+  void shouldLookupQuotedKeyWithSpecialCharacters() {
+    String key = "@key#with$special%characters";
+    TomlParseResult result = Toml.parse("\"" + key + "\" = \"works too\"\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+
+    assertEquals(Collections.singleton(key), result.keySet());
+    assertEquals("works too", result.get(Collections.singletonList(key)));
+    assertEquals("works too", result.get("\"" + key + "\""));
+    assertEquals(Collections.singleton("\"" + key + "\""), result.dottedKeySet());
+    for (String dottedKey : result.dottedKeySet()) {
+      assertEquals("works too", result.get(dottedKey));
+    }
+
+    Exception exception = assertThrows(IllegalArgumentException.class, () -> result.get(key));
+    assertEquals(
+        "Invalid key: Unexpected '@', expected a-z, A-Z, 0-9, ', or \"" + INVALID_KEY_HINT,
+        exception.getMessage());
   }
 
   @Test
