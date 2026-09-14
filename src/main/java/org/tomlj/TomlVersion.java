@@ -43,9 +43,17 @@ public enum TomlVersion {
    */
   V1_0_0(null),
   /**
+   * The 1.1.0 version of TOML.
+   *
+   * <p>
+   * This specification can be found at <a href=
+   * "https://github.com/toml-lang/toml/blob/1.1.0/toml.md">https://github.com/toml-lang/toml/blob/1.1.0/toml.md</a>.
+   */
+  V1_1_0(null),
+  /**
    * The latest stable specification of TOML.
    */
-  LATEST(V1_0_0),
+  LATEST(V1_1_0),
   /**
    * The head (development) specification of TOML.
    *

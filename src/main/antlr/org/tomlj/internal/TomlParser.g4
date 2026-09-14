@@ -132,7 +132,7 @@ localDate : date;
 localTime : time;
 
 date : year Dash month Dash day;
-time : hour Colon minute Colon second (Dot secondFraction)?;
+time : hour Colon minute (Colon second (Dot secondFraction)?)?;
 timeOffset
   : Z
   | hourOffset Colon minuteOffset
@@ -166,8 +166,9 @@ standardTable : TableKeyStart key? TableKeyEnd;
 
 
 // Inline Table
-inlineTable : InlineTableStart inlineTableValues? InlineTableEnd;
-inlineTableValues : keyval (Comma keyval)*;
+inlineTable : InlineTableStart (inlineTableValues NewLine* Comma?)? NewLine* InlineTableEnd;
+inlineTableValues : inlineTableValue (NewLine* Comma inlineTableValue)*;
+inlineTableValue : NewLine* keyval;
 
 
 // Array Table

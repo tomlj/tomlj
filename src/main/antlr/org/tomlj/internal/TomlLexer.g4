@@ -138,6 +138,7 @@ BasicStringEnd : '"' -> type(QuotationMark), popMode;
 BasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F"\\\u007F] -> type(StringChar);
 EscapeSequence
   : '\\' ~[\n]
+  | '\\x' HexDig HexDig
   | '\\u' HexDig HexDig HexDig HexDig
   | '\\U' HexDig HexDig HexDig HexDig HexDig HexDig HexDig HexDig;
 
@@ -152,7 +153,8 @@ MLBasicStringEnd : '"""' { _input.LA(1) != '"' }? -> type(TripleQuotationMark), 
 MLBasicStringLineEndBackslash : '\\' WSChar* NL (WSChar | NL)* -> type(NewLine), channel(WHITESPACE);
 MLBasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F\\\u007F] -> type(StringChar);
 MLBasicStringEscape :
-  ('\\u' HexDig HexDig HexDig HexDig
+  ('\\x' HexDig HexDig
+  | '\\u' HexDig HexDig HexDig HexDig
   | '\\U' HexDig HexDig HexDig HexDig HexDig HexDig HexDig HexDig
   | '\\' .) -> type(EscapeSequence);
 MLBasicStringNewLine: NL { setText(System.lineSeparator()); } -> type(StringChar);
@@ -208,6 +210,6 @@ InlineTableApostrophe : '\'' -> type(Apostrophe), pushMode(LiteralStringMode);
 InlineTableUnquotedKey : UNQUOTED_KEY -> type(UnquotedKey);
 
 InlineTableWS : WSChar+ -> type(WS), channel(WHITESPACE);
-InlineTableComment : COMMENT -> type(Comment), channel(COMMENTS), popMode;
-InlineTableNewLine : NL { setText(System.lineSeparator()); } -> type(NewLine), popMode;
+InlineTableComment : COMMENT -> type(Comment), channel(COMMENTS);
+InlineTableNewLine : NL { setText(System.lineSeparator()); } -> type(NewLine);
 InlineTableError : . -> type(Error), popMode;

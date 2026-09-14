@@ -130,6 +130,12 @@ class TomlTest {
                 "foo = \"I'm a string. \\\"You can quote me\\\". Name\tJos\\u00E9\\nLocation\\tSF.\"",
                 "I'm a string. \"You can quote me\". Name\tJosé\nLocation\tSF."),
         Arguments.of(
+                "foo = \"\\e[0m \\x41\\x00\\xe9\\xFF\"",
+                "\u001B[0m A\u0000\u00E9\u00FF"),
+        Arguments.of(
+                "foo = \"\"\"\\e \\x41\"\"\"",
+                "\u001B A"),
+        Arguments.of(
                 "foo = \"\"\"\"\"\"",
                 ""),
         Arguments.of(
@@ -324,7 +330,9 @@ class TomlTest {
         Arguments.of("foo = 1937-07-18 11:44:02.334543+18:00",
             OffsetDateTime.parse("1937-07-18T11:44:02.334543+18:00")),
         Arguments.of("foo = 1937-07-18 11:44:02Z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00")),
-        Arguments.of("foo = 1937-07-18 11:44:02z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00"))
+        Arguments.of("foo = 1937-07-18 11:44:02z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00")),
+        Arguments.of("foo = 1979-05-27 07:32Z", OffsetDateTime.parse("1979-05-27T07:32:00Z")),
+        Arguments.of("foo = 1979-05-27T07:32-07:00", OffsetDateTime.parse("1979-05-27T07:32:00-07:00"))
     );
     // @formatter:on
   }
@@ -344,7 +352,8 @@ class TomlTest {
         Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02")),
         Arguments.of("foo = 0000-07-18 11:44:02.00", LocalDateTime.parse("0000-07-18T11:44:02")),
         Arguments.of("foo = 1937-07-18 11:44:02.334543", LocalDateTime.parse("1937-07-18T11:44:02.334543")),
-        Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02"))
+        Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02")),
+        Arguments.of("foo = 1979-05-27T07:32", LocalDateTime.parse("1979-05-27T07:32:00"))
     );
     // @formatter:on
   }
@@ -384,7 +393,8 @@ class TomlTest {
         Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02")),
         Arguments.of("foo = 11:44:02.00", LocalTime.parse("11:44:02")),
         Arguments.of("foo = 11:44:02.334543", LocalTime.parse("11:44:02.334543")),
-        Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02"))
+        Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02")),
+        Arguments.of("foo = 07:32", LocalTime.parse("07:32:00"))
     );
     // @formatter:on
   }
@@ -534,7 +544,12 @@ class TomlTest {
         Arguments.of("foo = { bar = ['baz', 'buz']   , baz  .   buz = 2 }", "foo.baz.buz", 2L),
         Arguments.of("foo = { bar = ['baz',\n'buz'\n], baz.buz = 2 }", "foo.baz.buz", 2L),
         Arguments.of("bar = { bar = ['baz',\n'buz'\n], baz.buz = 2 }\nfoo=2\n", "foo", 2L),
-        Arguments.of("foo = { bar = 2, baz = [] }", "foo.bar", 2L)
+        Arguments.of("foo = { bar = 2, baz = [] }", "foo.bar", 2L),
+        Arguments.of("foo = {\n}", "foo.bar", null),
+        Arguments.of("foo = { bar = 'baz', }", "foo.bar", "baz"),
+        Arguments.of("foo = {\n  bar = 'baz',\n  baz.buz = 2,\n}", "foo.baz.buz", 2L),
+        Arguments.of("foo = { # comment\n  bar = 'baz' # comment\n  , baz.buz = 2 # comment\n} # comment\nbar = 1", "foo.baz.buz", 2L),
+        Arguments.of("foo = {\n  bar = {\n    baz = [\n      1,\n    ],\n    buz = 2,\n  },\n}", "foo.bar.buz", 2L)
     );
     // @formatter:on
   }
@@ -638,6 +653,8 @@ class TomlTest {
         Arguments.of("foo = \"val\\ue\"", 1, 11, "Invalid unicode escape sequence"),
         Arguments.of("foo = \"val\\U0000\"", 1, 11, "Invalid unicode escape sequence"),
         Arguments.of("foo = \"\"\"val\\ue\"\"\"", 1, 13, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"\\x4\"", 1, 8, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"\"\"\\xZZ\"\"\"", 1, 10, "Invalid unicode escape sequence"),
 
         Arguments.of("foo = 1234567891234567891233456789", 1, 7, "Integer is too large"),
 
@@ -716,16 +733,47 @@ class TomlTest {
         Arguments.of("[foo]\nbar='baz'\n[foo]\nbaz=1", 3, 1, "foo previously defined at line 1, column 1"),
         Arguments.of("[foo]\nbar='baz'\n[foo.bar]\nbaz=1", 3, 1, "foo.bar previously defined at line 2, column 1"),
 
-        Arguments.of("foo = {", 1, 8, "Unexpected end of input, expected a-z, A-Z, 0-9, }, ', or \""),
-        Arguments.of("foo = { bar = 1,\nbaz = 2 }", 1, 17, "Unexpected end of line, expected a-z, A-Z, 0-9, ', or \""),
-        Arguments.of("foo = { bar = 1\nbaz = 2 }", 1, 16, "Unexpected end of line, expected }"),
-        Arguments.of("foo = { bar = 1 baz = 2 }", 1, 17, "Unexpected 'baz', expected } or a comma"),
+        Arguments.of("foo = {", 1, 8, "Unexpected end of input, expected a-z, A-Z, 0-9, }, ', \", or a newline"),
+        Arguments.of("foo = { bar = 1\nbaz = 2 }", 2, 1, "Unexpected 'baz', expected }, a comma, or a newline"),
+        Arguments.of("foo = { bar = 1 baz = 2 }", 1, 17, "Unexpected 'baz', expected }, a comma, or a newline"),
+        Arguments.of("foo = { bar =\n1 }", 1, 14, "Unexpected end of line, expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
+        Arguments.of("foo = { bar = 1,, }", 1, 17, "Unexpected ',', expected } or a newline"),
 
         Arguments.of("[foo]\nbar=1\n[[foo]]\nbar=2\n", 3, 1, "foo is not an array (previously defined at line 1, column 1)"),
         Arguments.of("foo = [1]\n[[foo]]\nbar=2\n", 2, 1, "foo previously defined as a literal array at line 1, column 1"),
         Arguments.of("foo = []\n[[foo]]\nbar=2\n", 2, 1, "foo previously defined as a literal array at line 1, column 1"),
         Arguments.of("[[foo.bar]]\n[foo]\nbaz=2\nbar=3\n", 4, 1, "bar previously defined at line 1, column 1"),
         Arguments.of("[[foo]]\nbaz=1\n[[foo.bar]]\nbaz=2\n[foo.bar]\nbaz=3\n", 5, 1, "foo.bar previously defined at line 3, column 1")
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
+  @MethodSource("errorCaseSupplier_V1_0_0")
+  void shouldHandleParseErrors_V1_0_0(String input, int line, int column, String expected) {
+    TomlParseResult result = Toml.parse(input, TomlVersion.V1_0_0);
+    List<TomlParseError> errors = result.errors();
+    assertFalse(errors.isEmpty());
+    assertEquals(expected, errors.get(0).getMessage(), () -> joinErrors(result));
+    assertEquals(line, errors.get(0).position().line());
+    assertEquals(column, errors.get(0).position().column());
+  }
+
+  static Stream<Arguments> errorCaseSupplier_V1_0_0() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = \"\\e\"", 1, 8, "Invalid escape sequence '\\e' (TOML versions before 1.1.0)"),
+        Arguments.of("foo = \"\\x41\"", 1, 8, "Invalid escape sequence '\\x41' (TOML versions before 1.1.0)"),
+        Arguments.of("foo = \"\"\"\\x41\"\"\"", 1, 10, "Invalid escape sequence '\\x41' (TOML versions before 1.1.0)"),
+        Arguments.of("foo = 07:32", 1, 12, "Seconds are required in a time (TOML versions before 1.1.0)"),
+        Arguments.of("foo = 1979-05-27T07:32", 1, 23, "Seconds are required in a time (TOML versions before 1.1.0)"),
+        Arguments.of("foo = 1979-05-27 07:32Z", 1, 23, "Seconds are required in a time (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1,\nbaz = 2 }", 1, 17, "Newlines are not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = {\nbar = 1 }", 1, 8, "Newlines are not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1\n, baz = 2 }", 1, 16, "Newlines are not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1 # comment\n}", 1, 26, "Newlines are not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1, }", 1, 16, "A trailing comma is not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1,\n}", 1, 16, "A trailing comma is not allowed in an inline table (TOML versions before 1.1.0)")
     );
     // @formatter:on
   }
