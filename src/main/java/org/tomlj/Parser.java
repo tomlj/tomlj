@@ -103,7 +103,12 @@ final class Parser {
     List<TomlParseError> errors = errorListener.errors();
     if (!errors.isEmpty()) {
       TomlParseError e = errors.get(0);
-      throw new IllegalArgumentException("Invalid key: " + e.getMessage(), e);
+      throw new IllegalArgumentException(
+          "Invalid key: "
+              + e.getMessage()
+              + ". Keys containing characters other than A-Z, a-z, 0-9, '_' and '-' must be quoted (e.g. \"@key\")"
+              + ", or use the List<String> key path overloads.",
+          e);
     }
     return keyList;
   }

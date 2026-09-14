@@ -36,6 +36,20 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * An interface for accessing data stored in Tom's Obvious, Minimal Language (TOML).
+ *
+ * <p>
+ * Values can be addressed in two ways. Methods that take a {@code String} interpret it as a <em>dotted key</em> using
+ * TOML key syntax, exactly as it would appear in a document: {@code "server.port"} names the {@code port} entry within
+ * the {@code server} table, and any key containing characters other than {@code A-Z}, {@code a-z}, {@code 0-9},
+ * {@code _} and {@code -} must be quoted, e.g. {@code "\"@key\".value"}. Methods that take a {@code List<String>}
+ * interpret each element as a literal key, with no quoting or escaping required.
+ *
+ * <p>
+ * Consequently, the raw key names returned by {@link #keySet()} and {@link #entrySet()} can be used with the
+ * {@code List<String>} methods (e.g. {@code get(Collections.singletonList(key))}), but not directly with the
+ * {@code String} methods unless the key is a bare key. The keys returned by {@link #dottedKeySet()} and
+ * {@link #dottedEntrySet()} are already quoted where necessary and can be passed to the {@code String} methods.
+ * {@link Toml#joinKeyPath(List)} converts a key path into a dotted key.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
@@ -87,6 +101,11 @@ public interface TomlTable {
    * <p>
    * The returned set contains only immediate keys to this table, and not dotted keys or key paths. For a complete view
    * of keys available in the TOML document, use {@link #dottedKeySet()} or {@link #keyPathSet()}.
+   *
+   * <p>
+   * The keys are returned as raw names, without quoting. To look up a value by one of these keys, use a
+   * {@code List<String>} method such as {@link #get(List)}, or quote it with {@link Toml#joinKeyPath(List)} before
+   * passing it to a {@code String} method such as {@link #get(String)}.
    *
    * @return A set containing the keys of this table.
    */
@@ -145,6 +164,9 @@ public interface TomlTable {
    * a complete view of all entries available in the TOML document, use {@link #dottedEntrySet()} or
    * {@link #entryPathSet()}.
    *
+   * <p>
+   * The entry keys are raw names, without quoting. See {@link #keySet()} for how to use them in lookups.
+   *
    * @return A set containing the immediate entries of this table.
    */
   Set<Map.Entry<String, Object>> entrySet();
@@ -199,6 +221,11 @@ public interface TomlTable {
 
   /**
    * Get a value from the TOML document.
+   *
+   * <p>
+   * The key is parsed using TOML key syntax, so keys containing characters other than {@code A-Z}, {@code a-z},
+   * {@code 0-9}, {@code _} and {@code -} must be quoted (e.g. {@code "\"@key\""}). To look up a raw key name without
+   * quoting, such as one returned by {@link #keySet()}, use {@link #get(List)} instead.
    *
    * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
    * @return The value, or {@code null} if no value was set in the TOML document.

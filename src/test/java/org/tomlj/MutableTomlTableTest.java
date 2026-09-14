@@ -118,7 +118,9 @@ class MutableTomlTableTest {
   void throwsForInvalidKey() {
     MutableTomlTable table = new MutableTomlTable(HEAD);
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> table.get("foo.=bar"));
-    assertEquals("Invalid key: Unexpected '=', expected a-z, A-Z, 0-9, ', or \"", e.getMessage());
+    assertEquals(
+        "Invalid key: Unexpected '=', expected a-z, A-Z, 0-9, ', or \"" + TomlTest.INVALID_KEY_HINT,
+        e.getMessage());
   }
 
   @Test
