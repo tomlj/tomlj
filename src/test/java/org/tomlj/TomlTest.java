@@ -673,7 +673,10 @@ class TomlTest {
         Arguments.of("\nfoo = 1937-07-18T13:55:02.-04:00", 2, 27, "Unexpected '-', expected a date/time"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-25:00", 2, 26, "Invalid zone offset hours (valid range -18..+18)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-:00", 2, 27, "Unexpected ':', expected a date/time"),
+        Arguments.of("\nfoo = 1937-07-18T13:55:26-4:00", 2, 26, "Invalid zone offset hours (valid range -18..+18)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-04:60", 2, 30, "Invalid zone offset minutes (valid range 0..59)"),
+        Arguments.of("\nfoo = 1937-07-18T13:55:26-04:6", 2, 30, "Invalid zone offset minutes (valid range 0..59)"),
+        Arguments.of("\nfoo = 1937-07-18T13:55:26+04:6", 2, 30, "Invalid zone offset minutes (valid range 0..59)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-18:30", 2, 26, "Invalid zone offset (valid range -18:00..+18:00)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-18:", 2, 30, "Unexpected end of input, expected a date/time"),
 
