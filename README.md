@@ -22,6 +22,16 @@ result.errors().forEach(error -> System.err.println(error.toString()));
 String value = result.getString("a. dotted . key");
 ```
 
+Methods that take a `String` key parse it as a dotted key using TOML syntax, so keys containing characters
+outside `A-Z`, `a-z`, `0-9`, `_` and `-` must be quoted, exactly as in a TOML document. Methods that take a
+`List<String>` treat each element as a literal key with no quoting needed, which makes them the right choice
+when iterating over `keySet()` or `entrySet()`:
+
+```java
+String quoted = result.getString("\"@key#with$special%characters\"");
+String literal = result.getString(Collections.singletonList("@key#with$special%characters"));
+```
+
 ## Getting TomlJ
 
 TomlJ is published to a Maven Central.
