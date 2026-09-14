@@ -123,3 +123,12 @@ equality.
 supplier rather than writing a new test method. Larger fixtures live in `src/test/resources/org/tomlj/` as
 `.toml` files, some paired with a `.json` file that is compared against `result.toJson()` (line endings are
 normalised with `System.lineSeparator()`).
+
+`TomlTestSuiteTest` runs the official [toml-test](https://github.com/toml-lang/toml-test) suite. The
+`extractTomlTest` task (a dependency of `test`) fetches the tagged source archive, versioned in
+`dependency-versions.gradle` and resolved through an Ivy repository over GitHub, and extracts its `tests/` directory
+to `build/toml-test`. The test reads the `files-toml-1.0.0` and `files-toml-1.1.0` lists (parsed at `V1_0_0` and
+`HEAD`), compares valid cases against their tagged JSON with the same rules as the official runner, and asserts that
+invalid cases report errors. Cases the parser is known to fail are listed in the test's `KNOWN_FAILURES_*` sets and
+asserted to still fail, so remove the entry when fixing the behaviour. When bumping the suite version, expect to
+update those sets.

@@ -635,6 +635,9 @@ class TomlTest {
         Arguments.of("foo = \"\"\"Here are three quotation marks: \"\"\".\"\"\"", 1, 45, "Unexpected '.', expected a newline or end-of-input"),
         Arguments.of("foo = 2bar", 1, 8, "Unexpected 'bar', expected a newline or end-of-input"),
         Arguments.of("foo = \"Bad unicode \\uD801\"", 1, 20, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"val\\ue\"", 1, 11, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"val\\U0000\"", 1, 11, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"\"\"val\\ue\"\"\"", 1, 13, "Invalid unicode escape sequence"),
 
         Arguments.of("foo = 1234567891234567891233456789", 1, 7, "Integer is too large"),
 
@@ -673,7 +676,10 @@ class TomlTest {
         Arguments.of("\nfoo = 1937-07-18T13:55:02.-04:00", 2, 27, "Unexpected '-', expected a date/time"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-25:00", 2, 26, "Invalid zone offset hours (valid range -18..+18)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-:00", 2, 27, "Unexpected ':', expected a date/time"),
+        Arguments.of("\nfoo = 1937-07-18T13:55:26-4:00", 2, 26, "Invalid zone offset hours (valid range -18..+18)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-04:60", 2, 30, "Invalid zone offset minutes (valid range 0..59)"),
+        Arguments.of("\nfoo = 1937-07-18T13:55:26-04:6", 2, 30, "Invalid zone offset minutes (valid range 0..59)"),
+        Arguments.of("\nfoo = 1937-07-18T13:55:26+04:6", 2, 30, "Invalid zone offset minutes (valid range 0..59)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-18:30", 2, 26, "Invalid zone offset (valid range -18:00..+18:00)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-18:", 2, 30, "Unexpected end of input, expected a date/time"),
 

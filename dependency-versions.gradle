@@ -9,5 +9,7 @@ dependencyManagement {
       entry 'antlr4-runtime'
     }
     dependency('org.checkerframework:checker-qual:3.55.1')
+    // The official TOML test suite, fetched as a source archive of the tagged release
+    dependency('toml-lang:toml-test:2.2.0')
   }
 }

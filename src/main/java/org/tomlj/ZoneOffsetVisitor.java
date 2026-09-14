@@ -28,9 +28,14 @@ final class ZoneOffsetVisitor extends TomlParserBaseVisitor<ZoneOffset> {
 
   @Override
   public ZoneOffset visitHourOffset(TomlParser.HourOffsetContext ctx) {
+    String text = ctx.getText();
+    // The sign and exactly two digits
+    if (text.length() != 3) {
+      throw new TomlParseError("Invalid zone offset hours (valid range -18..+18)", new TomlPosition(ctx));
+    }
     int hours;
     try {
-      hours = Integer.parseInt(ctx.getText());
+      hours = Integer.parseInt(text);
     } catch (NumberFormatException e) {
       throw new TomlParseError("Invalid zone offset", new TomlPosition(ctx), e);
     }
@@ -44,9 +49,13 @@ final class ZoneOffsetVisitor extends TomlParserBaseVisitor<ZoneOffset> {
 
   @Override
   public ZoneOffset visitMinuteOffset(TomlParser.MinuteOffsetContext ctx) {
+    String text = ctx.getText();
+    if (text.length() != 2) {
+      throw new TomlParseError("Invalid zone offset minutes (valid range 0..59)", new TomlPosition(ctx));
+    }
     int minutes;
     try {
-      minutes = Integer.parseInt(ctx.getText());
+      minutes = Integer.parseInt(text);
     } catch (NumberFormatException e) {
       throw new TomlParseError("Invalid zone offset", new TomlPosition(ctx), e);
     }

@@ -40,6 +40,29 @@ static String buildTag() {
 repositories {
   mavenCentral()
   gradlePluginPortal()
+  // The official TOML test suite is not published as an artifact; fetch the tagged source archive
+  // from GitHub and treat it as a dependency so that it is cached and versioned like any other.
+  exclusiveContent {
+    forRepository {
+      ivy {
+        name = 'github-toml-test'
+        url = 'https://github.com/'
+        patternLayout {
+          artifact '[organisation]/[module]/archive/refs/tags/v[revision].[ext]'
+        }
+        metadataSources { artifact() }
+      }
+    }
+    filter { includeModule('toml-lang', 'toml-test') }
+  }
+}
+
+configurations {
+  tomlTest {
+    canBeConsumed = false
+    canBeResolved = true
+    transitive = false
+  }
 }
 
 apply from: "${rootDir}/dependency-versions.gradle"
@@ -170,7 +193,31 @@ tasks.withType(Test) {
   (Runtime.runtime.availableProcessors().intdiv(2) ?: 1)).toInteger()
 }
 
-test { useJUnitPlatform() }
+// The official TOML test suite (https://github.com/toml-lang/toml-test) is extracted into the build
+// directory and run by TomlTestSuiteTest.
+def tomlTestDir = layout.buildDirectory.dir('toml-test')
+
+tasks.register('extractTomlTest', Sync) {
+  description = 'Extracts the official TOML test suite used by TomlTestSuiteTest.'
+  from(configurations.tomlTest.elements.map { archives ->
+    archives.collect {
+      tarTree(it)
+    }
+  })
+  include '*/tests/**'
+  eachFile {
+    it.relativePath = new RelativePath(true, it.relativePath.segments.drop(2))
+  }
+  includeEmptyDirs = false
+  into tomlTestDir
+}
+
+test {
+  useJUnitPlatform()
+  dependsOn extractTomlTest
+  inputs.dir(tomlTestDir).withPathSensitivity(PathSensitivity.RELATIVE)
+  systemProperty 'org.tomlj.tomlTestDir', tomlTestDir.get().asFile.absolutePath
+}
 
 task jacocoRootTestReport(type: JacocoReport) {
   reports {
@@ -204,6 +251,8 @@ dependencies {
 
   testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+  tomlTest 'toml-lang:toml-test@tar.gz'
 }
 
 //////

@@ -85,19 +85,22 @@ final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
       case 't':
         return builder.append('\t');
       case 'u':
-        assert (text.length() == 6);
-        return builder.append(convertUnicodeEscape(text.substring(2), ctx));
+        return builder.append(convertUnicodeEscape(text, 6, ctx));
       case 'U':
-        assert (text.length() == 10);
-        return builder.append(convertUnicodeEscape(text.substring(2), ctx));
+        return builder.append(convertUnicodeEscape(text, 10, ctx));
       default:
         throw new TomlParseError("Invalid escape sequence '" + text + "'", new TomlPosition(ctx));
     }
   }
 
-  private char[] convertUnicodeEscape(String hexChars, TomlParser.EscapedContext ctx) {
+  private char[] convertUnicodeEscape(String text, int expectedLength, TomlParser.EscapedContext ctx) {
+    // The lexer only produces a full escape when the expected number of hex digits follows; a truncated escape
+    // is lexed as an escape of the single character after the backslash
+    if (text.length() != expectedLength) {
+      throw new TomlParseError("Invalid unicode escape sequence", new TomlPosition(ctx));
+    }
     try {
-      char[] characters = Character.toChars(Integer.parseInt(hexChars, 16));
+      char[] characters = Character.toChars(Integer.parseInt(text.substring(2), 16));
       if (characters.length == 1 && Character.isSurrogate(characters[0])) {
         throw new IllegalArgumentException();
       }
