@@ -22,6 +22,11 @@ result.errors().forEach(error -> System.err.println(error.toString()));
 String value = result.getString("a. dotted . key");
 ```
 
+Parsing never throws for invalid input. Every error is recorded in `result.errors()`, with its line and column,
+and parsing continues with the next expression so that the rest of the document is still available. Check
+`result.hasErrors()` before relying on the result. A key/value pair that contains a syntax error, such as
+`key = 4uoxyz`, is reported as an error and omitted from the result.
+
 Methods that take a `String` key parse it as a dotted key using TOML syntax, so keys containing characters
 outside `A-Z`, `a-z`, `0-9`, `_` and `-` must be quoted, exactly as in a TOML document. Methods that take a
 `List<String>` treat each element as a literal key with no quoting needed, which makes them the right choice
