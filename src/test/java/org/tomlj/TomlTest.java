@@ -635,6 +635,9 @@ class TomlTest {
         Arguments.of("foo = \"\"\"Here are three quotation marks: \"\"\".\"\"\"", 1, 45, "Unexpected '.', expected a newline or end-of-input"),
         Arguments.of("foo = 2bar", 1, 8, "Unexpected 'bar', expected a newline or end-of-input"),
         Arguments.of("foo = \"Bad unicode \\uD801\"", 1, 20, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"val\\ue\"", 1, 11, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"val\\U0000\"", 1, 11, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"\"\"val\\ue\"\"\"", 1, 13, "Invalid unicode escape sequence"),
 
         Arguments.of("foo = 1234567891234567891233456789", 1, 7, "Integer is too large"),
 
