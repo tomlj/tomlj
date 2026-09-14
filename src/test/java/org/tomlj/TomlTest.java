@@ -29,6 +29,7 @@ import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -617,6 +618,31 @@ class TomlTest {
         Arguments.of(
                 "[[foo]]\n[[foo.bar]]\n[[foo.baz]]\n[foo.bar.baz]\nbuz=2\n[foo.baz.buz]\nbiz=3\n",
                 new Object[] {"foo", 0, "baz", 0, "buz", "biz"}, 3L)
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
+  @MethodSource("syntaxErrorRecoverySupplier")
+  void shouldOmitKeyValuesContainingSyntaxErrors(String input, Set<String> expectedKeys) {
+    TomlParseResult result = Toml.parse(input);
+    assertTrue(result.hasErrors());
+    assertEquals(expectedKeys, result.dottedKeySet());
+  }
+
+  static Stream<Arguments> syntaxErrorRecoverySupplier() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("key=4uoxyz\n", Set.of()),
+        Arguments.of("foo = 0b", Set.of()),
+        Arguments.of("a = 1x\nb = 2\n", Set.of("b")),
+        Arguments.of("a = 1\nb = 2 junk\nc = 3\n", Set.of("a", "c")),
+        Arguments.of("a = 1.5x\nb = 2\n", Set.of("b")),
+        Arguments.of("a = truex\nb = 2\n", Set.of("b")),
+        Arguments.of("a = [1x, 2]\nb = 2\n", Set.of("b")),
+        Arguments.of("a = { b = 1 x }\nc = 3\n", Set.of("c")),
+        Arguments.of("a = \"\"\"\nfoo\n\"\"\" junk\nb = 2\n", Set.of("b")),
+        Arguments.of("[tbl]\na = 1x\nb = 2\n", Set.of("tbl.b"))
     );
     // @formatter:on
   }

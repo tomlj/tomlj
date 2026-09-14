@@ -19,6 +19,8 @@ import org.tomlj.internal.TomlParserBaseVisitor;
 
 import java.util.*;
 
+import org.antlr.v4.runtime.Token;
+
 final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
   private final TomlVersion version;
@@ -52,7 +54,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
         throw new TomlParseError("Dotted keys are not supported", new TomlPosition(keyContext));
       }
       Object value = valContext.accept(new ValueVisitor(version));
-      if (value != null) {
+      if (value != null && !hasSyntaxError(ctx)) {
         currentTable
             .set(path, value, new TomlPosition(ctx))
             .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
@@ -112,6 +114,23 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   @Override
   protected MutableTomlTable defaultResult() {
     return rootTable;
+  }
+
+  /**
+   * Check whether the parser reported a syntax error on any of the lines spanned by a key/value pair.
+   *
+   * <p>
+   * The parser recovers from syntax errors and still produces a (partial) parse tree, e.g. {@code key = 4uoxyz} yields
+   * a key/value pair for {@code key} with the integer value 4 followed by an error for the trailing {@code uoxyz}. Such
+   * values are not what the document expresses, so they are discarded rather than stored.
+   */
+  private boolean hasSyntaxError(TomlParser.KeyvalContext ctx) {
+    Token start = ctx.getStart();
+    Token stop = ctx.getStop();
+    if (start == null || stop == null) {
+      return true;
+    }
+    return errorReporter.hasSyntaxErrorBetween(start.getLine(), stop.getLine());
   }
 
   private void defineOpenTables() {

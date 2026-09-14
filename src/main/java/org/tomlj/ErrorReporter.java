@@ -14,4 +14,13 @@ package org.tomlj;
 
 interface ErrorReporter {
   void reportError(TomlParseError error);
+
+  /**
+   * Check whether the parser reported a syntax error within a range of lines.
+   *
+   * @param firstLine The first line of the range (inclusive).
+   * @param lastLine The last line of the range (inclusive).
+   * @return {@code true} if a syntax error was reported on any line in the range.
+   */
+  boolean hasSyntaxErrorBetween(int firstLine, int lastLine);
 }

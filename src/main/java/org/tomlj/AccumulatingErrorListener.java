@@ -31,6 +31,7 @@ import org.antlr.v4.runtime.misc.IntervalSet;
 final class AccumulatingErrorListener extends BaseErrorListener implements ErrorReporter {
 
   private final List<TomlParseError> errors = new ArrayList<>();
+  private final List<Integer> syntaxErrorLines = new ArrayList<>();
 
   @Override
   public void syntaxError(
@@ -42,6 +43,7 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
       RecognitionException e) {
 
     TomlPosition position = TomlPosition.positionAt(line, charPosition + 1);
+    syntaxErrorLines.add(line);
 
     if (e instanceof InputMismatchException || e instanceof NoViableAltException) {
       String message = getMessage(e.getOffendingToken(), getExpected(e));
@@ -61,6 +63,16 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
   @Override
   public void reportError(TomlParseError error) {
     errors.add(error);
+  }
+
+  @Override
+  public boolean hasSyntaxErrorBetween(int firstLine, int lastLine) {
+    for (int errorLine : syntaxErrorLines) {
+      if (errorLine >= firstLine && errorLine <= lastLine) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void reportError(String message, TomlPosition position) {

@@ -16,6 +16,12 @@ import java.util.List;
 
 /**
  * The result from parsing a TOML document.
+ *
+ * <p>
+ * Parsing never throws for invalid input. Instead, every error is recorded in {@link #errors()} and parsing continues
+ * with the next expression, so a document with errors still yields the values that could be parsed. Callers should
+ * check {@link #hasErrors()} before relying on the result. A key/value pair containing a syntax error is omitted from
+ * the result.
  */
 public interface TomlParseResult extends TomlTable {
 
