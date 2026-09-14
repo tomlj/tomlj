@@ -29,7 +29,6 @@ import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Scanner;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -275,10 +274,10 @@ class TomlTest {
   void shouldParseBoolean() {
     TomlParseResult result = Toml.parse("foo = true");
     assertFalse(result.hasErrors(), () -> joinErrors(result));
-    assertEquals(Boolean.TRUE, result.getBoolean("foo"));
+    assertEquals(true, result.getBoolean("foo"));
     TomlParseResult result2 = Toml.parse("\nfoo=false");
     assertFalse(result2.hasErrors(), () -> joinErrors(result2));
-    assertEquals(Boolean.FALSE, result2.getBoolean("foo"));
+    assertEquals(false, result2.getBoolean("foo"));
   }
 
   @ParameterizedTest
@@ -550,12 +549,12 @@ class TomlTest {
 
     Object element = result;
     for (Object step : path) {
-      if (step instanceof String) {
+      if (step instanceof String key) {
         assertTrue(element instanceof TomlTable);
-        element = ((TomlTable) element).get((String) step);
-      } else if (step instanceof Integer) {
+        element = ((TomlTable) element).get(key);
+      } else if (step instanceof Integer index) {
         assertTrue(element instanceof TomlArray);
-        element = ((TomlArray) element).get((Integer) step);
+        element = ((TomlArray) element).get(index);
       } else {
         fail("path not found");
       }
@@ -806,7 +805,7 @@ class TomlTest {
   void testArrayTables() throws Exception {
     InputStream jsonStream = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.json");
     assertNotNull(jsonStream);
-    String expectedJson = new Scanner(jsonStream, "UTF-8").useDelimiter("\\A").next();
+    String expectedJson = new String(jsonStream.readAllBytes(), StandardCharsets.UTF_8);
     InputStream tomlStream = this.getClass().getResourceAsStream("/org/tomlj/array_table_example.toml");
     assertNotNull(tomlStream);
     TomlParseResult result = Toml.parse(tomlStream);
@@ -887,7 +886,7 @@ class TomlTest {
   void testOrderPreservationInJson() throws Exception {
     InputStream jsonStream = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.json");
     assertNotNull(jsonStream);
-    String expectedJson = new Scanner(jsonStream, "UTF-8").useDelimiter("\\A").next();
+    String expectedJson = new String(jsonStream.readAllBytes(), StandardCharsets.UTF_8);
     InputStream tomlStream = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.toml");
     assertNotNull(tomlStream);
     TomlParseResult result = Toml.parse(tomlStream, TomlVersion.V0_5_0);

@@ -7,11 +7,11 @@ plugins {
   id 'jacoco'
   id 'maven-publish'
   id 'signing'
-  id 'com.diffplug.spotless' version '6.25.0'
-  id "com.github.hierynomus.license-report" version "0.16.1"
-  id 'io.spring.dependency-management' version '1.1.6'
-  id 'net.ltgt.errorprone' version '4.0.1'
-  id 'com.gradleup.shadow' version '8.3.2'
+  id 'com.diffplug.spotless' version '8.10.2'
+  id 'com.github.jk1.dependency-license-report' version '3.1.4'
+  id 'io.spring.dependency-management' version '1.1.7'
+  id 'net.ltgt.errorprone' version '5.1.1'
+  id 'com.gradleup.shadow' version '9.6.1'
 }
 
 description = 'A parser for Tom\'s Obvious, Minimal Language (TOML).'
@@ -43,17 +43,30 @@ repositories {
 }
 
 apply from: "${rootDir}/dependency-versions.gradle"
-apply from: "${rootDir}/gradle/check-licenses.gradle"
+
+// Check that the licenses of our 3rd party dependencies are in the accepted list in
+// gradle/allowed-licenses.json. Run it with "./gradlew checkLicense". License names are
+// normalized by the plugin's default bundle before matching, and the full report is written
+// under build/reports/dependency-license.
+licenseReport {
+  configurations = ['runtimeClasspath']
+  filters = [
+    new com.github.jk1.license.filter.LicenseBundleNormalizer()
+  ]
+  allowedLicensesFile = layout.projectDirectory.file('gradle/allowed-licenses.json')
+}
+
+check.dependsOn checkLicense
 
 //////
 // Default tasks and build aliases
 
-defaultTasks 'build', 'checkLicenses', 'javadoc'
+defaultTasks 'build', 'checkLicense', 'javadoc'
 
 def buildAliases = ['dev': [
     'spotlessApply',
     'build',
-    'checkLicenses',
+    'checkLicense',
     'javadoc'
   ]]
 
@@ -89,9 +102,12 @@ spotless {
 // Source generation
 
 generateGrammarSource {
-  outputDirectory file("${buildDir}/generated-src/antlr/main/org/tomlj/internal")
+  // Output lands in build/generated-src/antlr/main/org/tomlj/internal, derived from the grammar file
+  // location. The parser grammar imports the lexer's .tokens file, which ANTLR only finds via -lib.
   arguments << "-visitor" << "-long-messages"
-  arguments << "-Xexact-output-dir"
+  def libDir = file(outputDirectory.path + "/org/tomlj/internal")
+  arguments << "-lib" << libDir.absolutePath
+  doFirst { libDir.mkdirs() }
 }
 
 configurations {
@@ -103,8 +119,10 @@ configurations {
 //////
 // Compilation
 
-sourceCompatibility = '1.8'
-targetCompatibility = '1.8'
+java {
+  sourceCompatibility = JavaVersion.VERSION_1_8
+  targetCompatibility = JavaVersion.VERSION_1_8
+}
 
 compileJava.options.encoding = 'UTF-8'
 compileTestJava.options.encoding = 'UTF-8'
@@ -117,10 +135,13 @@ java {
 
 sourcesJar.dependsOn generateGrammarSource
 
-jacoco { toolVersion = '0.8.12' }
+jacoco { toolVersion = '0.8.15' }
+
+// The library targets Java 9; tests use JUnit 6, which requires Java 17.
+compileJava.options.release = 9
+compileTestJava.options.release = 17
 
 tasks.withType(JavaCompile) {
-  options.release = 9
   options.compilerArgs += [
     '-Xlint:unchecked',
     '-Xlint:cast',
@@ -135,6 +156,7 @@ tasks.withType(JavaCompile) {
   options.errorprone {
     excludedPaths = '.*/generated-src/.*'
     check('UnnecessaryParentheses', CheckSeverity.OFF)
+    check('StringConcatToTextBlock', CheckSeverity.OFF)
     disableWarningsInGeneratedCode = true
   }
 }
@@ -145,7 +167,7 @@ tasks.withType(JavaCompile) {
 tasks.withType(Test) {
   // If GRADLE_MAX_TEST_FORKS is not set, use half the available processors
   maxParallelForks = (System.getenv('GRADLE_MAX_TEST_FORKS') ?:
-    (Runtime.runtime.availableProcessors().intdiv(2) ?: 1)).toInteger()
+  (Runtime.runtime.availableProcessors().intdiv(2) ?: 1)).toInteger()
 }
 
 test { useJUnitPlatform() }
@@ -170,10 +192,7 @@ javadoc { exclude '**/internal/**' }
 // Dependencies
 
 dependencies {
-  errorprone("com.google.errorprone:error_prone_core")
-  if (JavaVersion.current().isJava8()) {
-    errorproneJavac("com.google.errorprone:javac")
-  }
+  errorprone('com.google.errorprone:error_prone_core')
 
   antlr 'org.antlr:antlr4'
 
@@ -184,6 +203,7 @@ dependencies {
   testImplementation 'org.junit.jupiter:junit-jupiter-params'
 
   testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 //////
@@ -192,7 +212,7 @@ dependencies {
 ext.moduleName = "org.tomlj"
 
 jar {
-  destinationDirectory = file("${rootProject.buildDir}/libs")
+  destinationDirectory = rootProject.layout.buildDirectory.dir('libs')
   inputs.property("moduleName", moduleName)
   manifest {
     attributes('Implementation-Title': project.name,
@@ -229,9 +249,9 @@ publishing {
   publications {
     tomljLibrary(MavenPublication) {
       from components.java
-      groupId 'org.tomlj'
-      artifactId project.archivesBaseName
-      version project.version
+      groupId = 'org.tomlj'
+      artifactId = base.archivesName.get()
+      version = project.version
       versionMapping {
         usage('java-api') {
           fromResolutionOf('runtimeClasspath')
@@ -241,7 +261,7 @@ publishing {
         }
       }
       pom {
-        name = project.archivesBaseName
+        name = base.archivesName.get()
         description = project.description
         url = 'https://github.com/tomlj/tomlj'
         packaging = 'jar'
@@ -276,7 +296,7 @@ publishing {
           username = "$ossrhUsername"
           password = "$ossrhPassword"
         }
-        url "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+        url = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
       }
     }
   }
@@ -295,8 +315,6 @@ tasks.withType(Sign) {
   onlyIf { System.getenv('ENABLE_SIGNING') == 'true' }
 }
 
-model {
-  tasks.generatePomFileForTomljLibraryPublication {
-    destination = file("$buildDir/generated-pom.xml")
-  }
+tasks.named('generatePomFileForTomljLibraryPublication') {
+  destination = layout.buildDirectory.file('generated-pom.xml').get().asFile
 }
