@@ -111,7 +111,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
   @Override
   public Object visitOffsetDateTime(TomlParser.OffsetDateTimeContext ctx) {
     LocalDate date = ctx.date().accept(new LocalDateVisitor());
-    LocalTime time = ctx.time().accept(new LocalTimeVisitor());
+    LocalTime time = ctx.time().accept(new LocalTimeVisitor(version));
     ZoneOffset offset = ctx.timeOffset().accept(new ZoneOffsetVisitor());
     return OffsetDateTime.of(date, time, offset);
   }
@@ -119,7 +119,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
   @Override
   public Object visitLocalDateTime(TomlParser.LocalDateTimeContext ctx) {
     LocalDate date = ctx.date().accept(new LocalDateVisitor());
-    LocalTime time = ctx.time().accept(new LocalTimeVisitor());
+    LocalTime time = ctx.time().accept(new LocalTimeVisitor(version));
     return LocalDateTime.of(date, time);
   }
 
@@ -130,7 +130,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitLocalTime(TomlParser.LocalTimeContext ctx) {
-    return ctx.time().accept(new LocalTimeVisitor());
+    return ctx.time().accept(new LocalTimeVisitor(version));
   }
 
   @Override

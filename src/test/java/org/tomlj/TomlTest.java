@@ -330,7 +330,9 @@ class TomlTest {
         Arguments.of("foo = 1937-07-18 11:44:02.334543+18:00",
             OffsetDateTime.parse("1937-07-18T11:44:02.334543+18:00")),
         Arguments.of("foo = 1937-07-18 11:44:02Z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00")),
-        Arguments.of("foo = 1937-07-18 11:44:02z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00"))
+        Arguments.of("foo = 1937-07-18 11:44:02z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00")),
+        Arguments.of("foo = 1979-05-27 07:32Z", OffsetDateTime.parse("1979-05-27T07:32:00Z")),
+        Arguments.of("foo = 1979-05-27T07:32-07:00", OffsetDateTime.parse("1979-05-27T07:32:00-07:00"))
     );
     // @formatter:on
   }
@@ -350,7 +352,8 @@ class TomlTest {
         Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02")),
         Arguments.of("foo = 0000-07-18 11:44:02.00", LocalDateTime.parse("0000-07-18T11:44:02")),
         Arguments.of("foo = 1937-07-18 11:44:02.334543", LocalDateTime.parse("1937-07-18T11:44:02.334543")),
-        Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02"))
+        Arguments.of("foo = 1937-07-18 11:44:02", LocalDateTime.parse("1937-07-18T11:44:02")),
+        Arguments.of("foo = 1979-05-27T07:32", LocalDateTime.parse("1979-05-27T07:32:00"))
     );
     // @formatter:on
   }
@@ -390,7 +393,8 @@ class TomlTest {
         Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02")),
         Arguments.of("foo = 11:44:02.00", LocalTime.parse("11:44:02")),
         Arguments.of("foo = 11:44:02.334543", LocalTime.parse("11:44:02.334543")),
-        Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02"))
+        Arguments.of("foo = 11:44:02", LocalTime.parse("11:44:02")),
+        Arguments.of("foo = 07:32", LocalTime.parse("07:32:00"))
     );
     // @formatter:on
   }
@@ -754,7 +758,10 @@ class TomlTest {
     return Stream.of(
         Arguments.of("foo = \"\\e\"", 1, 8, "Invalid escape sequence '\\e' (TOML versions before 1.1.0)"),
         Arguments.of("foo = \"\\x41\"", 1, 8, "Invalid escape sequence '\\x41' (TOML versions before 1.1.0)"),
-        Arguments.of("foo = \"\"\"\\x41\"\"\"", 1, 10, "Invalid escape sequence '\\x41' (TOML versions before 1.1.0)")
+        Arguments.of("foo = \"\"\"\\x41\"\"\"", 1, 10, "Invalid escape sequence '\\x41' (TOML versions before 1.1.0)"),
+        Arguments.of("foo = 07:32", 1, 12, "Seconds are required in a time (TOML versions before 1.1.0)"),
+        Arguments.of("foo = 1979-05-27T07:32", 1, 23, "Seconds are required in a time (TOML versions before 1.1.0)"),
+        Arguments.of("foo = 1979-05-27 07:32Z", 1, 23, "Seconds are required in a time (TOML versions before 1.1.0)")
     );
     // @formatter:on
   }

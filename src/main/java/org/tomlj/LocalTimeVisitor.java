@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static org.tomlj.TomlVersion.V1_0_0;
+
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
@@ -21,7 +23,24 @@ import org.antlr.v4.runtime.tree.ErrorNode;
 
 final class LocalTimeVisitor extends TomlParserBaseVisitor<LocalTime> {
 
+  private final TomlVersion version;
   private LocalTime time = LocalTime.MIN;
+
+  LocalTimeVisitor(TomlVersion version) {
+    this.version = version;
+  }
+
+  @Override
+  public LocalTime visitTime(TomlParser.TimeContext ctx) {
+    LocalTime result = visitChildren(ctx);
+    // Seconds became optional in TOML 1.1.0
+    if (ctx.second() == null && !version.after(V1_0_0)) {
+      throw new TomlParseError(
+          "Seconds are required in a time (TOML versions before 1.1.0)",
+          new TomlPosition(ctx.minute(), ctx.minute().getText().length()));
+    }
+    return result;
+  }
 
   @Override
   public LocalTime visitHour(TomlParser.HourContext ctx) {

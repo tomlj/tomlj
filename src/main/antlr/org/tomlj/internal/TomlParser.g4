@@ -132,7 +132,7 @@ localDate : date;
 localTime : time;
 
 date : year Dash month Dash day;
-time : hour Colon minute Colon second (Dot secondFraction)?;
+time : hour Colon minute (Colon second (Dot secondFraction)?)?;
 timeOffset
   : Z
   | hourOffset Colon minuteOffset

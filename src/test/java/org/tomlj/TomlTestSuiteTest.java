@@ -62,11 +62,6 @@ class TomlTestSuiteTest {
    */
   private static final Set<String> KNOWN_FAILURES_1_1_0 = Set
       .of(
-          // Seconds are optional in TOML 1.1.0 times
-          "valid/datetime/no-seconds.toml",
-          "valid/spec-1.1.0/common-29.toml",
-          "valid/spec-1.1.0/common-31.toml",
-          "valid/spec-1.1.0/common-34.toml",
           // Newlines are allowed inside inline tables in TOML 1.1.0
           "valid/inline-table/newline.toml",
           "valid/inline-table/newline-comment.toml",
