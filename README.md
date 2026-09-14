@@ -46,11 +46,11 @@ To include using Maven:
 <dependency>
   <groupId>org.tomlj</groupId>
   <artifactId>tomlj</artifactId>
-  <version>1.1.1</version>
+  <version>1.2.0</version>
 </dependency>
 ```
 
-To include using Gradle: `implementation 'org.tomlj:tomlj:1.1.1'`
+To include using Gradle: `implementation 'org.tomlj:tomlj:1.2.0'`
 
 ## Links
 
