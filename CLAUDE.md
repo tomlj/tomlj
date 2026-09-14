@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-TomlJ is a Java library (`org.tomlj:tomlj`) that parses TOML 1.0.0 using ANTLR 4. It reports errors with
+TomlJ is a Java library (`org.tomlj:tomlj`) that parses TOML 1.1.0 using ANTLR 4. It reports errors with
 positions and performs error recovery, so a parse always returns a result plus a list of errors. Main sources
 compile with `--release 9`, so no `var`, records, text blocks, or pattern matching in `src/main`. Tests compile
 with `--release 17` because JUnit 6 requires it, so test code may use those features.
@@ -112,9 +112,10 @@ interface as a `default` method, not to the implementations.
 ### Spec versions
 
 `TomlVersion` (`V0_4_0`, `V0_5_0`, `V1_0_0`, `V1_1_0`, `LATEST` = alias of `V1_1_0`, `HEAD`) is threaded through
-every visitor. Behaviour that differs between spec versions is gated with `version.after(V0_x_0)` (dotted keys,
-heterogeneous arrays, tabs in strings). Add new version-dependent behaviour the same way rather than branching on
-equality.
+every visitor. Behaviour that differs between spec versions is gated with `version.after(...)` (dotted keys,
+heterogeneous arrays, tabs in strings, and the 1.1.0 additions: `\e` and `\xHH` escapes, optional seconds, and
+newlines and trailing commas in inline tables). Add new version-dependent behaviour the same way rather than
+branching on equality.
 
 ## Tests
 
@@ -129,6 +130,6 @@ normalised with `System.lineSeparator()`).
 `dependency-versions.gradle` and resolved through an Ivy repository over GitHub, and extracts its `tests/` directory
 to `build/toml-test`. The test reads the `files-toml-1.0.0` list (parsed at `V1_0_0`) and the `files-toml-1.1.0`
 list (parsed at both `V1_1_0` and `HEAD`), compares valid cases against their tagged JSON with the same rules as the
-official runner, and asserts that invalid cases report errors. Cases the parser is known to fail are listed in the test's `KNOWN_FAILURES_*` sets and
-asserted to still fail, so remove the entry when fixing the behaviour. When bumping the suite version, expect to
-update those sets.
+official runner, and asserts that invalid cases report errors. Each test factory takes a set of cases the parser is
+known to fail, which are asserted to still fail so that an entry must be removed once the behaviour is fixed. The
+sets are currently empty; when bumping the suite version, expect to add entries for any new cases that fail.
