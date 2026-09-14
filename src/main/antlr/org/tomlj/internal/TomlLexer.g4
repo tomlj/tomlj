@@ -210,6 +210,6 @@ InlineTableApostrophe : '\'' -> type(Apostrophe), pushMode(LiteralStringMode);
 InlineTableUnquotedKey : UNQUOTED_KEY -> type(UnquotedKey);
 
 InlineTableWS : WSChar+ -> type(WS), channel(WHITESPACE);
-InlineTableComment : COMMENT -> type(Comment), channel(COMMENTS), popMode;
-InlineTableNewLine : NL { setText(System.lineSeparator()); } -> type(NewLine), popMode;
+InlineTableComment : COMMENT -> type(Comment), channel(COMMENTS);
+InlineTableNewLine : NL { setText(System.lineSeparator()); } -> type(NewLine);
 InlineTableError : . -> type(Error), popMode;

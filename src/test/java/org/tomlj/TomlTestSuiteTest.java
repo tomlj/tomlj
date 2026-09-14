@@ -53,20 +53,6 @@ import org.junit.jupiter.api.TestFactory;
  */
 class TomlTestSuiteTest {
 
-  /**
-   * Cases from the TOML 1.1.0 list that the parser is known to fail at {@link TomlVersion#V1_1_0} and
-   * {@link TomlVersion#HEAD}.
-   *
-   * <p>
-   * Each case is asserted to still fail, so fixing the behaviour requires removing the case from this set.
-   */
-  private static final Set<String> KNOWN_FAILURES_1_1_0 = Set
-      .of(
-          // Newlines are allowed inside inline tables in TOML 1.1.0
-          "valid/inline-table/newline.toml",
-          "valid/inline-table/newline-comment.toml",
-          "valid/spec-1.1.0/common-47.toml");
-
   @TestFactory
   Stream<DynamicTest> toml_1_0_0() throws IOException {
     return suite("files-toml-1.0.0", TomlVersion.V1_0_0, Set.of());
@@ -74,12 +60,12 @@ class TomlTestSuiteTest {
 
   @TestFactory
   Stream<DynamicTest> toml_1_1_0() throws IOException {
-    return suite("files-toml-1.1.0", TomlVersion.V1_1_0, KNOWN_FAILURES_1_1_0);
+    return suite("files-toml-1.1.0", TomlVersion.V1_1_0, Set.of());
   }
 
   @TestFactory
   Stream<DynamicTest> toml_1_1_0_at_head() throws IOException {
-    return suite("files-toml-1.1.0", TomlVersion.HEAD, KNOWN_FAILURES_1_1_0);
+    return suite("files-toml-1.1.0", TomlVersion.HEAD, Set.of());
   }
 
   private static Stream<DynamicTest> suite(String fileList, TomlVersion version, Set<String> knownFailures)

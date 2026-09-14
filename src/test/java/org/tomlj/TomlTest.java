@@ -544,7 +544,12 @@ class TomlTest {
         Arguments.of("foo = { bar = ['baz', 'buz']   , baz  .   buz = 2 }", "foo.baz.buz", 2L),
         Arguments.of("foo = { bar = ['baz',\n'buz'\n], baz.buz = 2 }", "foo.baz.buz", 2L),
         Arguments.of("bar = { bar = ['baz',\n'buz'\n], baz.buz = 2 }\nfoo=2\n", "foo", 2L),
-        Arguments.of("foo = { bar = 2, baz = [] }", "foo.bar", 2L)
+        Arguments.of("foo = { bar = 2, baz = [] }", "foo.bar", 2L),
+        Arguments.of("foo = {\n}", "foo.bar", null),
+        Arguments.of("foo = { bar = 'baz', }", "foo.bar", "baz"),
+        Arguments.of("foo = {\n  bar = 'baz',\n  baz.buz = 2,\n}", "foo.baz.buz", 2L),
+        Arguments.of("foo = { # comment\n  bar = 'baz' # comment\n  , baz.buz = 2 # comment\n} # comment\nbar = 1", "foo.baz.buz", 2L),
+        Arguments.of("foo = {\n  bar = {\n    baz = [\n      1,\n    ],\n    buz = 2,\n  },\n}", "foo.bar.buz", 2L)
     );
     // @formatter:on
   }
@@ -728,10 +733,11 @@ class TomlTest {
         Arguments.of("[foo]\nbar='baz'\n[foo]\nbaz=1", 3, 1, "foo previously defined at line 1, column 1"),
         Arguments.of("[foo]\nbar='baz'\n[foo.bar]\nbaz=1", 3, 1, "foo.bar previously defined at line 2, column 1"),
 
-        Arguments.of("foo = {", 1, 8, "Unexpected end of input, expected a-z, A-Z, 0-9, }, ', or \""),
-        Arguments.of("foo = { bar = 1,\nbaz = 2 }", 1, 17, "Unexpected end of line, expected a-z, A-Z, 0-9, ', or \""),
-        Arguments.of("foo = { bar = 1\nbaz = 2 }", 1, 16, "Unexpected end of line, expected }"),
-        Arguments.of("foo = { bar = 1 baz = 2 }", 1, 17, "Unexpected 'baz', expected } or a comma"),
+        Arguments.of("foo = {", 1, 8, "Unexpected end of input, expected a-z, A-Z, 0-9, }, ', \", or a newline"),
+        Arguments.of("foo = { bar = 1\nbaz = 2 }", 2, 1, "Unexpected 'baz', expected }, a comma, or a newline"),
+        Arguments.of("foo = { bar = 1 baz = 2 }", 1, 17, "Unexpected 'baz', expected }, a comma, or a newline"),
+        Arguments.of("foo = { bar =\n1 }", 1, 14, "Unexpected end of line, expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
+        Arguments.of("foo = { bar = 1,, }", 1, 17, "Unexpected ',', expected } or a newline"),
 
         Arguments.of("[foo]\nbar=1\n[[foo]]\nbar=2\n", 3, 1, "foo is not an array (previously defined at line 1, column 1)"),
         Arguments.of("foo = [1]\n[[foo]]\nbar=2\n", 2, 1, "foo previously defined as a literal array at line 1, column 1"),
@@ -761,7 +767,13 @@ class TomlTest {
         Arguments.of("foo = \"\"\"\\x41\"\"\"", 1, 10, "Invalid escape sequence '\\x41' (TOML versions before 1.1.0)"),
         Arguments.of("foo = 07:32", 1, 12, "Seconds are required in a time (TOML versions before 1.1.0)"),
         Arguments.of("foo = 1979-05-27T07:32", 1, 23, "Seconds are required in a time (TOML versions before 1.1.0)"),
-        Arguments.of("foo = 1979-05-27 07:32Z", 1, 23, "Seconds are required in a time (TOML versions before 1.1.0)")
+        Arguments.of("foo = 1979-05-27 07:32Z", 1, 23, "Seconds are required in a time (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1,\nbaz = 2 }", 1, 17, "Newlines are not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = {\nbar = 1 }", 1, 8, "Newlines are not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1\n, baz = 2 }", 1, 16, "Newlines are not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1 # comment\n}", 1, 26, "Newlines are not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1, }", 1, 16, "A trailing comma is not allowed in an inline table (TOML versions before 1.1.0)"),
+        Arguments.of("foo = { bar = 1,\n}", 1, 16, "A trailing comma is not allowed in an inline table (TOML versions before 1.1.0)")
     );
     // @formatter:on
   }

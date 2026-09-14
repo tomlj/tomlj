@@ -166,8 +166,9 @@ standardTable : TableKeyStart key? TableKeyEnd;
 
 
 // Inline Table
-inlineTable : InlineTableStart inlineTableValues? InlineTableEnd;
-inlineTableValues : keyval (Comma keyval)*;
+inlineTable : InlineTableStart (inlineTableValues NewLine* Comma?)? NewLine* InlineTableEnd;
+inlineTableValues : inlineTableValue (NewLine* Comma inlineTableValue)*;
+inlineTableValue : NewLine* keyval;
 
 
 // Array Table

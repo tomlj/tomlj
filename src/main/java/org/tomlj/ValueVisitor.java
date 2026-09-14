@@ -13,7 +13,9 @@
 package org.tomlj;
 
 import static org.tomlj.EmptyTomlArray.EMPTY_ARRAY;
+import static org.tomlj.TomlVersion.V1_0_0;
 
+import org.tomlj.internal.TomlLexer;
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
@@ -22,9 +24,15 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.TerminalNode;
 
 final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
@@ -144,6 +152,9 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitInlineTable(TomlParser.InlineTableContext ctx) {
+    if (!version.after(V1_0_0)) {
+      checkSingleLineInlineTable(ctx);
+    }
     TomlParser.InlineTableValuesContext valuesContext = ctx.inlineTableValues();
     if (valuesContext == null) {
       return EmptyTomlTable.EMPTY_TABLE;
@@ -152,6 +163,31 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     MutableTomlTable result = valuesContext.accept(visitor);
     visitor.defineOpenTables();
     return result;
+  }
+
+  // Newlines and trailing commas in inline tables were added in TOML 1.1.0. Newlines inside the values of an inline
+  // table (multi-line strings and arrays) are not direct children of the inline table rules, so are not collected.
+  private static void checkSingleLineInlineTable(TomlParser.InlineTableContext ctx) {
+    List<TerminalNode> unsupported = new ArrayList<>(ctx.NewLine());
+    TerminalNode trailingComma = ctx.Comma();
+    if (trailingComma != null) {
+      unsupported.add(trailingComma);
+    }
+    TomlParser.InlineTableValuesContext valuesContext = ctx.inlineTableValues();
+    if (valuesContext != null) {
+      unsupported.addAll(valuesContext.NewLine());
+      valuesContext.inlineTableValue().forEach(value -> unsupported.addAll(value.NewLine()));
+    }
+    if (unsupported.isEmpty()) {
+      return;
+    }
+    Token first =
+        Collections.min(unsupported, Comparator.comparingInt(node -> node.getSymbol().getTokenIndex())).getSymbol();
+    String message = (first.getType() == TomlLexer.Comma) ? "A trailing comma is not allowed in an inline table"
+        : "Newlines are not allowed in an inline table";
+    throw new TomlParseError(
+        message + " (TOML versions before 1.1.0)",
+        TomlPosition.positionAt(first.getLine(), first.getCharPositionInLine() + 1));
   }
 
   @Override
