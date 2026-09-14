@@ -13,6 +13,7 @@
 package org.tomlj;
 
 import static org.tomlj.TomlVersion.V0_5_0;
+import static org.tomlj.TomlVersion.V1_0_0;
 
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
@@ -84,12 +85,27 @@ final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
         return builder.append('\r');
       case 't':
         return builder.append('\t');
+      case 'e':
+        checkEscapeVersion(text, ctx);
+        return builder.append('\u001B');
+      case 'x':
+        checkEscapeVersion(text, ctx);
+        return builder.append(convertUnicodeEscape(text, 4, ctx));
       case 'u':
         return builder.append(convertUnicodeEscape(text, 6, ctx));
       case 'U':
         return builder.append(convertUnicodeEscape(text, 10, ctx));
       default:
         throw new TomlParseError("Invalid escape sequence '" + text + "'", new TomlPosition(ctx));
+    }
+  }
+
+  private void checkEscapeVersion(String text, TomlParser.EscapedContext ctx) {
+    // \e and \xHH were added in TOML 1.1.0
+    if (!version.after(V1_0_0)) {
+      throw new TomlParseError(
+          "Invalid escape sequence '" + text + "' (TOML versions before 1.1.0)",
+          new TomlPosition(ctx));
     }
   }
 

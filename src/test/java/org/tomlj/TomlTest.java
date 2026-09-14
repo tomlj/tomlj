@@ -130,6 +130,12 @@ class TomlTest {
                 "foo = \"I'm a string. \\\"You can quote me\\\". Name\tJos\\u00E9\\nLocation\\tSF.\"",
                 "I'm a string. \"You can quote me\". Name\tJosé\nLocation\tSF."),
         Arguments.of(
+                "foo = \"\\e[0m \\x41\\x00\\xe9\\xFF\"",
+                "\u001B[0m A\u0000\u00E9\u00FF"),
+        Arguments.of(
+                "foo = \"\"\"\\e \\x41\"\"\"",
+                "\u001B A"),
+        Arguments.of(
                 "foo = \"\"\"\"\"\"",
                 ""),
         Arguments.of(
@@ -638,6 +644,8 @@ class TomlTest {
         Arguments.of("foo = \"val\\ue\"", 1, 11, "Invalid unicode escape sequence"),
         Arguments.of("foo = \"val\\U0000\"", 1, 11, "Invalid unicode escape sequence"),
         Arguments.of("foo = \"\"\"val\\ue\"\"\"", 1, 13, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"\\x4\"", 1, 8, "Invalid unicode escape sequence"),
+        Arguments.of("foo = \"\"\"\\xZZ\"\"\"", 1, 10, "Invalid unicode escape sequence"),
 
         Arguments.of("foo = 1234567891234567891233456789", 1, 7, "Integer is too large"),
 
@@ -726,6 +734,27 @@ class TomlTest {
         Arguments.of("foo = []\n[[foo]]\nbar=2\n", 2, 1, "foo previously defined as a literal array at line 1, column 1"),
         Arguments.of("[[foo.bar]]\n[foo]\nbaz=2\nbar=3\n", 4, 1, "bar previously defined at line 1, column 1"),
         Arguments.of("[[foo]]\nbaz=1\n[[foo.bar]]\nbaz=2\n[foo.bar]\nbaz=3\n", 5, 1, "foo.bar previously defined at line 3, column 1")
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
+  @MethodSource("errorCaseSupplier_V1_0_0")
+  void shouldHandleParseErrors_V1_0_0(String input, int line, int column, String expected) {
+    TomlParseResult result = Toml.parse(input, TomlVersion.V1_0_0);
+    List<TomlParseError> errors = result.errors();
+    assertFalse(errors.isEmpty());
+    assertEquals(expected, errors.get(0).getMessage(), () -> joinErrors(result));
+    assertEquals(line, errors.get(0).position().line());
+    assertEquals(column, errors.get(0).position().column());
+  }
+
+  static Stream<Arguments> errorCaseSupplier_V1_0_0() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = \"\\e\"", 1, 8, "Invalid escape sequence '\\e' (TOML versions before 1.1.0)"),
+        Arguments.of("foo = \"\\x41\"", 1, 8, "Invalid escape sequence '\\x41' (TOML versions before 1.1.0)"),
+        Arguments.of("foo = \"\"\"\\x41\"\"\"", 1, 10, "Invalid escape sequence '\\x41' (TOML versions before 1.1.0)")
     );
     // @formatter:on
   }

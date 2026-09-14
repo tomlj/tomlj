@@ -70,11 +70,7 @@ class TomlTestSuiteTest {
           // Newlines are allowed inside inline tables in TOML 1.1.0
           "valid/inline-table/newline.toml",
           "valid/inline-table/newline-comment.toml",
-          "valid/spec-1.1.0/common-47.toml",
-          // \e and \x escapes were added in TOML 1.1.0
-          "valid/spec-1.1.0/common-12.toml",
-          "valid/string/escape-esc.toml",
-          "valid/string/hex-escape.toml");
+          "valid/spec-1.1.0/common-47.toml");
 
   @TestFactory
   Stream<DynamicTest> toml_1_0_0() throws IOException {
