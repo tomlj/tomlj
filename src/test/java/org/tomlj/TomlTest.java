@@ -642,7 +642,12 @@ class TomlTest {
         Arguments.of("a = [1x, 2]\nb = 2\n", Set.of("b")),
         Arguments.of("a = { b = 1 x }\nc = 3\n", Set.of("c")),
         Arguments.of("a = \"\"\"\nfoo\n\"\"\" junk\nb = 2\n", Set.of("b")),
-        Arguments.of("[tbl]\na = 1x\nb = 2\n", Set.of("tbl.b"))
+        Arguments.of("[tbl]\na = 1x\nb = 2\n", Set.of("tbl.b")),
+        Arguments.of("a = [1,\n  2\nb = 3\n", Set.of()),
+        Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", Set.of()),
+        Arguments.of("a = { x = 1, y = 2\nb = 3\n", Set.of()),
+        Arguments.of("a = { x = 1,\n  y = 2\nb = 3\n", Set.of()),
+        Arguments.of("a = { x = 1,\n  y = 2\n[tbl]\nb = 3\n", Set.of())
     );
     // @formatter:on
   }

@@ -19,7 +19,10 @@ import org.tomlj.internal.TomlParserBaseVisitor;
 
 import java.util.*;
 
+import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ErrorNode;
+import org.antlr.v4.runtime.tree.ParseTree;
 
 final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
@@ -117,12 +120,18 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   }
 
   /**
-   * Check whether the parser reported a syntax error on any of the lines spanned by a key/value pair.
+   * Check whether a key/value pair contains a syntax error.
    *
    * <p>
    * The parser recovers from syntax errors and still produces a (partial) parse tree, e.g. {@code key = 4uoxyz} yields
    * a key/value pair for {@code key} with the integer value 4 followed by an error for the trailing {@code uoxyz}. Such
    * values are not what the document expresses, so they are discarded rather than stored.
+   *
+   * <p>
+   * An error is attributed to the pair if it was reported on any of the lines the pair spans (which catches trailing
+   * input that the parser rejected after completing the pair), or if the parser recorded a recognition failure within
+   * the pair's parse tree (which catches an unterminated array or inline table, whose missing closing bracket is
+   * reported at the start of the next expression).
    */
   private boolean hasSyntaxError(TomlParser.KeyvalContext ctx) {
     Token start = ctx.getStart();
@@ -130,7 +139,22 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     if (start == null || stop == null) {
       return true;
     }
-    return errorReporter.hasSyntaxErrorBetween(start.getLine(), stop.getLine());
+    return errorReporter.hasSyntaxErrorBetween(start.getLine(), stop.getLine()) || hasRecognitionError(ctx);
+  }
+
+  private static boolean hasRecognitionError(ParseTree tree) {
+    if (tree instanceof ErrorNode) {
+      return true;
+    }
+    if (tree instanceof ParserRuleContext && ((ParserRuleContext) tree).exception != null) {
+      return true;
+    }
+    for (int i = 0; i < tree.getChildCount(); i++) {
+      if (hasRecognitionError(tree.getChild(i))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void defineOpenTables() {
