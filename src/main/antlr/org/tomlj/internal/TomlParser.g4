@@ -6,6 +6,78 @@ options { tokenVocab=TomlLexer; }
 package org.tomlj.internal;
 }
 
+@members {
+  /**
+   * The maximum number of tables and arrays, not counting the root table, that may enclose any value, table or array
+   * in a document. Nesting is limited so that the stack depth needed by the recursive descent parser, the visitors
+   * that build the model and the serializers stays bounded, whatever the input.
+   */
+  public static final int MAX_NESTING_DEPTH = 128;
+
+  /** Thrown by the parser when a value is nested deeper than {@link #MAX_NESTING_DEPTH}. */
+  public static final class NestingTooDeepException extends InputMismatchException {
+    NestingTooDeepException(TomlParser parser) {
+      super(parser);
+    }
+
+    @Override
+    public String getMessage() {
+      return nestingTooDeepMessage();
+    }
+  }
+
+  public static String nestingTooDeepMessage() {
+    return "Nesting is too deep (more than " + MAX_NESTING_DEPTH + " levels of tables and arrays)";
+  }
+
+  // Called before each value. Counts the tables and arrays between the value and the table holding the current
+  // expression (each key of a dotted key adds a table and each array adds a level, while the final key of the
+  // expression names the value itself), records the deepest count seen on the expression's key/value pair so that
+  // LineVisitor can add the depth of the current table, and rejects the value once the count exceeds the limit. The
+  // rejected value is skipped whole so that parsing resumes after it with a single error reported.
+  private void checkNestingDepth() {
+    int depth = -1;
+    KeyvalContext outermost = null;
+    for (RuleContext ctx = _ctx; ctx != null; ctx = ctx.parent) {
+      if (ctx instanceof ArrayContext) {
+        depth++;
+      } else if (ctx instanceof KeyvalContext) {
+        outermost = (KeyvalContext) ctx;
+        KeyContext key = outermost.key();
+        if (key != null) {
+          depth += key.simpleKey().size();
+        }
+      }
+    }
+    if (outermost != null && depth > outermost.nesting) {
+      outermost.nesting = depth;
+    }
+    if (depth > MAX_NESTING_DEPTH) {
+      NestingTooDeepException e = new NestingTooDeepException(this);
+      skipValue();
+      throw e;
+    }
+  }
+
+  // Consumes the tokens of the value about to be parsed: a single token, or an array or inline table together with
+  // everything nested inside it.
+  private void skipValue() {
+    int open = 0;
+    do {
+      int type = _input.LA(1);
+      if (type == Token.EOF) {
+        return;
+      }
+      if (type == ArrayStart || type == InlineTableStart) {
+        open++;
+      } else if (type == ArrayEnd || type == InlineTableEnd) {
+        open--;
+      }
+      _input.consume();
+    } while (open > 0);
+  }
+}
+
 // Document parser
 toml : NewLine* (expression (NewLine+ expression)* NewLine*)? EOF;
 
@@ -20,7 +92,7 @@ tomlKey : key EOF;
 
 
 // Key-Value pairs
-keyval : key Equals val;
+keyval locals [int nesting] : key Equals val;
 
 key : simpleKey (Dot simpleKey)*;
 simpleKey
@@ -35,13 +107,15 @@ quotedKey
   ;
 
 val
-  : string
-  | integer
-  | floatValue
-  | booleanValue
-  | dateTime
-  | array
-  | inlineTable
+  : {checkNestingDepth();}
+    ( string
+    | integer
+    | floatValue
+    | booleanValue
+    | dateTime
+    | array
+    | inlineTable
+    )
   ;
 
 

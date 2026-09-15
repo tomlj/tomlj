@@ -39,6 +39,10 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * Methods for parsing data stored in Tom's Obvious, Minimal Language (TOML).
+ * <p>
+ * Documents may nest tables and arrays at most 128 levels deep, not counting the root table; a value, table or array
+ * nested deeper than that is reported as a parse error. The limit bounds the stack depth needed to parse and serialize
+ * any document.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})

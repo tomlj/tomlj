@@ -13,6 +13,7 @@
 package org.tomlj;
 
 import org.tomlj.internal.TomlLexer;
+import org.tomlj.internal.TomlParser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +45,11 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
 
     TomlPosition position = TomlPosition.positionAt(line, charPosition + 1);
     syntaxErrorLines.add(line);
+
+    if (e instanceof TomlParser.NestingTooDeepException) {
+      reportError(e.getMessage(), position);
+      return;
+    }
 
     if (e instanceof InputMismatchException || e instanceof NoViableAltException) {
       String message = getMessage(e.getOffendingToken(), getExpected(e));
