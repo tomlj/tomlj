@@ -675,6 +675,8 @@ class TomlTest {
         Arguments.of("=", 1, 1, "Unexpected '=', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
         Arguments.of("\"foo \nbar\" = 1", 1, 6, "Unexpected end of line, expected \" or a character"),
         Arguments.of("foo = \"bar \\y baz\"", 1, 12, "Invalid escape sequence '\\y'"),
+        Arguments.of("foo = \"bar \\' baz\"", 1, 12, "Invalid escape sequence '\\''"),
+        Arguments.of("foo = \"\"\"bar \\' baz\"\"\"", 1, 14, "Invalid escape sequence '\\''"),
         Arguments.of("\u0011abc = 'foo'", 1, 1, "Unexpected '\\u0011', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
         Arguments.of(" \uDBFF\uDFFFAAabc='foo'", 1, 2, "Unexpected '\\U0010ffff', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
         Arguments.of("foo = '''Here are fifteen apostrophes: ''''''''''''''''''", 1, 43, "Unexpected ', expected a newline or end-of-input"),
