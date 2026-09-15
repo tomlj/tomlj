@@ -30,14 +30,20 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   private final ErrorReporter errorReporter;
   private final MutableTomlTable rootTable;
   private MutableTomlTable currentTable;
+  // The number of tables and arrays enclosing the entries of currentTable, not counting the root table. Starts at 0.
+  private int currentDepth;
   private final Map<MutableTomlTable, TomlPosition> openTables;
+  // The maximum number of tables and arrays, not counting the root table, that may enclose any value, table or array
+  // in the document.
+  private final int maxNestingDepth;
 
-  LineVisitor(TomlVersion version, ErrorReporter errorReporter) {
+  LineVisitor(TomlVersion version, ErrorReporter errorReporter, int maxNestingDepth) {
     this.version = version;
     this.errorReporter = errorReporter;
     this.rootTable = new MutableTomlTable(version, TomlPosition.positionAt(1, 1));
     this.currentTable = rootTable;
     this.openTables = new HashMap<>();
+    this.maxNestingDepth = maxNestingDepth;
   }
 
   @Override
@@ -58,6 +64,9 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       }
       Object value = valContext.accept(new ValueVisitor(version));
       if (value != null && !hasSyntaxError(ctx)) {
+        if ((long) currentDepth + ctx.nesting > maxNestingDepth) {
+          throw new TomlParseError(TomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
+        }
         currentTable
             .set(path, value, new TomlPosition(ctx))
             .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
@@ -81,8 +90,16 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     if (path == null) {
       return rootTable;
     }
+    // The table named by the header's last key is enclosed by whatever its leading keys walk through.
+    int depth = headerDepth(path);
+    if (depth > maxNestingDepth) {
+      errorReporter
+          .reportError(new TomlParseError(TomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
+      return rootTable;
+    }
     try {
       currentTable = rootTable.createTable(path, new TomlPosition(ctx));
+      currentDepth = depth + 1;
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
     }
@@ -101,12 +118,56 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     if (path == null) {
       return rootTable;
     }
+    // The array named by the header's last key is enclosed by whatever its leading keys walk through, and its new
+    // element table is enclosed by that array as well.
+    int depth = headerDepth(path);
+    if ((long) depth + 1 > maxNestingDepth) {
+      errorReporter
+          .reportError(new TomlParseError(TomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
+      return rootTable;
+    }
     try {
       currentTable = rootTable.createTableArray(path, new TomlPosition(ctx));
+      currentDepth = depth + 2;
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
     }
     return rootTable;
+  }
+
+  /**
+   * Compute the depth of the table or array named by a header's last key, without creating anything.
+   *
+   * <p>
+   * Walks {@link #rootTable} along the header's leading keys ({@code path} without its last element), mirroring
+   * {@code MutableTomlTable.ensureTable}'s {@code followTableArrays} behaviour: each leading key adds one level, and a
+   * leading key that names a (non-empty) array of tables adds a second level, because the header walks into the last
+   * table of that array rather than the array itself. A key that is absent, or that names anything else, stops the
+   * walk, but every remaining leading key still adds its one level, since {@code createTable} /
+   * {@code createTableArray} will report the real error for it.
+   */
+  private int headerDepth(List<String> path) {
+    int depth = 0;
+    MutableTomlTable table = rootTable;
+    for (int i = 0; i < path.size() - 1; i++) {
+      depth++;
+      if (table == null) {
+        continue;
+      }
+      Object value = table.get(Collections.singletonList(path.get(i)));
+      if (value instanceof MutableTomlArray
+          && ((MutableTomlArray) value).isTableArray()
+          && !((MutableTomlArray) value).isEmpty()) {
+        MutableTomlArray array = (MutableTomlArray) value;
+        depth++;
+        table = (MutableTomlTable) array.get(array.size() - 1);
+      } else if (value instanceof MutableTomlTable) {
+        table = (MutableTomlTable) value;
+      } else {
+        table = null;
+      }
+    }
+    return depth;
   }
 
   @Override

@@ -45,6 +45,20 @@ class TomlTest {
   static final String INVALID_KEY_HINT =
       ". Keys containing characters other than A-Z, a-z, 0-9, '_' and '-' must be quoted (e.g. \"@key\"), or use the List<String> key path overloads.";
 
+  static final String NESTING_TOO_DEEP_MESSAGE = "Nesting is too deep (more than 128 levels of tables and arrays)";
+
+  // A chain of k array-of-tables headers "[[a]]\n[[a.a]]\n...\n[[a.a...a]]\n" (k keys in the last header), so that
+  // header i (1-based) walks through i - 1 array-of-tables levels, each of which counts two levels of nesting (the
+  // array plus the table it was last appended to). The last header's element table sits at depth 2k - 1, and its
+  // own entries sit at depth 2k.
+  private static String arrayTableChain(int k) {
+    StringBuilder builder = new StringBuilder();
+    for (int i = 1; i <= k; i++) {
+      builder.append("[[a").append(".a".repeat(i - 1)).append("]]\n");
+    }
+    return builder.toString();
+  }
+
   @Test
   void shouldParseEmptyDocument() {
     TomlParseResult result = Toml.parse("\n");
@@ -684,7 +698,13 @@ class TomlTest {
         Arguments.of("a = \n[tbl]\nb = 2\n", Set.of("tbl.b")),
         Arguments.of("a = \n[[arr]]\nb = 2\n", Set.of("arr")),
         Arguments.of("a = { b = \n c = 2 }\nd = 3\n", Set.of("d")),
-        Arguments.of("a = [ 1, \n 2 ]\nb = \nc = 3\n", Set.of("a", "c"))
+        Arguments.of("a = [ 1, \n 2 ]\nb = \nc = 3\n", Set.of("a", "c")),
+
+        // Nesting depth limit: the rejected value is skipped whole, so parsing recovers and continues.
+        Arguments.of("a = " + "[".repeat(130) + "]".repeat(130) + "\nb = 1\n", Set.of("b")),
+        Arguments.of("a = " + "{ b = ".repeat(129) + "1" + " }".repeat(129) + "\nc = 1\n", Set.of("c")),
+        Arguments.of("a = { x = 1, y = " + "[".repeat(130) + "]".repeat(130) + ", z = 2 }\nb = 1\n", Set.of("b")),
+        Arguments.of("a = [1, " + "[".repeat(130) + "]".repeat(130) + ", 2]\nb = 1\n", Set.of("b"))
     );
     // @formatter:on
   }
@@ -826,7 +846,24 @@ class TomlTest {
         Arguments.of("a = { b = 1 }\na.c = 2\n", 2, 1, "a is an inline table (defined at line 1, column 5) and cannot be extended"),
         Arguments.of("a = {}\n[a.c]\nd = 2\n", 2, 1, "a is an inline table (defined at line 1, column 5) and cannot be extended"),
         Arguments.of("a = { b = { c = 1 }, b.d = 2 }\n", 1, 22, "b is an inline table (defined at line 1, column 11) and cannot be extended"),
-        Arguments.of("[x]\na = { b = 1 }\n[x.a.c]\nd = 2\n", 3, 1, "x.a is an inline table (defined at line 2, column 5) and cannot be extended")
+        Arguments.of("[x]\na = { b = 1 }\n[x.a.c]\nd = 2\n", 3, 1, "x.a is an inline table (defined at line 2, column 5) and cannot be extended"),
+
+        // Nesting depth limit (128 levels of tables and arrays, not counting the root table).
+        Arguments.of("a = " + "[".repeat(129) + "1" + "]".repeat(129) + "\n", 1, 134, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of("a = " + "[".repeat(130) + "]".repeat(130) + "\n", 1, 134, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of("a = " + "{ b = ".repeat(129) + "1" + " }".repeat(129) + "\n", 1, 779, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of("a" + ".b".repeat(129) + " = 1\n", 1, 263, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of("[a" + ".b".repeat(129) + "]\n", 1, 1, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of("[[a" + ".b".repeat(128) + "]]\n", 1, 1, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of("[a" + ".b".repeat(127) + "]\nx = [1]\n", 2, 1, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of("[a" + ".b".repeat(127) + "]\nx.y = 1\n", 2, 1, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of("[[a" + ".b".repeat(126) + "]]\nx = { y = 1 }\n", 2, 1, NESTING_TOO_DEEP_MESSAGE),
+
+        // A header that walks through leading array-of-tables keys counts two levels per such key (the array and
+        // the table it was last appended to), not one.
+        Arguments.of(arrayTableChain(65), 65, 1, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of("[[a]]\n[a" + ".a".repeat(128) + "]\n", 2, 1, NESTING_TOO_DEEP_MESSAGE),
+        Arguments.of(arrayTableChain(64) + "x = [1]\n", 65, 1, NESTING_TOO_DEEP_MESSAGE)
     );
     // @formatter:on
   }
@@ -877,6 +914,62 @@ class TomlTest {
     return Stream.of(
         Arguments.of("\"foo\tbar\" = 1", 1, 5, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
         Arguments.of("foo = [ 1, 'bar' ]", 1, 12, "Cannot add a string to an array containing integers")
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
+  @MethodSource("nestingTooDeepSupplier")
+  void shouldReportNestingTooDeepOnce(String input) {
+    TomlParseResult result = Toml.parse(input);
+    List<TomlParseError> errors = result.errors();
+    assertEquals(1, errors.size(), () -> joinErrors(result));
+    assertEquals(NESTING_TOO_DEEP_MESSAGE, errors.get(0).getMessage());
+  }
+
+  static Stream<Arguments> nestingTooDeepSupplier() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("a = " + "[".repeat(130) + "]".repeat(130) + "\nb = 1\n"),
+        Arguments.of("a = " + "{ b = ".repeat(129) + "1" + " }".repeat(129) + "\nc = 1\n"),
+        Arguments.of("a = { x = 1, y = " + "[".repeat(130) + "]".repeat(130) + ", z = 2 }\nb = 1\n"),
+        Arguments.of("a = [1, " + "[".repeat(130) + "]".repeat(130) + ", 2]\nb = 1\n")
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
+  @MethodSource("nestingUpToLimitSupplier")
+  void shouldParseNestingUpToTheLimit(String input) {
+    TomlParseResult result = Toml.parse(input);
+    assertTrue(result.errors().isEmpty(), () -> joinErrors(result));
+
+    result.toJson();
+    String toml = result.toToml();
+    result.keyPathSet(true);
+    result.entryPathSet(true);
+
+    TomlParseResult reparsed = Toml.parse(toml);
+    assertTrue(reparsed.errors().isEmpty(), () -> joinErrors(reparsed));
+  }
+
+  static Stream<Arguments> nestingUpToLimitSupplier() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("a = " + "[".repeat(128) + "1" + "]".repeat(128) + "\n"),
+        Arguments.of("a = " + "[".repeat(129) + "]".repeat(129) + "\n"),
+        Arguments.of("a = " + "{ b = ".repeat(128) + "1" + " }".repeat(128) + "\n"),
+        Arguments.of("a" + ".b".repeat(128) + " = 1\n"),
+        Arguments.of("[a" + ".b".repeat(128) + "]\n"),
+        Arguments.of("[[a" + ".b".repeat(127) + "]]\n"),
+        Arguments.of("[a" + ".b".repeat(127) + "]\nx = 1\n"),
+        Arguments.of("[[a" + ".b".repeat(126) + "]]\nx = 1\n"),
+        Arguments.of("a = [1, " + "[".repeat(127) + "2" + "]".repeat(127) + "]\nb = [{ c = { d = 1 } }]\n"),
+
+        // A header that walks through leading array-of-tables keys counts two levels per such key.
+        Arguments.of(arrayTableChain(64)),
+        Arguments.of(arrayTableChain(64) + "x = 1\n"),
+        Arguments.of("[[a]]\n[a" + ".a".repeat(127) + "]\n")
     );
     // @formatter:on
   }

@@ -28,14 +28,16 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 final class Parser {
   private Parser() {}
 
-  static TomlParseResult parse(CharStream stream, TomlVersion version) {
+  static TomlParseResult parse(CharStream stream, TomlParseOptions options) {
     TomlLexer lexer = new TomlLexer(stream);
     TomlParser parser = new TomlParser(new CommonTokenStream(lexer));
     parser.removeErrorListeners();
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
     parser.addErrorListener(errorListener);
+    parser.setMaxNestingDepth(options.maxNestingDepth());
     ParseTree tree = parser.toml();
-    TomlTable table = tree.accept(new LineVisitor(version, errorListener));
+    TomlTable table =
+        tree.accept(new LineVisitor(options.version().canonical, errorListener, options.maxNestingDepth()));
 
     return new TomlParseResult() {
       @Override
