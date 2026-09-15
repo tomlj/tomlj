@@ -114,6 +114,10 @@ final class LocalTimeVisitor extends TomlParserBaseVisitor<LocalTime> {
     } catch (NumberFormatException e) {
       throw new TomlParseError("Invalid nanoseconds", new TomlPosition(ctx), e);
     }
+    // The text includes any sign the parser dropped as extraneous input, as in 07:32:00.-5
+    if (nano < 0) {
+      throw new TomlParseError("Invalid nanoseconds (valid range 0..999999999)", new TomlPosition(ctx));
+    }
     time = time.withNano(nano);
     return time;
   }

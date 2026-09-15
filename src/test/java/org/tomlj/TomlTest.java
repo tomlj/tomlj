@@ -856,6 +856,11 @@ class TomlTest {
         Arguments.of("\nfoo = 1937-07-18T13:55:26+04:6", 2, 30, "Invalid zone offset minutes (valid range 0..59)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-18:30", 2, 26, "Invalid zone offset (valid range -18:00..+18:00)"),
         Arguments.of("\nfoo = 1937-07-18T13:55:26-18:", 2, 30, "Unexpected end of input, expected a date/time"),
+        Arguments.of("\nfoo = 1937-07-18T13:55:26+04Z:00", 2, 29, "Unexpected 'Z', expected :"),
+        Arguments.of("\nfoo = 1937-07-18T13:55:26-04-00", 2, 29, "Unexpected '-', expected :"),
+        Arguments.of("\nfoo = 1937-07-18T13:55-00+04:00", 2, 26, "Unexpected '+', expected :"),
+        Arguments.of("\nfoo = [1937-07-18T13:55:26+04Z:00]", 2, 30, "Unexpected 'Z', expected :"),
+        Arguments.of("\nfoo = { bar = 1937-07-18T13:55:26+04Z:00 }", 2, 37, "Unexpected 'Z', expected :"),
 
         Arguments.of("\nfoo = 2334567891233457889-07-18T00:00:00", 2, 7, "Invalid year (valid range 0000..9999)"),
         Arguments.of("\nfoo = 1937-47-18T00:00:00", 2, 12, "Invalid month (valid range 01..12)"),
@@ -873,6 +878,9 @@ class TomlTest {
         Arguments.of("\nfoo = 13:70:00", 2, 10, "Invalid minutes (valid range 00..59)"),
         Arguments.of("\nfoo = 13:55:92", 2, 13, "Invalid seconds (valid range 00..59)"),
         Arguments.of("\nfoo = 13:55:02.0000000009", 2, 16, "Invalid nanoseconds (valid range 0..999999999)"),
+        Arguments.of("\nfoo = 13:55:02.-5", 2, 16, "Unexpected '-', expected a date/time"),
+        Arguments.of("\nfoo = [13:55:02.-5]", 2, 17, "Unexpected '-', expected a date/time"),
+        Arguments.of("\nfoo = { bar = 13:55:02.-5 }", 2, 24, "Unexpected '-', expected a date/time"),
         Arguments.of("\nfoo = 13:55:02,", 2, 15, "Unexpected ',', expected a newline or end-of-input"),
         Arguments.of("\nfoo = 13:55:02 , ", 2, 16, "Unexpected ',', expected a newline or end-of-input"),
 
