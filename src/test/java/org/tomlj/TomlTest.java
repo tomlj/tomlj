@@ -1126,6 +1126,19 @@ class TomlTest {
     // @formatter:on
   }
 
+  @Test
+  void testSerializerArrayOfTablesOnItsOwn() {
+    TomlParseResult result = Toml.parse("[[a]]\nb = 1\n[[a]]\nc = { d = 2 }\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    TomlArray array = result.getArray("a");
+    assertNotNull(array);
+
+    String serializedToml = array.toToml();
+    TomlParseResult resultReparse = Toml.parse("a = " + serializedToml);
+    assertFalse(resultReparse.hasErrors(), () -> serializedToml + "\n" + joinErrors(resultReparse));
+    assertTrue(Toml.equals(result, resultReparse), () -> serializedToml);
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }

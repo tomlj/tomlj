@@ -75,7 +75,7 @@ final class TomlSerializer {
   static void toToml(TomlArray array, Appendable appendable) throws IOException {
     requireNonNull(array);
     requireNonNull(appendable);
-    toToml(array, appendable, 0, "");
+    appendArray(array, appendable, 0, "");
   }
 
   private static void toToml(TomlArray array, Appendable appendable, int indent, String path) throws IOException {
