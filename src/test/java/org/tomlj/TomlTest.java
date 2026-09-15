@@ -333,7 +333,9 @@ class TomlTest {
         Arguments.of("foo = 1937-07-18 11:44:02Z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00")),
         Arguments.of("foo = 1937-07-18 11:44:02z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00")),
         Arguments.of("foo = 1979-05-27 07:32Z", OffsetDateTime.parse("1979-05-27T07:32:00Z")),
-        Arguments.of("foo = 1979-05-27T07:32-07:00", OffsetDateTime.parse("1979-05-27T07:32:00-07:00"))
+        Arguments.of("foo = 1979-05-27T07:32-07:00", OffsetDateTime.parse("1979-05-27T07:32:00-07:00")),
+        Arguments.of("foo = 2020-01-02T03:04:05-00:30", OffsetDateTime.parse("2020-01-02T03:04:05-00:30")),
+        Arguments.of("foo = 2020-01-02T03:04:05-00:00", OffsetDateTime.parse("2020-01-02T03:04:05-00:00"))
     );
     // @formatter:on
   }
