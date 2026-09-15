@@ -64,7 +64,7 @@ UnquotedKey : UNQUOTED_KEY;
 
 WS : WSChar+ -> channel(WHITESPACE);
 Comment : COMMENT -> channel(COMMENTS);
-NewLine : NL { setText(System.lineSeparator()); };
+NewLine : NL;
 Error : .;
 
 
@@ -143,7 +143,7 @@ EscapeSequence
   | '\\u' HexDig HexDig HexDig HexDig
   | '\\U' HexDig HexDig HexDig HexDig HexDig HexDig HexDig HexDig;
 
-BasicStringNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine), popMode;
+BasicStringNewLine: NL -> type(NewLine), popMode;
 BasicStringError : . -> type(Error), popMode;
 
 
@@ -160,7 +160,9 @@ MLBasicStringEscape :
   | '\\u' HexDig HexDig HexDig HexDig
   | '\\U' HexDig HexDig HexDig HexDig HexDig HexDig HexDig HexDig
   | '\\' .) -> type(EscapeSequence);
-MLBasicStringNewLine: NL { setText(System.lineSeparator()); } -> type(StringChar);
+// TOML lets a parser choose the newline in a multi-line string value. Both LF and CRLF become "\n", so a document
+// parses to the same values on every platform and whichever line endings the file uses.
+MLBasicStringNewLine: NL { setText("\n"); } -> type(StringChar);
 
 MLBasicStringError : . -> type(Error), popMode;
 
@@ -170,7 +172,7 @@ mode LiteralStringMode;
 LiteralStringEnd : '\'' -> type(Apostrophe), popMode;
 LiteralStringChar : ~[\u0000-\u0008\u000A-\u001F'\u007F\uD800-\uDFFF] -> type(StringChar);
 
-LiteralStringNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine), popMode;
+LiteralStringNewLine: NL -> type(NewLine), popMode;
 LiteralStringError : . -> type(Error), popMode;
 
 
@@ -179,7 +181,8 @@ mode MLLiteralStringMode;
 MLLiteralStringSextEnd : '\'\'\'' { _input.LA(1) == '\'' && _input.LA(2) == '\'' && _input.LA(3) == '\'' }? -> type(TripleApostrophe), popMode;
 MLLiteralStringEnd : '\'\'\'' { _input.LA(1) != '\'' }? -> type(TripleApostrophe), popMode;
 MLLiteralStringChar : ~[\u0000-\u0008\u000A-\u001F\u007F\uD800-\uDFFF] -> type(StringChar);
-MLLiteralStringNewLine: NL { setText(System.lineSeparator()); } -> type(StringChar);
+// Newlines are normalized as in a multi-line basic string.
+MLLiteralStringNewLine: NL { setText("\n"); } -> type(StringChar);
 
 MLLiteralStringError : . -> type(Error), popMode;
 
@@ -196,7 +199,7 @@ DateDigits : Digit+;
 
 DateWS : WSChar+ -> type(WS), channel(WHITESPACE), popMode;
 DateComment : COMMENT -> type(Comment), channel(COMMENTS), popMode;
-DateNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine), popMode;
+DateNewLine: NL -> type(NewLine), popMode;
 DateComma: ',' -> type(Comma), popMode;
 // DateStart pushed ValueMode inside an array, so leave it before closing the array as ArrayEnd does.
 DateArrayEnd : ']' { if (inArray()) { popMode(); arrayDepth--; pushValueModeIfInArray(); } } -> type(ArrayEnd), popMode;
@@ -217,5 +220,5 @@ InlineTableUnquotedKey : UNQUOTED_KEY -> type(UnquotedKey);
 
 InlineTableWS : WSChar+ -> type(WS), channel(WHITESPACE);
 InlineTableComment : COMMENT -> type(Comment), channel(COMMENTS);
-InlineTableNewLine : NL { setText(System.lineSeparator()); } -> type(NewLine);
+InlineTableNewLine : NL -> type(NewLine);
 InlineTableError : . -> type(Error), popMode;
