@@ -128,7 +128,7 @@ class TomlTest {
   void shouldParseString(String input, String expected) {
     TomlParseResult result = Toml.parse(input);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
-    assertEquals(expected.replace("\n", System.lineSeparator()), result.getString("foo"));
+    assertEquals(expected, result.getString("foo"));
   }
 
   static Stream<Arguments> stringSupplier() {
@@ -163,6 +163,9 @@ class TomlTest {
                 "  foobar"),
         Arguments.of(
                 "foo = \"\"\"\n  foo\nbar\"\"\"",
+                "  foo\nbar"),
+        Arguments.of(
+                "foo = \"\"\"\r\n  foo\r\nbar\"\"\"",
                 "  foo\nbar"),
         Arguments.of(
                 "foo = \"\"\"\\n  foo\nbar\"\"\"",
@@ -208,6 +211,9 @@ class TomlTest {
                 "foobar \n"),
         Arguments.of(
                 "foo = '''\nfoobar \n'''",
+                "foobar \n"),
+        Arguments.of(
+                "foo = '''\r\nfoobar \r\n'''",
                 "foobar \n"),
         Arguments.of(
                 "foo = '''\nfoobar \\    \n'''",
@@ -451,7 +457,7 @@ class TomlTest {
                 new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
         Arguments.of("foo = [ 1993-08-04 , 1993-08-04   , ]",
                 new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
-        Arguments.of("foo = [\n'''bar\nbaz''',\n'baz'\n]", new Object[] {"bar" + System.lineSeparator() + "baz", "baz"}),
+        Arguments.of("foo = [\n'''bar\nbaz''',\n'baz'\n]", new Object[] {"bar\nbaz", "baz"}),
         Arguments.of("foo = [['bar']]", new Object[] {new Object[] {"bar"}}),
         Arguments.of("foo = [ 1,\n2\n,3,4]", new Object[] {1L, 2L, 3L, 4L})
     );
