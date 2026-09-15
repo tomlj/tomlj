@@ -33,13 +33,17 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   // The number of tables and arrays enclosing the entries of currentTable, not counting the root table. Starts at 0.
   private int currentDepth;
   private final Map<MutableTomlTable, TomlPosition> openTables;
+  // The maximum number of tables and arrays, not counting the root table, that may enclose any value, table or array
+  // in the document.
+  private final int maxNestingDepth;
 
-  LineVisitor(TomlVersion version, ErrorReporter errorReporter) {
+  LineVisitor(TomlVersion version, ErrorReporter errorReporter, int maxNestingDepth) {
     this.version = version;
     this.errorReporter = errorReporter;
     this.rootTable = new MutableTomlTable(version, TomlPosition.positionAt(1, 1));
     this.currentTable = rootTable;
     this.openTables = new HashMap<>();
+    this.maxNestingDepth = maxNestingDepth;
   }
 
   @Override
@@ -60,8 +64,8 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       }
       Object value = valContext.accept(new ValueVisitor(version));
       if (value != null && !hasSyntaxError(ctx)) {
-        if (currentDepth + ctx.nesting > TomlParser.MAX_NESTING_DEPTH) {
-          throw new TomlParseError(TomlParser.nestingTooDeepMessage(), new TomlPosition(ctx));
+        if ((long) currentDepth + ctx.nesting > maxNestingDepth) {
+          throw new TomlParseError(TomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
         }
         currentTable
             .set(path, value, new TomlPosition(ctx))
@@ -88,8 +92,9 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     }
     // The table named by the header's last key is enclosed by whatever its leading keys walk through.
     int depth = headerDepth(path);
-    if (depth > TomlParser.MAX_NESTING_DEPTH) {
-      errorReporter.reportError(new TomlParseError(TomlParser.nestingTooDeepMessage(), new TomlPosition(ctx)));
+    if (depth > maxNestingDepth) {
+      errorReporter
+          .reportError(new TomlParseError(TomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
       return rootTable;
     }
     try {
@@ -116,8 +121,9 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     // The array named by the header's last key is enclosed by whatever its leading keys walk through, and its new
     // element table is enclosed by that array as well.
     int depth = headerDepth(path);
-    if (depth + 1 > TomlParser.MAX_NESTING_DEPTH) {
-      errorReporter.reportError(new TomlParseError(TomlParser.nestingTooDeepMessage(), new TomlPosition(ctx)));
+    if ((long) depth + 1 > maxNestingDepth) {
+      errorReporter
+          .reportError(new TomlParseError(TomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
       return rootTable;
     }
     try {

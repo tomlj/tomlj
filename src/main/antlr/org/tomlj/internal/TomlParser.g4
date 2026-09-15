@@ -4,30 +4,45 @@ options { tokenVocab=TomlLexer; }
 
 @header {
 package org.tomlj.internal;
+
+import org.tomlj.TomlParseOptions;
 }
 
 @members {
-  /**
-   * The maximum number of tables and arrays, not counting the root table, that may enclose any value, table or array
-   * in a document. Nesting is limited so that the stack depth needed by the recursive descent parser, the visitors
-   * that build the model and the serializers stays bounded, whatever the input.
-   */
-  public static final int MAX_NESTING_DEPTH = 128;
+  // The maximum number of tables and arrays, not counting the root table, that may enclose any value, table or array
+  // in a document. Nesting is limited so that the stack depth needed by the recursive descent parser, the visitors
+  // that build the model and the serializers stays bounded, whatever the input. Defaults to
+  // TomlParseOptions.DEFAULT_MAX_NESTING_DEPTH and is changed with setMaxNestingDepth(int).
+  private int maxNestingDepth = TomlParseOptions.DEFAULT_MAX_NESTING_DEPTH;
 
-  /** Thrown by the parser when a value is nested deeper than {@link #MAX_NESTING_DEPTH}. */
+  /**
+   * Set the maximum number of tables and arrays, not counting the root table, that may enclose any value, table or
+   * array in the document.
+   *
+   * @param maxNestingDepth The maximum nesting depth.
+   */
+  public void setMaxNestingDepth(int maxNestingDepth) {
+    this.maxNestingDepth = maxNestingDepth;
+  }
+
+  /** Thrown by the parser when a value is nested deeper than the parser's maximum nesting depth. */
   public static final class NestingTooDeepException extends InputMismatchException {
+    private final int maxNestingDepth;
+
     NestingTooDeepException(TomlParser parser) {
       super(parser);
+      this.maxNestingDepth = parser.maxNestingDepth;
     }
 
     @Override
     public String getMessage() {
-      return nestingTooDeepMessage();
+      return nestingTooDeepMessage(maxNestingDepth);
     }
   }
 
-  public static String nestingTooDeepMessage() {
-    return "Nesting is too deep (more than " + MAX_NESTING_DEPTH + " levels of tables and arrays)";
+  public static String nestingTooDeepMessage(int maxNestingDepth) {
+    return "Nesting is too deep (more than " + maxNestingDepth + " level" + (maxNestingDepth == 1 ? "" : "s")
+        + " of tables and arrays)";
   }
 
   // Called before each value. Counts the tables and arrays between the value and the table holding the current
@@ -52,7 +67,7 @@ package org.tomlj.internal;
     if (outermost != null && depth > outermost.nesting) {
       outermost.nesting = depth;
     }
-    if (depth > MAX_NESTING_DEPTH) {
+    if (depth > maxNestingDepth) {
       NestingTooDeepException e = new NestingTooDeepException(this);
       skipValue();
       throw e;

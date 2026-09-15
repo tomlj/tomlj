@@ -40,9 +40,10 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 /**
  * Methods for parsing data stored in Tom's Obvious, Minimal Language (TOML).
  * <p>
- * Documents may nest tables and arrays at most 128 levels deep, not counting the root table; a value, table or array
- * nested deeper than that is reported as a parse error. The limit bounds the stack depth needed to parse and serialize
- * any document.
+ * By default, documents may nest tables and arrays at most {@value TomlParseOptions#DEFAULT_MAX_NESTING_DEPTH} levels
+ * deep, not counting the root table, and a value, table or array nested deeper than that is reported as a parse error.
+ * The limit bounds the stack depth needed to parse and serialize a document; change it with
+ * {@link TomlParseOptions#withMaxNestingDepth(int)}.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
@@ -58,7 +59,7 @@ public final class Toml {
    * @return The parse result.
    */
   public static TomlParseResult parse(String input) {
-    return parse(input, TomlVersion.LATEST);
+    return parse(input, TomlParseOptions.defaults());
   }
 
   /**
@@ -69,8 +70,19 @@ public final class Toml {
    * @return The parse result.
    */
   public static TomlParseResult parse(String input, TomlVersion version) {
+    return parse(input, TomlParseOptions.defaults().withVersion(version));
+  }
+
+  /**
+   * Parse a TOML string.
+   *
+   * @param input The input to parse.
+   * @param options The options to parse with.
+   * @return The parse result.
+   */
+  public static TomlParseResult parse(String input, TomlParseOptions options) {
     CharStream stream = CharStreams.fromString(input);
-    return Parser.parse(stream, version.canonical);
+    return Parser.parse(stream, options);
   }
 
   /**
@@ -81,7 +93,7 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(Path file) throws IOException {
-    return parse(file, TomlVersion.LATEST);
+    return parse(file, TomlParseOptions.defaults());
   }
 
   /**
@@ -93,11 +105,23 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(Path file, TomlVersion version) throws IOException {
+    return parse(file, TomlParseOptions.defaults().withVersion(version));
+  }
+
+  /**
+   * Parse a TOML file.
+   *
+   * @param file The input file to parse.
+   * @param options The options to parse with.
+   * @return The parse result.
+   * @throws IOException If an IO error occurs.
+   */
+  public static TomlParseResult parse(Path file, TomlParseOptions options) throws IOException {
     CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
     decoder.onMalformedInput(CodingErrorAction.REPORT);
     decoder.onUnmappableCharacter(CodingErrorAction.REPORT);
     InputStreamReader reader = new InputStreamReader(Files.newInputStream(file), decoder);
-    return parse(reader, version);
+    return parse(reader, options);
   }
 
   /**
@@ -108,7 +132,7 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(InputStream is) throws IOException {
-    return parse(is, TomlVersion.LATEST);
+    return parse(is, TomlParseOptions.defaults());
   }
 
   /**
@@ -120,10 +144,22 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(InputStream is, TomlVersion version) throws IOException {
+    return parse(is, TomlParseOptions.defaults().withVersion(version));
+  }
+
+  /**
+   * Parse a TOML input stream.
+   *
+   * @param is The UTF-8 encoded input stream to read the TOML document from.
+   * @param options The options to parse with.
+   * @return The parse result.
+   * @throws IOException If an IO error occurs.
+   */
+  public static TomlParseResult parse(InputStream is, TomlParseOptions options) throws IOException {
     CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
     decoder.onMalformedInput(CodingErrorAction.REPORT);
     decoder.onUnmappableCharacter(CodingErrorAction.REPORT);
-    return parse(new InputStreamReader(is, decoder), version);
+    return parse(new InputStreamReader(is, decoder), options);
   }
 
   /**
@@ -134,7 +170,7 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(Reader reader) throws IOException {
-    return parse(reader, TomlVersion.LATEST);
+    return parse(reader, TomlParseOptions.defaults());
   }
 
   /**
@@ -146,8 +182,20 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(Reader reader, TomlVersion version) throws IOException {
+    return parse(reader, TomlParseOptions.defaults().withVersion(version));
+  }
+
+  /**
+   * Parse a TOML input stream.
+   *
+   * @param reader The reader to obtain the TOML document from.
+   * @param options The options to parse with.
+   * @return The parse result.
+   * @throws IOException If an IO error occurs.
+   */
+  public static TomlParseResult parse(Reader reader, TomlParseOptions options) throws IOException {
     CharStream stream = CharStreams.fromString(readFully(reader));
-    return Parser.parse(stream, version.canonical);
+    return Parser.parse(stream, options);
   }
 
   // CharStreams.fromReader duplicates a surrogate pair that a read splits across its 4096-char buffer, so read the
@@ -172,7 +220,7 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(ReadableByteChannel channel) throws IOException {
-    return parse(channel, TomlVersion.LATEST);
+    return parse(channel, TomlParseOptions.defaults());
   }
 
   /**
@@ -184,6 +232,18 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(ReadableByteChannel channel, TomlVersion version) throws IOException {
+    return parse(channel, TomlParseOptions.defaults().withVersion(version));
+  }
+
+  /**
+   * Parse a TOML input stream.
+   *
+   * @param channel The UTF-8 encoded channel to read the TOML document from.
+   * @param options The options to parse with.
+   * @return The parse result.
+   * @throws IOException If an IO error occurs.
+   */
+  public static TomlParseResult parse(ReadableByteChannel channel, TomlParseOptions options) throws IOException {
     CharStream stream = CharStreams
         .fromChannel(
             channel,
@@ -192,7 +252,7 @@ public final class Toml {
             CodingErrorAction.REPORT,
             IntStream.UNKNOWN_SOURCE_NAME,
             -1);
-    return Parser.parse(stream, version.canonical);
+    return Parser.parse(stream, options);
   }
 
   /**
