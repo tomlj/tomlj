@@ -14,6 +14,7 @@ package org.tomlj;
 
 import static org.tomlj.TomlVersion.V0_4_0;
 
+import org.tomlj.internal.AbstractTomlParser;
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
@@ -65,7 +66,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       Object value = valContext.accept(new ValueVisitor(version));
       if (value != null && !hasSyntaxError(ctx)) {
         if ((long) currentDepth + ctx.nesting > maxNestingDepth) {
-          throw new TomlParseError(TomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
+          throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
         }
         currentTable
             .set(path, value, new TomlPosition(ctx))
@@ -94,7 +95,8 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     int depth = headerDepth(path);
     if (depth > maxNestingDepth) {
       errorReporter
-          .reportError(new TomlParseError(TomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
+          .reportError(
+              new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
       return rootTable;
     }
     try {
@@ -123,7 +125,8 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     int depth = headerDepth(path);
     if ((long) depth + 1 > maxNestingDepth) {
       errorReporter
-          .reportError(new TomlParseError(TomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
+          .reportError(
+              new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
       return rootTable;
     }
     try {
