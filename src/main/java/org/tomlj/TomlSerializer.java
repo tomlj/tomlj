@@ -48,13 +48,8 @@ final class TomlSerializer {
         })).collect(Collectors.toList());
 
     for (Map.Entry<String, Object> entry : entryListSorted) {
-      String key = entry.getKey();
+      String key = tomlKey(entry.getKey());
       Object value = entry.getValue();
-
-      key = Toml.tomlEscape(key).toString();
-      if (!key.matches("[a-zA-Z0-9_-]*")) {
-        key = "\"" + key + "\"";
-      }
 
       String newPath = (path.isEmpty() ? "" : path + ".") + key;
 
@@ -70,7 +65,7 @@ final class TomlSerializer {
         append(appendable, indent + 2, key + "=");
       }
 
-      appendTomlValue(value, appendable, indent, newPath);
+      appendTomlValue(value, appendable, indent, newPath, false);
       if (!tomlType.get().equals(TABLE) && !isTableArray) {
         appendable.append(System.lineSeparator());
       }
@@ -84,40 +79,49 @@ final class TomlSerializer {
   }
 
   private static void toToml(TomlArray array, Appendable appendable, int indent, String path) throws IOException {
-    boolean tableArray = isTableArray(array);
-    if (!tableArray) {
-      appendable.append("[");
-      if (!array.isEmpty()) {
-        appendable.append(System.lineSeparator());
-      }
+    if (!isTableArray(array)) {
+      appendArray(array, appendable, indent, path);
+      return;
     }
-
-    for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext();) {
-      Object tomlValue = iterator.next();
-      Optional<TomlType> tomlType = typeFor(tomlValue);
-      assert tomlType.isPresent();
-      if (tomlType.get().equals(TABLE)) {
-        append(appendable, indent, "[[" + path + "]]");
-        appendable.append(System.lineSeparator());
-        toToml((TomlTable) tomlValue, appendable, indent, path);
-      } else {
-        indentLine(appendable, indent + 2);
-        appendTomlValue(tomlValue, appendable, indent, path);
-      }
-
-      if (!tableArray) {
-        if (iterator.hasNext()) {
-          appendable.append(",");
-        }
-        appendable.append(System.lineSeparator());
-      }
-    }
-    if (!tableArray) {
-      append(appendable, indent, "]");
+    for (Object tomlValue : array.toList()) {
+      append(appendable, indent, "[[" + path + "]]");
+      appendable.append(System.lineSeparator());
+      toToml((TomlTable) tomlValue, appendable, indent, path);
     }
   }
 
-  private static void appendTomlValue(Object value, Appendable appendable, int indent, String path) throws IOException {
+  private static void appendArray(TomlArray array, Appendable appendable, int indent, String path) throws IOException {
+    appendable.append("[");
+    if (!array.isEmpty()) {
+      appendable.append(System.lineSeparator());
+    }
+    for (Iterator<Object> iterator = array.toList().iterator(); iterator.hasNext();) {
+      indentLine(appendable, indent + 2);
+      appendTomlValue(iterator.next(), appendable, indent, path, true);
+      if (iterator.hasNext()) {
+        appendable.append(",");
+      }
+      appendable.append(System.lineSeparator());
+    }
+    append(appendable, indent, "]");
+  }
+
+  private static void appendInlineTable(TomlTable table, Appendable appendable, int indent, String path)
+      throws IOException {
+    appendable.append("{");
+    for (Iterator<Map.Entry<String, Object>> iterator = table.entrySet().iterator(); iterator.hasNext();) {
+      Map.Entry<String, Object> entry = iterator.next();
+      appendable.append(tomlKey(entry.getKey())).append("=");
+      appendTomlValue(entry.getValue(), appendable, indent, path, true);
+      if (iterator.hasNext()) {
+        appendable.append(", ");
+      }
+    }
+    appendable.append("}");
+  }
+
+  private static void appendTomlValue(Object value, Appendable appendable, int indent, String path, boolean inline)
+      throws IOException {
     Optional<TomlType> tomlType = typeFor(value);
     assert tomlType.isPresent();
     switch (tomlType.get()) {
@@ -144,12 +148,25 @@ final class TomlSerializer {
         append(appendable, 0, ((Boolean) value) ? "true" : "false");
         break;
       case ARRAY:
-        toToml((TomlArray) value, appendable, indent + 2, path);
+        if (inline) {
+          appendArray((TomlArray) value, appendable, indent + 2, path);
+        } else {
+          toToml((TomlArray) value, appendable, indent + 2, path);
+        }
         break;
       case TABLE:
-        toToml((TomlTable) value, appendable, indent + 2, path);
+        if (inline) {
+          appendInlineTable((TomlTable) value, appendable, indent + 2, path);
+        } else {
+          toToml((TomlTable) value, appendable, indent + 2, path);
+        }
         break;
     }
+  }
+
+  private static String tomlKey(String key) {
+    String escaped = Toml.tomlEscape(key).toString();
+    return escaped.matches("[a-zA-Z0-9_-]*") ? escaped : "\"" + escaped + "\"";
   }
 
   private static void append(Appendable appendable, int indent, String line) throws IOException {
@@ -167,10 +184,10 @@ final class TomlSerializer {
     for (Object tomlValue : array.toList()) {
       Optional<TomlType> tomlType = typeFor(tomlValue);
       assert tomlType.isPresent();
-      if (tomlType.get().equals(TABLE)) {
-        return true;
+      if (!tomlType.get().equals(TABLE)) {
+        return false;
       }
     }
-    return false;
+    return !array.isEmpty();
   }
 }
