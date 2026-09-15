@@ -40,7 +40,7 @@ package org.tomlj.internal;
 
 fragment WSChar : [ \t];
 fragment NL : '\r'? '\n';
-fragment COMMENT : '#' (~[\u0000-\u0008\u000A-\u001F\u007F])*;
+fragment COMMENT : '#' (~[\u0000-\u0008\u000A-\u001F\u007F\uD800-\uDFFF])*;
 fragment Alpha : [A-Za-z];
 fragment Digit : [0-9];
 fragment Digit1_9 : [1-9];
@@ -135,7 +135,7 @@ ValueError : . -> type(Error), popMode;
 mode BasicStringMode;
 
 BasicStringEnd : '"' -> type(QuotationMark), popMode;
-BasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F"\\\u007F] -> type(StringChar);
+BasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F"\\\u007F\uD800-\uDFFF] -> type(StringChar);
 EscapeSequence
   : '\\' ~[\n]
   | '\\x' HexDig HexDig
@@ -151,7 +151,7 @@ mode MLBasicStringMode;
 MLBasicStringSextEnd : '"""' { _input.LA(1) == '"' && _input.LA(2) == '"' && _input.LA(3) == '"' }? -> type(TripleQuotationMark), popMode;
 MLBasicStringEnd : '"""' { _input.LA(1) != '"' }? -> type(TripleQuotationMark), popMode;
 MLBasicStringLineEndBackslash : '\\' WSChar* NL (WSChar | NL)* -> type(NewLine), channel(WHITESPACE);
-MLBasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F\\\u007F] -> type(StringChar);
+MLBasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F\\\u007F\uD800-\uDFFF] -> type(StringChar);
 MLBasicStringEscape :
   ('\\x' HexDig HexDig
   | '\\u' HexDig HexDig HexDig HexDig
@@ -165,7 +165,7 @@ MLBasicStringError : . -> type(Error), popMode;
 mode LiteralStringMode;
 
 LiteralStringEnd : '\'' -> type(Apostrophe), popMode;
-LiteralStringChar : ~[\u0000-\u0008\u000A-\u001F'\u007F] -> type(StringChar);
+LiteralStringChar : ~[\u0000-\u0008\u000A-\u001F'\u007F\uD800-\uDFFF] -> type(StringChar);
 
 LiteralStringNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine), popMode;
 LiteralStringError : . -> type(Error), popMode;
@@ -175,7 +175,7 @@ mode MLLiteralStringMode;
 
 MLLiteralStringSextEnd : '\'\'\'' { _input.LA(1) == '\'' && _input.LA(2) == '\'' && _input.LA(3) == '\'' }? -> type(TripleApostrophe), popMode;
 MLLiteralStringEnd : '\'\'\'' { _input.LA(1) != '\'' }? -> type(TripleApostrophe), popMode;
-MLLiteralStringChar : ~[\u0000-\u0008\u000A-\u001F\u007F] -> type(StringChar);
+MLLiteralStringChar : ~[\u0000-\u0008\u000A-\u001F\u007F\uD800-\uDFFF] -> type(StringChar);
 MLLiteralStringNewLine: NL { setText(System.lineSeparator()); } -> type(StringChar);
 
 MLLiteralStringError : . -> type(Error), popMode;
