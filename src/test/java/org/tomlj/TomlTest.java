@@ -1089,6 +1089,36 @@ class TomlTest {
     assertTrue(Toml.equals(result, resultReparse));
   }
 
+  @ParameterizedTest
+  @MethodSource("serializerRoundTripSupplier")
+  void testSerializerRoundTrip(String input) throws Exception {
+    TomlParseResult result = Toml.parse(input, TomlVersion.V1_0_0);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+
+    String serializedToml = result.toToml();
+    TomlParseResult resultReparse = Toml.parse(serializedToml, TomlVersion.V1_0_0);
+    assertFalse(resultReparse.hasErrors(), () -> serializedToml + "\n" + joinErrors(resultReparse));
+
+    assertTrue(Toml.equals(result, resultReparse), () -> serializedToml);
+  }
+
+  static Stream<Arguments> serializerRoundTripSupplier() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("a = [1, { k = 2 }]\n"),
+        Arguments.of("a = [{ k = 1 }, 2]\n"),
+        Arguments.of("a = [1, {}]\n"),
+        Arguments.of("a = [[{ k = 1 }]]\n"),
+        Arguments.of("a = [1, { b = { c = 2 } }]\n"),
+        Arguments.of("a = [1, { b = [2, 3] }]\n"),
+        Arguments.of("a = [1, { b = [{ c = 2 }] }]\n"),
+        Arguments.of("a = [1, { \"b c\" = 2 }]\n"),
+        Arguments.of("a = [{ b = [1, { c = 2 }] }]\n"),
+        Arguments.of("a = { b = [1, { c = 2 }] }\n")
+    );
+    // @formatter:on
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }
