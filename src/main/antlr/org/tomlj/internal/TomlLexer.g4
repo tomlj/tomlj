@@ -125,7 +125,8 @@ ArrayEnd : ']' { if (inArray()) { arrayDepth--; pushValueModeIfInArray(); } } ->
 InlineTableStart : '{' { pushValueModeIfInArray(); pushArrayDepth(); } -> mode(InlineTableMode);
 
 ValueComma : ',' -> type(Comma);
-ValueNewLine: NL -> type(NewLine);
+// A newline outside an array ends the key/value pair, so the value is missing and the mode must be left.
+ValueNewLine: NL { if (!inArray()) { popMode(); } } -> type(NewLine);
 ValueWS : WSChar+ -> type(WS), channel(WHITESPACE);
 ValueComment : COMMENT -> type(Comment), channel(COMMENTS);
 
