@@ -151,7 +151,9 @@ mode MLBasicStringMode;
 
 MLBasicStringSextEnd : '"""' { _input.LA(1) == '"' && _input.LA(2) == '"' && _input.LA(3) == '"' }? -> type(TripleQuotationMark), popMode;
 MLBasicStringEnd : '"""' { _input.LA(1) != '"' }? -> type(TripleQuotationMark), popMode;
-MLBasicStringLineEndBackslash : '\\' WSChar* NL (WSChar | NL)* -> type(NewLine), channel(WHITESPACE);
+// A backslash ending a line continues the string over the newlines and whitespace that follow, so it keeps a token type
+// of its own: code that finds the lines of a document by the NewLine type must not mistake it for the end of a line.
+MLBasicStringLineEndBackslash : '\\' WSChar* NL (WSChar | NL)* -> channel(WHITESPACE);
 MLBasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F\\\u007F\uD800-\uDFFF] -> type(StringChar);
 MLBasicStringEscape :
   ('\\x' HexDig HexDig
