@@ -1139,6 +1139,22 @@ class TomlTest {
     assertTrue(Toml.equals(result, resultReparse), () -> serializedToml);
   }
 
+  @Test
+  void shouldSerializeApostropheWithoutEscaping() throws Exception {
+    TomlParseResult result = Toml.parse("\"a'key\" = \"a 'value'\"");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+
+    String serializedToml = result.toToml();
+    assertTrue(serializedToml.contains("'"));
+    assertFalse(serializedToml.contains("\\'"));
+
+    TomlParseResult resultReparse =
+        Toml.parse(new ByteArrayInputStream(serializedToml.getBytes(StandardCharsets.UTF_8)));
+    assertFalse(resultReparse.hasErrors(), () -> joinErrors(resultReparse));
+
+    assertTrue(Toml.equals(result, resultReparse));
+  }
+
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
   }
