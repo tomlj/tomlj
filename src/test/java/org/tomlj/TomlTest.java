@@ -726,6 +726,9 @@ class TomlTest {
         Arguments.of("a = \n[[arr]]\nb = 2\n", Set.of("arr")),
         Arguments.of("a = { b = \n c = 2 }\nd = 3\n", Set.of("d")),
         Arguments.of("a = [ 1, \n 2 ]\nb = \nc = 3\n", Set.of("a", "c")),
+        // A control character ends the string early, and the quotation mark meant to close it opens another string,
+        // which takes the rest of the line including the closing brace.
+        Arguments.of("a = { b = \"a\rbc\", c = 1 }\nd = 2\n", Set.of("d")),
 
         // Nesting depth limit: the rejected value is skipped whole, so parsing recovers and continues.
         Arguments.of("a = " + "[".repeat(130) + "]".repeat(130) + "\nb = 1\n", Set.of("b")),
@@ -769,7 +772,16 @@ class TomlTest {
             "Unexpected '$', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 3, column 1)")),
         Arguments.of("a = 1 junk junk\nb = 2 junk junk\n", List.of(
             "Unexpected 'junk', expected a newline or end-of-input (line 1, column 7)",
-            "Unexpected 'junk', expected a newline or end-of-input (line 2, column 7)"))
+            "Unexpected 'junk', expected a newline or end-of-input (line 2, column 7)")),
+        // The rest of a line after a broken string is lexed as another string, and reported by its first character.
+        Arguments.of("\"a\rbc def\" = 1\nb = 2\n", List.of(
+            "Unexpected '\\r', expected \" or a character (line 1, column 3)",
+            "Unexpected ' ', expected . or = (line 1, column 11)")),
+        Arguments.of("a = { b = \"\n\"ab\ncd\"\"\" }\ne = 2\n", List.of(
+            "Unexpected end of line, expected \" or a character (line 1, column 12)",
+            "Unexpected 'a', expected }, a comma, or a newline (line 2, column 2)",
+            "Unexpected \", expected = (line 3, column 3)",
+            "Unexpected \", expected a newline or end-of-input (line 3, column 5)"))
     );
     // @formatter:on
   }
@@ -988,6 +1000,10 @@ class TomlTest {
     // @formatter:off
     return Stream.of(
         Arguments.of("\"foo\tbar\" = 1", 1, 5, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
+        Arguments.of("foo = \"bar\tbaz\"", 1, 11, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
+        Arguments.of("foo = \"\"\"a\\nbar\tbaz\"\"\"", 1, 16, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
+        Arguments.of("foo = \"\"\"\nbar\tbaz\"\"\"", 2, 4, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
+        Arguments.of("foo = \"\uD83D\uDE00\tbar\"", 1, 9, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
         Arguments.of("foo = [ 1, 'bar' ]", 1, 12, "Cannot add a string to an array containing integers")
     );
     // @formatter:on

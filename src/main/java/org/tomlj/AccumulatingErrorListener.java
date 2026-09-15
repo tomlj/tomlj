@@ -113,10 +113,15 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
         return "end of input";
       default:
         String text = token.getText();
+        if (tokenType == TomlLexer.StringChars) {
+          // A run of string characters is a single token. Name only its first character, where the input went wrong,
+          // so that a long run does not end up in the message.
+          text = text.substring(0, text.offsetByCodePoints(0, 1));
+        }
         if (isOnlyQuotes(text)) {
           return text;
         }
-        return "'" + Toml.tomlEscape(token.getText()) + '\'';
+        return "'" + Toml.tomlEscape(text) + '\'';
     }
   }
 

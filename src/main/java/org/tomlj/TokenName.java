@@ -37,7 +37,7 @@ enum TokenName {
   QUOTATION_MARK("\"", TomlLexer.QuotationMark),
   TRIPLE_APOSTROPHE("'''", TomlLexer.TripleApostrophe),
   TRIPLE_QUOTATION_MARK("\"\"\"", TomlLexer.TripleQuotationMark),
-  CHARACTER("a character", TomlLexer.EscapeSequence, TomlLexer.StringChar),
+  CHARACTER("a character", TomlLexer.EscapeSequence, TomlLexer.StringChars),
   NUMBER("a number", TomlLexer.DecimalInteger, TomlLexer.BinaryInteger, TomlLexer.OctalInteger, TomlLexer.HexInteger,
       TomlLexer.FloatingPoint, TomlLexer.FloatingPointInf, TomlLexer.FloatingPointNaN),
   BOOLEAN("a boolean", TomlLexer.TrueBoolean, TomlLexer.FalseBoolean),
