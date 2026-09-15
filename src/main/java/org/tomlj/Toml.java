@@ -237,10 +237,6 @@ public final class Toml {
       }
 
       char ch = Character.toChars(codepoint)[0];
-      if (ch == '\'') {
-        out.append("\\'");
-        continue;
-      }
       if (ch == '\"') {
         out.append("\\\"");
         continue;

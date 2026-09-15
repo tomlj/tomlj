@@ -333,7 +333,9 @@ class TomlTest {
         Arguments.of("foo = 1937-07-18 11:44:02Z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00")),
         Arguments.of("foo = 1937-07-18 11:44:02z", OffsetDateTime.parse("1937-07-18T11:44:02+00:00")),
         Arguments.of("foo = 1979-05-27 07:32Z", OffsetDateTime.parse("1979-05-27T07:32:00Z")),
-        Arguments.of("foo = 1979-05-27T07:32-07:00", OffsetDateTime.parse("1979-05-27T07:32:00-07:00"))
+        Arguments.of("foo = 1979-05-27T07:32-07:00", OffsetDateTime.parse("1979-05-27T07:32:00-07:00")),
+        Arguments.of("foo = 2020-01-02T03:04:05-00:30", OffsetDateTime.parse("2020-01-02T03:04:05-00:30")),
+        Arguments.of("foo = 2020-01-02T03:04:05-00:00", OffsetDateTime.parse("2020-01-02T03:04:05-00:00"))
     );
     // @formatter:on
   }
@@ -436,6 +438,31 @@ class TomlTest {
         Arguments.of("foo = [\n'''bar\nbaz''',\n'baz'\n]", new Object[] {"bar" + System.lineSeparator() + "baz", "baz"}),
         Arguments.of("foo = [['bar']]", new Object[] {new Object[] {"bar"}}),
         Arguments.of("foo = [ 1,\n2\n,3,4]", new Object[] {1L, 2L, 3L, 4L})
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
+  @MethodSource("arrayElementPositionSupplier")
+  void shouldReturnArrayElementPositions(String input, int line0, int column0, int line1, int column1) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    TomlArray array = result.getArray("foo");
+    assertNotNull(array);
+    assertEquals(line0, array.inputPositionOf(0).line());
+    assertEquals(column0, array.inputPositionOf(0).column());
+    assertEquals(line1, array.inputPositionOf(1).line());
+    assertEquals(column1, array.inputPositionOf(1).column());
+  }
+
+  static Stream<Arguments> arrayElementPositionSupplier() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = [1, 2]", 1, 8, 1, 11),
+        Arguments.of("foo = [\n  1,\n  2\n]", 2, 3, 3, 3),
+        Arguments.of("foo = [\n  # comment\n  1,\n  2\n]", 3, 3, 4, 3),
+        Arguments.of("foo = [\n  {x = 1},\n  2\n]", 2, 3, 3, 3),
+        Arguments.of("foo = [\n  [1, 2],\n  3\n]", 2, 3, 3, 3)
     );
     // @formatter:on
   }
@@ -675,8 +702,15 @@ class TomlTest {
         Arguments.of("=", 1, 1, "Unexpected '=', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
         Arguments.of("\"foo \nbar\" = 1", 1, 6, "Unexpected end of line, expected \" or a character"),
         Arguments.of("foo = \"bar \\y baz\"", 1, 12, "Invalid escape sequence '\\y'"),
+        Arguments.of("foo = \"bar \\' baz\"", 1, 12, "Invalid escape sequence '\\''"),
+        Arguments.of("foo = \"\"\"bar \\' baz\"\"\"", 1, 14, "Invalid escape sequence '\\''"),
         Arguments.of("\u0011abc = 'foo'", 1, 1, "Unexpected '\\u0011', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
         Arguments.of(" \uDBFF\uDFFFAAabc='foo'", 1, 2, "Unexpected '\\U0010ffff', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
+        Arguments.of("foo = \"bar \uD800 baz\"", 1, 12, "Unexpected '\\ud800', expected \" or a character"),
+        Arguments.of("foo = \"\"\"bar \uDC00 baz\"\"\"", 1, 14, "Unexpected '\\udc00', expected \"\"\" or a character"),
+        Arguments.of("foo = 'bar \uDFFF baz'", 1, 12, "Unexpected '\\udfff', expected ' or a character"),
+        Arguments.of("foo = '''bar \uD800 baz'''", 1, 14, "Unexpected '\\ud800', expected ''' or a character"),
+        Arguments.of("foo = 'bar' # baz \uDC00", 1, 19, "Unexpected '\\udc00', expected a newline or end-of-input"),
         Arguments.of("foo = '''Here are fifteen apostrophes: ''''''''''''''''''", 1, 43, "Unexpected ', expected a newline or end-of-input"),
         Arguments.of("foo = \"\"\"Here are three quotation marks: \"\"\".\"\"\"", 1, 45, "Unexpected '.', expected a newline or end-of-input"),
         Arguments.of("foo = 2bar", 1, 8, "Unexpected 'bar', expected a newline or end-of-input"),
@@ -1137,6 +1171,22 @@ class TomlTest {
     TomlParseResult resultReparse = Toml.parse("a = " + serializedToml);
     assertFalse(resultReparse.hasErrors(), () -> serializedToml + "\n" + joinErrors(resultReparse));
     assertTrue(Toml.equals(result, resultReparse), () -> serializedToml);
+  }
+
+  @Test
+  void shouldSerializeApostropheWithoutEscaping() throws Exception {
+    TomlParseResult result = Toml.parse("\"a'key\" = \"a 'value'\"");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+
+    String serializedToml = result.toToml();
+    assertTrue(serializedToml.contains("'"));
+    assertFalse(serializedToml.contains("\\'"));
+
+    TomlParseResult resultReparse =
+        Toml.parse(new ByteArrayInputStream(serializedToml.getBytes(StandardCharsets.UTF_8)));
+    assertFalse(resultReparse.hasErrors(), () -> joinErrors(resultReparse));
+
+    assertTrue(Toml.equals(result, resultReparse));
   }
 
   private String joinErrors(TomlParseResult result) {

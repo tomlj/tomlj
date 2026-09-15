@@ -25,6 +25,7 @@ final class ZoneOffsetVisitor extends TomlParserBaseVisitor<ZoneOffset> {
 
   private int hours = 0;
   private int minutes = 0;
+  private boolean negative = false;
 
   @Override
   public ZoneOffset visitHourOffset(TomlParser.HourOffsetContext ctx) {
@@ -33,6 +34,8 @@ final class ZoneOffsetVisitor extends TomlParserBaseVisitor<ZoneOffset> {
     if (text.length() != 3) {
       throw new TomlParseError("Invalid zone offset hours (valid range -18..+18)", new TomlPosition(ctx));
     }
+    // Integer.parseInt("-00") is 0, so take the sign from the text
+    boolean negative = text.charAt(0) == '-';
     int hours;
     try {
       hours = Integer.parseInt(text);
@@ -42,8 +45,9 @@ final class ZoneOffsetVisitor extends TomlParserBaseVisitor<ZoneOffset> {
     if (hours < -18 || hours > 18) {
       throw new TomlParseError("Invalid zone offset hours (valid range -18..+18)", new TomlPosition(ctx));
     }
-    ZoneOffset offset = toZoneOffset(hours, minutes, ctx, 0);
+    ZoneOffset offset = toZoneOffset(hours, minutes, negative, ctx, 0);
     this.hours = hours;
+    this.negative = negative;
     return offset;
   }
 
@@ -62,14 +66,14 @@ final class ZoneOffsetVisitor extends TomlParserBaseVisitor<ZoneOffset> {
     if (minutes < 0 || minutes > 59) {
       throw new TomlParseError("Invalid zone offset minutes (valid range 0..59)", new TomlPosition(ctx));
     }
-    ZoneOffset offset = toZoneOffset(hours, minutes, ctx, -4);
+    ZoneOffset offset = toZoneOffset(hours, minutes, negative, ctx, -4);
     this.minutes = minutes;
     return offset;
   }
 
-  private static ZoneOffset toZoneOffset(int hours, int minutes, ParserRuleContext ctx, int offset) {
+  private static ZoneOffset toZoneOffset(int hours, int minutes, boolean negative, ParserRuleContext ctx, int offset) {
     try {
-      return ZoneOffset.ofHoursMinutes(hours, (hours < 0) ? -minutes : minutes);
+      return ZoneOffset.ofHoursMinutes(hours, negative ? -minutes : minutes);
     } catch (DateTimeException e) {
       throw new TomlParseError("Invalid zone offset (valid range -18:00..+18:00)", new TomlPosition(ctx, offset), e);
     }
@@ -87,6 +91,6 @@ final class ZoneOffsetVisitor extends TomlParserBaseVisitor<ZoneOffset> {
 
   @Override
   protected ZoneOffset defaultResult() {
-    return ZoneOffset.ofHoursMinutes(this.hours, (this.hours < 0) ? -this.minutes : this.minutes);
+    return ZoneOffset.ofHoursMinutes(this.hours, this.negative ? -this.minutes : this.minutes);
   }
 }
