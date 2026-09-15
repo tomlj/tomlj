@@ -687,10 +687,12 @@ class TomlTest {
         Arguments.of("a = \"\"\"\nfoo\n\"\"\" junk\nb = 2\n", Set.of("b")),
         Arguments.of("[tbl]\na = 1x\nb = 2\n", Set.of("tbl.b")),
         Arguments.of("a = [1,\n  2\nb = 3\n", Set.of()),
-        Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", Set.of()),
+        // Here and in the inline table case below, the unterminated value takes the table header, so the key/value pair
+        // after it is parsed into the root table.
+        Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", Set.of("b")),
         Arguments.of("a = { x = 1, y = 2\nb = 3\n", Set.of()),
         Arguments.of("a = { x = 1,\n  y = 2\nb = 3\n", Set.of()),
-        Arguments.of("a = { x = 1,\n  y = 2\n[tbl]\nb = 3\n", Set.of()),
+        Arguments.of("a = { x = 1,\n  y = 2\n[tbl]\nb = 3\n", Set.of("b")),
         Arguments.of("a =\n", Set.of()),
         Arguments.of("a = \nb = 2\nc = 3\n", Set.of("b", "c")),
         Arguments.of("a = 1\nb =\n\nc = 3\n", Set.of("a", "c")),
@@ -704,7 +706,45 @@ class TomlTest {
         Arguments.of("a = " + "[".repeat(130) + "]".repeat(130) + "\nb = 1\n", Set.of("b")),
         Arguments.of("a = " + "{ b = ".repeat(129) + "1" + " }".repeat(129) + "\nc = 1\n", Set.of("c")),
         Arguments.of("a = { x = 1, y = " + "[".repeat(130) + "]".repeat(130) + ", z = 2 }\nb = 1\n", Set.of("b")),
-        Arguments.of("a = [1, " + "[".repeat(130) + "]".repeat(130) + ", 2]\nb = 1\n", Set.of("b"))
+        Arguments.of("a = [1, " + "[".repeat(130) + "]".repeat(130) + ", 2]\nb = 1\n", Set.of("b")),
+
+        // A line that cannot be parsed is skipped, so parsing resumes on the next line.
+        Arguments.of("a = 1\n@\nb = 2\nc = 3\n", Set.of("a", "b", "c")),
+        Arguments.of("@@ x\na = 1\n", Set.of("a")),
+        Arguments.of("a = 1\n@@ x\nb = 2\n", Set.of("a", "b")),
+        Arguments.of("a = 1\n@@", Set.of("a")),
+        Arguments.of("a = 1\n= 2\nb = 3\n", Set.of("a", "b")),
+        Arguments.of("a = 1\n.b = 2\nc = 3\n", Set.of("a", "c")),
+        Arguments.of("a = 1\n]] x\nb = 2\n", Set.of("a", "b")),
+        Arguments.of("a = 1\n\uD83D\uDE00\nb = 2\n", Set.of("a", "b")),
+        Arguments.of("a = 1\n\uD800 x\nb = 2\n", Set.of("a", "b")),
+        Arguments.of("a = 1\n# comment \u0001 x\nb = 2\n", Set.of("a", "b")),
+        Arguments.of("a = 1 # comment \u0001 x\nb = 2\n", Set.of("b")),
+        Arguments.of("a = 1 junk junk\nb = 2\n", Set.of("b")),
+        Arguments.of("[tbl] junk junk\nb = 2\n", Set.of("tbl.b")),
+        Arguments.of("[tbl]\n@@ x\nb = 2\n", Set.of("tbl.b"))
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
+  @MethodSource("syntaxErrorReportSupplier")
+  void shouldReportEachSyntaxErrorOnce(String input, List<String> expectedErrors) {
+    TomlParseResult result = Toml.parse(input);
+    assertEquals(expectedErrors, result.errors().stream().map(TomlParseError::toString).collect(Collectors.toList()));
+  }
+
+  static Stream<Arguments> syntaxErrorReportSupplier() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("a = [1,\n  2\nb = 3\n", List.of("Unexpected 'b', expected ], a comma, or a newline (line 3, column 1)")),
+        Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", List.of("Unexpected '[', expected ], a comma, or a newline (line 3, column 1)")),
+        Arguments.of("@@ x\na = 1\n$$ y\nb = 2\n", List.of(
+            "Unexpected '@', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 1, column 1)",
+            "Unexpected '$', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 3, column 1)")),
+        Arguments.of("a = 1 junk junk\nb = 2 junk junk\n", List.of(
+            "Unexpected 'junk', expected a newline or end-of-input (line 1, column 7)",
+            "Unexpected 'junk', expected a newline or end-of-input (line 2, column 7)"))
     );
     // @formatter:on
   }
@@ -745,6 +785,8 @@ class TomlTest {
         Arguments.of("foo = '''Here are fifteen apostrophes: ''''''''''''''''''", 1, 43, "Unexpected ', expected a newline or end-of-input"),
         Arguments.of("foo = \"\"\"Here are three quotation marks: \"\"\".\"\"\"", 1, 45, "Unexpected '.', expected a newline or end-of-input"),
         Arguments.of("foo = 2bar", 1, 8, "Unexpected 'bar', expected a newline or end-of-input"),
+        Arguments.of("foo = 2 bar baz\nqux = 1\n", 1, 9, "Unexpected 'bar', expected a newline or end-of-input"),
+        Arguments.of("foo = 2\n@@ bar\nqux = 1\n", 2, 1, "Unexpected '@', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
         Arguments.of("foo = \"Bad unicode \\uD801\"", 1, 20, "Invalid unicode escape sequence"),
         Arguments.of("foo = \"val\\ue\"", 1, 11, "Invalid unicode escape sequence"),
         Arguments.of("foo = \"val\\U0000\"", 1, 11, "Invalid unicode escape sequence"),
