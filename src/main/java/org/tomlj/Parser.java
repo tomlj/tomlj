@@ -31,6 +31,7 @@ final class Parser {
   static TomlParseResult parse(CharStream stream, TomlParseOptions options) {
     TomlLexer lexer = new TomlLexer(stream);
     TomlParser parser = new TomlParser(new CommonTokenStream(lexer));
+    parser.setErrorHandler(new LineRecoveryStrategy());
     parser.removeErrorListeners();
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
     parser.addErrorListener(errorListener);

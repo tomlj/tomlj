@@ -94,7 +94,10 @@ import org.tomlj.TomlParseOptions;
 }
 
 // Document parser
-toml : NewLine* (expression (NewLine+ expression)* NewLine*)? EOF;
+// Each line is an optional expression, so every decision here needs only one token of lookahead. That lets
+// LineRecoveryStrategy skip the rest of a line that cannot be parsed, rather than a failed prediction discarding
+// the rest of the document.
+toml : expression? (NewLine expression?)* EOF;
 
 expression
   : keyval

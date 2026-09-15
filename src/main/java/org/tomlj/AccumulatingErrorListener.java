@@ -33,6 +33,7 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
 
   private final List<TomlParseError> errors = new ArrayList<>();
   private final List<Integer> syntaxErrorLines = new ArrayList<>();
+  private int lastOffendingTokenIndex = -1;
 
   @Override
   public void syntaxError(
@@ -42,6 +43,16 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
       int charPosition,
       String msg,
       RecognitionException e) {
+
+    // Recovery can leave the parser on a token that a rule has already rejected (e.g. an unterminated array followed
+    // by a line that cannot start an expression), and a second report of that token adds nothing.
+    if (offendingSymbol instanceof Token) {
+      int tokenIndex = ((Token) offendingSymbol).getTokenIndex();
+      if (tokenIndex >= 0 && tokenIndex == lastOffendingTokenIndex) {
+        return;
+      }
+      lastOffendingTokenIndex = tokenIndex;
+    }
 
     TomlPosition position = TomlPosition.positionAt(line, charPosition + 1);
     syntaxErrorLines.add(line);
