@@ -624,24 +624,43 @@ class TomlTest {
   }
 
   @ParameterizedTest
+  @MethodSource("dateTimeBeforeClosingBracketSupplier")
+  void shouldParseDateTimeDirectlyBeforeClosingBracket(String input, Object[] path, Object expected) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    assertEquals(expected, valueAt(result, path));
+  }
+
+  static Stream<Arguments> dateTimeBeforeClosingBracketSupplier() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = {bar = 1979-05-27}", new Object[] {"foo", "bar"}, LocalDate.of(1979, 5, 27)),
+        Arguments.of("foo = {bar = 07:32:00}", new Object[] {"foo", "bar"}, LocalTime.parse("07:32:00")),
+        Arguments.of("foo = {bar = 1979-05-27T07:32:00}", new Object[] {"foo", "bar"},
+                LocalDateTime.parse("1979-05-27T07:32:00")),
+        Arguments.of("foo = {bar = 1979-05-27T07:32:00.999-08:00}", new Object[] {"foo", "bar"},
+                OffsetDateTime.parse("1979-05-27T07:32:00.999-08:00")),
+        Arguments.of("foo = {bar = 1979-05-27T07:32:00Z}", new Object[] {"foo", "bar"},
+                OffsetDateTime.parse("1979-05-27T07:32:00Z")),
+        Arguments.of("foo = {bar = {baz = 1979-05-27}}", new Object[] {"foo", "bar", "baz"}, LocalDate.of(1979, 5, 27)),
+        Arguments.of("foo = {bar = 1979-05-27}\nbaz = 1", new Object[] {"baz"}, 1L),
+        Arguments.of("foo = {bar = [1979-05-27]}", new Object[] {"foo", "bar", 0}, LocalDate.of(1979, 5, 27)),
+        Arguments.of("foo = {bar = [1979-05-27], baz = 1}", new Object[] {"foo", "baz"}, 1L),
+        Arguments.of("foo = {bar = [[1979-05-27]], baz = 1}", new Object[] {"foo", "baz"}, 1L),
+        Arguments.of("foo = [{bar = [1979-05-27]}]", new Object[] {"foo", 0, "bar", 0}, LocalDate.of(1979, 5, 27)),
+        Arguments.of("foo = [{bar = 1979-05-27}, {bar = 07:32:00}]", new Object[] {"foo", 1, "bar"},
+                LocalTime.parse("07:32:00")),
+        Arguments.of("foo = [[1979-05-27], 07:32:00]", new Object[] {"foo", 1}, LocalTime.parse("07:32:00"))
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
   @MethodSource("arrayTableSupplier")
   void shouldParseArrayTable(String input, Object[] path, Object expected) {
     TomlParseResult result = Toml.parse(input);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
-
-    Object element = result;
-    for (Object step : path) {
-      if (step instanceof String key) {
-        assertTrue(element instanceof TomlTable);
-        element = ((TomlTable) element).get(key);
-      } else if (step instanceof Integer index) {
-        assertTrue(element instanceof TomlArray);
-        element = ((TomlArray) element).get(index);
-      } else {
-        fail("path not found");
-      }
-    }
-    assertEquals(expected, element);
+    assertEquals(expected, valueAt(result, path));
   }
 
   static Stream<Arguments> arrayTableSupplier() {
@@ -1356,6 +1375,22 @@ class TomlTest {
 
   private String joinErrors(TomlParseResult result) {
     return result.errors().stream().map(TomlParseError::toString).collect(Collectors.joining("\n"));
+  }
+
+  private static Object valueAt(TomlTable table, Object[] path) {
+    Object element = table;
+    for (Object step : path) {
+      if (step instanceof String key) {
+        assertTrue(element instanceof TomlTable);
+        element = ((TomlTable) element).get(key);
+      } else if (step instanceof Integer index) {
+        assertTrue(element instanceof TomlArray);
+        element = ((TomlArray) element).get(index);
+      } else {
+        fail("path not found");
+      }
+    }
+    return element;
   }
 
   private static void assertTomlArrayEquals(Object[] expected, TomlArray array) {

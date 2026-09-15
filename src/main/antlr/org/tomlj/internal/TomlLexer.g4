@@ -196,7 +196,10 @@ DateWS : WSChar+ -> type(WS), channel(WHITESPACE), popMode;
 DateComment : COMMENT -> type(Comment), channel(COMMENTS), popMode;
 DateNewLine: NL { setText(System.lineSeparator()); } -> type(NewLine), popMode;
 DateComma: ',' -> type(Comma), popMode;
-DateArrayEnd : ']' { if (inArray()) { arrayDepth--; } } -> type(ArrayEnd), popMode;
+// DateStart pushed ValueMode inside an array, so leave it before closing the array as ArrayEnd does.
+DateArrayEnd : ']' { if (inArray()) { popMode(); arrayDepth--; pushValueModeIfInArray(); } } -> type(ArrayEnd), popMode;
+// A date directly before the end of an inline table leaves DateMode, then closes the table as InlineTableEnd does.
+DateInlineTableEnd : '}' { !_modeStack.isEmpty() && _modeStack.peek() == InlineTableMode }? { popMode(); popArrayDepth(); } -> type(InlineTableEnd), popMode;
 DateError : . -> type(Error), popMode;
 
 
