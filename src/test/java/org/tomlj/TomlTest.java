@@ -725,6 +725,7 @@ class TomlTest {
         Arguments.of("a = 1x\nb = 2\n", Set.of("b")),
         Arguments.of("a = 1\nb = 2 junk\nc = 3\n", Set.of("a", "c")),
         Arguments.of("a = 1.5x\nb = 2\n", Set.of("b")),
+        Arguments.of("a = 0123\nb = 2\n", Set.of("b")),
         Arguments.of("a = truex\nb = 2\n", Set.of("b")),
         Arguments.of("a = [1x, 2]\nb = 2\n", Set.of("b")),
         Arguments.of("a = { b = 1 x }\nc = 3\n", Set.of("c")),
@@ -795,6 +796,8 @@ class TomlTest {
         Arguments.of("a = 1 junk junk\nb = 2 junk junk\n", List.of(
             "Unexpected 'junk', expected a newline or end-of-input (line 1, column 7)",
             "Unexpected 'junk', expected a newline or end-of-input (line 2, column 7)")),
+        // The whole run of digits is one token, so a leading zero is reported once, at the start of the value.
+        Arguments.of("a = [0123, 1]\nb = 2\n", List.of("Leading zeros are not allowed (line 1, column 6)")),
         // The rest of a line after a broken string is lexed as another string, and reported by its first character.
         Arguments.of("\"a\rbc def\" = 1\nb = 2\n", List.of(
             "Unexpected '\\r', expected \" or a character (line 1, column 3)",
@@ -854,6 +857,13 @@ class TomlTest {
         Arguments.of("foo = \"\"\"\\xZZ\"\"\"", 1, 10, "Invalid unicode escape sequence"),
 
         Arguments.of("foo = 1234567891234567891233456789", 1, 7, "Integer is too large"),
+
+        Arguments.of("foo = 0123", 1, 7, "Leading zeros are not allowed"),
+        Arguments.of("foo = 00", 1, 7, "Leading zeros are not allowed"),
+        Arguments.of("foo = [0123, 1]", 1, 8, "Leading zeros are not allowed"),
+        Arguments.of("foo = { bar = 0123, baz = 1 }", 1, 15, "Leading zeros are not allowed"),
+        Arguments.of("foo = +1979-05-27", 1, 7, "Unexpected '+1979', expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
+        Arguments.of("foo = 1_979-05-27", 1, 7, "Unexpected '1_979', expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
 
         Arguments.of("invalid_float = .7", 1, 17, "Unexpected '.', expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
         Arguments.of("invalid_float = 7.", 1, 18, "Unexpected '.', expected a newline or end-of-input"),

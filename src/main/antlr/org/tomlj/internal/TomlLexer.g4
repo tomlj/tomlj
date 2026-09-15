@@ -36,6 +36,36 @@ package org.tomlj.internal;
   private void popArrayDepth() {
     arrayDepth = arrayDepthStack.pop();
   }
+
+  // A run of digits starts a date or a time when a dash or a colon follows it, and is a decimal integer otherwise.
+  // An action reads that following character. A semantic predicate can read it too, but ANTLR then caches no DFA edge
+  // for input that reaches the predicate, leaving every digit of every number to ATN simulation: with one here, an
+  // array of 500,000 integers lexed about 60 times slower.
+  private void decimalIntegerOrDateStart() {
+    if ("-:".indexOf(_input.LA(1)) < 0) {
+      pushValueModeIfInArray();
+      popMode();
+    } else if (isDigits(getText())) {
+      pushValueModeIfInArray();
+      setType(DateDigits);
+      mode(DateMode);
+    } else {
+      // A dash or a colon follows, but a run holding a sign or an underscore starts no date or time, and a dash or a
+      // colon ends no integer.
+      setType(Error);
+      popMode();
+    }
+  }
+
+  private static boolean isDigits(String text) {
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (c < '0' || c > '9') {
+        return false;
+      }
+    }
+    return true;
+  }
 }
 
 fragment WSChar : [ \t];
@@ -85,9 +115,12 @@ ValueTripleQuotationMark : '"""' NL? { pushValueModeIfInArray(); } -> type(Tripl
 ValueApostrophe : '\'' { pushValueModeIfInArray(); } -> type(Apostrophe), mode(LiteralStringMode);
 ValueTripleApostrophe : '\'\'\'' NL? { pushValueModeIfInArray(); } -> type(TripleApostrophe), mode(MLLiteralStringMode);
 
-// Integers
+// Integers, dates and times
+// One rule matches the digits that start any of them, as they are told apart only by what follows. Digit+ also matches
+// a run with a leading zero, which is no integer but may be a year or an hour; ValueVisitor rejects the ones that are
+// left as integers.
 fragment DecInt : [-+]? (Digit | Digit1_9 ('_'? Digit)+);
-DecimalInteger : DecInt { "-:".indexOf(_input.LA(1)) < 0 }? { pushValueModeIfInArray(); } -> popMode;
+DecimalInteger : (DecInt | Digit+) { decimalIntegerOrDateStart(); };
 HexInteger : '0x' HexDig ('_'? HexDig)* { pushValueModeIfInArray(); } -> popMode;
 OctalInteger : '0o' Digit0_7 ('_'? Digit0_7)* { pushValueModeIfInArray(); } -> popMode;
 BinaryInteger : '0b' Digit0_1 ('_'? Digit0_1)* { pushValueModeIfInArray(); } -> popMode;
@@ -102,9 +135,6 @@ FloatingPointNaN : [-+]? 'nan' { pushValueModeIfInArray(); } -> popMode;
 // Boolean
 TrueBoolean : 'true' { pushValueModeIfInArray(); } -> popMode;
 FalseBoolean : 'false' { pushValueModeIfInArray(); } -> popMode;
-
-// Date and Time
-DateStart : Digit+ { "-:".indexOf(_input.LA(1)) >= 0 }? { pushValueModeIfInArray(); } -> type(DateDigits), mode(DateMode);
 
 // Array
 ArrayStart : '[' { arrayDepth++; };
