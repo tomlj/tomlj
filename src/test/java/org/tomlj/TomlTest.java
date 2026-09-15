@@ -674,7 +674,15 @@ class TomlTest {
         Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", Set.of()),
         Arguments.of("a = { x = 1, y = 2\nb = 3\n", Set.of()),
         Arguments.of("a = { x = 1,\n  y = 2\nb = 3\n", Set.of()),
-        Arguments.of("a = { x = 1,\n  y = 2\n[tbl]\nb = 3\n", Set.of())
+        Arguments.of("a = { x = 1,\n  y = 2\n[tbl]\nb = 3\n", Set.of()),
+        Arguments.of("a =\n", Set.of()),
+        Arguments.of("a = \nb = 2\nc = 3\n", Set.of("b", "c")),
+        Arguments.of("a = 1\nb =\n\nc = 3\n", Set.of("a", "c")),
+        Arguments.of("a = # comment\nb = 2\n", Set.of("b")),
+        Arguments.of("a = \n[tbl]\nb = 2\n", Set.of("tbl.b")),
+        Arguments.of("a = \n[[arr]]\nb = 2\n", Set.of("arr")),
+        Arguments.of("a = { b = \n c = 2 }\nd = 3\n", Set.of("d")),
+        Arguments.of("a = [ 1, \n 2 ]\nb = \nc = 3\n", Set.of("a", "c"))
     );
     // @formatter:on
   }
@@ -698,6 +706,7 @@ class TomlTest {
         Arguments.of("foo  \n", 1, 6, "Unexpected end of line, expected . or ="),
         Arguments.of("foo =", 1, 6, "Unexpected end of input, expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
         Arguments.of("foo = 0b", 1, 8, "Unexpected 'b', expected a newline or end-of-input"),
+        Arguments.of("foo =\nbar = 1\n", 1, 6, "Unexpected end of line, expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
         Arguments.of("foo = +", 1, 7, "Unexpected '+', expected ', \", ''', \"\"\", a number, a boolean, a date/time, an array, or a table"),
         Arguments.of("=", 1, 1, "Unexpected '=', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input"),
         Arguments.of("\"foo \nbar\" = 1", 1, 6, "Unexpected end of line, expected \" or a character"),
