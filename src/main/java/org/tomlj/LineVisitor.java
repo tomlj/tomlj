@@ -87,19 +87,16 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
       return rootTable;
     }
-    List<String> path = keyContext.accept(new KeyVisitor(version));
-    if (path == null) {
-      return rootTable;
-    }
-    // The table named by the header's last key is enclosed by whatever its leading keys walk through.
-    int depth = headerDepth(path);
-    if (depth > maxNestingDepth) {
-      errorReporter
-          .reportError(
-              new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
-      return rootTable;
-    }
     try {
+      List<String> path = keyContext.accept(new KeyVisitor(version));
+      if (path == null) {
+        return rootTable;
+      }
+      // The table named by the header's last key is enclosed by whatever its leading keys walk through.
+      int depth = headerDepth(path);
+      if (depth > maxNestingDepth) {
+        throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
+      }
       currentTable = rootTable.createTable(path, new TomlPosition(ctx));
       currentDepth = depth + 1;
     } catch (TomlParseError e) {
@@ -116,20 +113,17 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
       return rootTable;
     }
-    List<String> path = keyContext.accept(new KeyVisitor(version));
-    if (path == null) {
-      return rootTable;
-    }
-    // The array named by the header's last key is enclosed by whatever its leading keys walk through, and its new
-    // element table is enclosed by that array as well.
-    int depth = headerDepth(path);
-    if ((long) depth + 1 > maxNestingDepth) {
-      errorReporter
-          .reportError(
-              new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx)));
-      return rootTable;
-    }
     try {
+      List<String> path = keyContext.accept(new KeyVisitor(version));
+      if (path == null) {
+        return rootTable;
+      }
+      // The array named by the header's last key is enclosed by whatever its leading keys walk through, and its new
+      // element table is enclosed by that array as well.
+      int depth = headerDepth(path);
+      if ((long) depth + 1 > maxNestingDepth) {
+        throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
+      }
       currentTable = rootTable.createTableArray(path, new TomlPosition(ctx));
       currentDepth = depth + 2;
     } catch (TomlParseError e) {

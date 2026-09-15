@@ -711,6 +711,9 @@ class TomlTest {
         Arguments.of("a = { b = 1 x }\nc = 3\n", Set.of("c")),
         Arguments.of("a = \"\"\"\nfoo\n\"\"\" junk\nb = 2\n", Set.of("b")),
         Arguments.of("[tbl]\na = 1x\nb = 2\n", Set.of("tbl.b")),
+        // A header whose quoted key is rejected is skipped, and parsing carries on after it.
+        Arguments.of("[\"\\a\"]\n[tbl]\nb = 2\n", Set.of("tbl.b")),
+        Arguments.of("[[\"\\a\"]]\n[tbl]\nb = 2\n", Set.of("tbl.b")),
         Arguments.of("a = [1,\n  2\nb = 3\n", Set.of()),
         // Here and in the inline table case below, the unterminated value takes the table header, so the key/value pair
         // after it is parsed into the root table.
@@ -911,6 +914,8 @@ class TomlTest {
         Arguments.of("foo = 1\nfoo = 2\n", 2, 1, "foo previously defined at line 1, column 1"),
 
         Arguments.of("[]", 1, 1, "Empty table key"),
+        Arguments.of("[\"\\a\"]\nb = 1\n", 1, 3, "Invalid escape sequence '\\a'"),
+        Arguments.of("[[\"\\a\"]]\nb = 1\n", 1, 4, "Invalid escape sequence '\\a'"),
         Arguments.of("[foo] bar='baz'", 1, 7, "Unexpected 'bar', expected a newline or end-of-input"),
         Arguments.of("foo='bar'\n[foo]\nbar='baz'", 2, 1, "foo previously defined at line 1, column 1"),
         Arguments.of("[foo]\nbar='baz'\n[foo]\nbaz=1", 3, 1, "foo previously defined at line 1, column 1"),
@@ -1000,6 +1005,8 @@ class TomlTest {
     // @formatter:off
     return Stream.of(
         Arguments.of("\"foo\tbar\" = 1", 1, 5, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
+        Arguments.of("[\"foo\tbar\"]", 1, 6, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
+        Arguments.of("[[\"foo\tbar\"]]", 1, 7, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
         Arguments.of("foo = \"bar\tbaz\"", 1, 11, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
         Arguments.of("foo = \"\"\"a\\nbar\tbaz\"\"\"", 1, 16, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
         Arguments.of("foo = \"\"\"\nbar\tbaz\"\"\"", 2, 4, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
