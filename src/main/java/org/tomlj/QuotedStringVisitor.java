@@ -41,21 +41,33 @@ final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
 
   @Override
   public StringBuilder visitBasicUnescaped(TomlParser.BasicUnescapedContext ctx) {
-    return appendText(ctx.getText(), ctx);
+    return appendRun(ctx.getText(), ctx);
   }
 
   @Override
   public StringBuilder visitMlBasicUnescaped(TomlParser.MlBasicUnescapedContext ctx) {
-    return appendText(ctx.getText(), ctx);
+    return appendRun(ctx.getText(), ctx);
   }
 
   private StringBuilder appendText(String text, ParserRuleContext ctx) {
     if (!(version.after(V0_5_0)) && text.indexOf('\t') != -1) {
-      throw new TomlParseError(
-          "Use \\t to represent a tab in a string (TOML versions before 1.0.0)",
-          new TomlPosition(ctx));
+      throw tabError(new TomlPosition(ctx));
     }
     return builder.append(text);
+  }
+
+  // An unescaped context holds one token, a run of characters within a single line, so a tab is reported at its own
+  // column rather than where the run starts. Columns count code points, as the lexer does.
+  private StringBuilder appendRun(String text, ParserRuleContext ctx) {
+    int tab;
+    if (!(version.after(V0_5_0)) && (tab = text.indexOf('\t')) != -1) {
+      throw tabError(new TomlPosition(ctx, text.codePointCount(0, tab)));
+    }
+    return builder.append(text);
+  }
+
+  private static TomlParseError tabError(TomlPosition position) {
+    return new TomlParseError("Use \\t to represent a tab in a string (TOML versions before 1.0.0)", position);
   }
 
   @Override

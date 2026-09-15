@@ -16,6 +16,7 @@ import org.tomlj.internal.TomlParser;
 
 import org.antlr.v4.runtime.DefaultErrorStrategy;
 import org.antlr.v4.runtime.Parser;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.IntervalSet;
 
 /**
@@ -43,5 +44,21 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
     }
     // Also resets the state the default strategy keeps for reporting what a later rule expected.
     super.sync(recognizer);
+  }
+
+  @Override
+  protected Token singleTokenDeletion(Parser recognizer) {
+    // A run of string characters outside a string (e.g. the rest of a line after a broken string) is a single token,
+    // but it is not the single stray token that deletion is meant for: deleting it lets the parser carry on as though
+    // the line were whole, e.g. still inside an inline table whose closing brace was in the run, and fail on the lines
+    // that follow. Recover as the default strategy does from more than one unexpected token.
+    Token token = recognizer.getInputStream().LT(1);
+    if (token.getType() == TomlParser.StringChars) {
+      String text = token.getText();
+      if (text.codePointCount(0, text.length()) > 1) {
+        return null;
+      }
+    }
+    return super.singleTokenDeletion(recognizer);
   }
 }

@@ -152,7 +152,7 @@ basicChar
   : basicUnescaped
   | escaped
   ;
-basicUnescaped : StringChar;
+basicUnescaped : StringChars;
 
 escaped : EscapeSequence;
 
@@ -162,17 +162,17 @@ mlBasicString : TripleQuotationMark mlBasicChar* TripleQuotationMark;
 mlBasicChar
   : mlBasicUnescaped
   | escaped;
-mlBasicUnescaped : StringChar;
+mlBasicUnescaped : StringChars;
 
 
 // Literal String
 literalString : Apostrophe literalBody Apostrophe;
-literalBody : StringChar*;
+literalBody : StringChars*;
 
 
 // Multiline Literal String
 mlLiteralString : TripleApostrophe mlLiteralBody TripleApostrophe;
-mlLiteralBody : StringChar*;
+mlLiteralBody : StringChars*;
 
 
 // Integer

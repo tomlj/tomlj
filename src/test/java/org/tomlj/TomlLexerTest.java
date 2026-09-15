@@ -37,4 +37,22 @@ class TomlLexerTest {
         .collect(Collectors.toList());
     assertEquals(List.of(2, 3), newLineLines);
   }
+
+  @Test
+  void runsOfStringCharactersAreSingleTokens() {
+    // Escapes, newlines, and quotes inside multi-line strings are tokens of their own.
+    assertEquals(List.of("abc ", "\\t", " def"), stringTokens("a = \"abc \\t def\""));
+    assertEquals(List.of("a", "\"", "\"", "b", "\n", "c d"), stringTokens("a = \"\"\"a\"\"b\nc d\"\"\""));
+    assertEquals(List.of("abc \\t def"), stringTokens("a = 'abc \\t def'"));
+    assertEquals(List.of("a", "'", "'", "b", "\n", "c d"), stringTokens("a = '''a''b\nc d'''"));
+  }
+
+  private static List<String> stringTokens(String input) {
+    return new TomlLexer(CharStreams.fromString(input))
+        .getAllTokens()
+        .stream()
+        .filter(token -> token.getType() == TomlLexer.StringChars || token.getType() == TomlLexer.EscapeSequence)
+        .map(Token::getText)
+        .collect(Collectors.toList());
+  }
 }

@@ -2,7 +2,7 @@ lexer grammar TomlLexer;
 
 channels { COMMENTS, WHITESPACE }
 
-tokens { TripleQuotationMark, TripleApostrophe, StringChar, Comma }
+tokens { TripleQuotationMark, TripleApostrophe, StringChars, Comma }
 
 @header {
 package org.tomlj.internal;
@@ -125,7 +125,8 @@ ValueError : . -> type(Error), popMode;
 mode BasicStringMode;
 
 BasicStringEnd : '"' -> type(QuotationMark), popMode;
-BasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F"\\\u007F\uD800-\uDFFF] -> type(StringChar);
+// A run of characters is a single token, rather than a token and parse tree nodes for each character.
+BasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F"\\\u007F\uD800-\uDFFF]+ -> type(StringChars);
 EscapeSequence
   : '\\' ~[\n]
   | '\\x' HexDig HexDig
@@ -143,7 +144,9 @@ MLBasicStringEnd : '"""' { _input.LA(1) != '"' }? -> type(TripleQuotationMark), 
 // A backslash ending a line continues the string over the newlines and whitespace that follow, so it keeps a token type
 // of its own: code that finds the lines of a document by the NewLine type must not mistake it for the end of a line.
 MLBasicStringLineEndBackslash : '\\' WSChar* NL (WSChar | NL)* -> channel(WHITESPACE);
-MLBasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F\\\u007F\uD800-\uDFFF] -> type(StringChar);
+MLBasicStringUnescaped : ~[\u0000-\u0008\u000A-\u001F"\\\u007F\uD800-\uDFFF]+ -> type(StringChars);
+// A quotation mark is a token of its own, so that a run of characters cannot reach into the closing delimiter.
+MLBasicStringQuotationMark : '"' -> type(StringChars);
 MLBasicStringEscape :
   ('\\x' HexDig HexDig
   | '\\u' HexDig HexDig HexDig HexDig
@@ -151,7 +154,7 @@ MLBasicStringEscape :
   | '\\' .) -> type(EscapeSequence);
 // TOML lets a parser choose the newline in a multi-line string value. Both LF and CRLF become "\n", so a document
 // parses to the same values on every platform and whichever line endings the file uses.
-MLBasicStringNewLine: NL { setText("\n"); } -> type(StringChar);
+MLBasicStringNewLine: NL { setText("\n"); } -> type(StringChars);
 
 MLBasicStringError : . -> type(Error), popMode;
 
@@ -159,7 +162,7 @@ MLBasicStringError : . -> type(Error), popMode;
 mode LiteralStringMode;
 
 LiteralStringEnd : '\'' -> type(Apostrophe), popMode;
-LiteralStringChar : ~[\u0000-\u0008\u000A-\u001F'\u007F\uD800-\uDFFF] -> type(StringChar);
+LiteralStringChars : ~[\u0000-\u0008\u000A-\u001F'\u007F\uD800-\uDFFF]+ -> type(StringChars);
 
 LiteralStringNewLine: NL -> type(NewLine), popMode;
 LiteralStringError : . -> type(Error), popMode;
@@ -169,9 +172,10 @@ mode MLLiteralStringMode;
 
 MLLiteralStringSextEnd : '\'\'\'' { _input.LA(1) == '\'' && _input.LA(2) == '\'' && _input.LA(3) == '\'' }? -> type(TripleApostrophe), popMode;
 MLLiteralStringEnd : '\'\'\'' { _input.LA(1) != '\'' }? -> type(TripleApostrophe), popMode;
-MLLiteralStringChar : ~[\u0000-\u0008\u000A-\u001F\u007F\uD800-\uDFFF] -> type(StringChar);
+MLLiteralStringChars : ~[\u0000-\u0008\u000A-\u001F'\u007F\uD800-\uDFFF]+ -> type(StringChars);
+MLLiteralStringApostrophe : '\'' -> type(StringChars);
 // Newlines are normalized as in a multi-line basic string.
-MLLiteralStringNewLine: NL { setText("\n"); } -> type(StringChar);
+MLLiteralStringNewLine: NL { setText("\n"); } -> type(StringChars);
 
 MLLiteralStringError : . -> type(Error), popMode;
 
