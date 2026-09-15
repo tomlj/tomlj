@@ -878,6 +878,9 @@ class TomlTest {
         Arguments.of("\nfoo = 13:70:00", 2, 10, "Invalid minutes (valid range 00..59)"),
         Arguments.of("\nfoo = 13:55:92", 2, 13, "Invalid seconds (valid range 00..59)"),
         Arguments.of("\nfoo = 13:55:02.0000000009", 2, 16, "Invalid nanoseconds (valid range 0..999999999)"),
+        Arguments.of("\nfoo = 13:55:02.-5", 2, 16, "Unexpected '-', expected a date/time"),
+        Arguments.of("\nfoo = [13:55:02.-5]", 2, 17, "Unexpected '-', expected a date/time"),
+        Arguments.of("\nfoo = { bar = 13:55:02.-5 }", 2, 24, "Unexpected '-', expected a date/time"),
         Arguments.of("\nfoo = 13:55:02,", 2, 15, "Unexpected ',', expected a newline or end-of-input"),
         Arguments.of("\nfoo = 13:55:02 , ", 2, 16, "Unexpected ',', expected a newline or end-of-input"),
 
