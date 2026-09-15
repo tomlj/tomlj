@@ -1116,7 +1116,12 @@ class TomlTest {
         Arguments.of("a = [{ b = [1, { c = 2 }] }]\n"),
         Arguments.of("a = { b = [1, { c = 2 }] }\n"),
         Arguments.of("a = nan\nb = inf\nc = -inf\n"),
-        Arguments.of("a = [+nan, -nan, +inf, -inf, 1.5]\n")
+        Arguments.of("a = [+nan, -nan, +inf, -inf, 1.5]\n"),
+        Arguments.of("\"\" = 1\n"),
+        Arguments.of("a.\"\".b = 1\n"),
+        Arguments.of("['']\nb = 1\n"),
+        Arguments.of("[[\"\"]]\nb = 1\n"),
+        Arguments.of("a = [{ \"\" = 1 }]\n")
     );
     // @formatter:on
   }

@@ -178,7 +178,7 @@ final class TomlSerializer {
 
   private static String tomlKey(String key) {
     String escaped = Toml.tomlEscape(key).toString();
-    return escaped.matches("[a-zA-Z0-9_-]*") ? escaped : "\"" + escaped + "\"";
+    return escaped.matches("[a-zA-Z0-9_-]+") ? escaped : "\"" + escaped + "\"";
   }
 
   private static void append(Appendable appendable, int indent, String line) throws IOException {
