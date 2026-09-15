@@ -130,6 +130,7 @@ normalised with `System.lineSeparator()`).
 `dependency-versions.gradle` and resolved through an Ivy repository over GitHub, and extracts its `tests/` directory
 to `build/toml-test`. The test reads the `files-toml-1.0.0` list (parsed at `V1_0_0`) and the `files-toml-1.1.0`
 list (parsed at both `V1_1_0` and `HEAD`), compares valid cases against their tagged JSON with the same rules as the
-official runner, and asserts that invalid cases report errors. Each test factory takes a set of cases the parser is
-known to fail, which are asserted to still fail so that an entry must be removed once the behaviour is fixed. The
-sets are currently empty; when bumping the suite version, expect to add entries for any new cases that fail.
+official runner, both as parsed and after a round trip through `toToml()`, and asserts that invalid cases report
+errors. Each test factory takes a set of cases the parser is known to fail, which are asserted to still fail so that
+an entry must be removed once the behaviour is fixed. The sets are currently empty; when bumping the suite version,
+expect to add entries for any new cases that fail.

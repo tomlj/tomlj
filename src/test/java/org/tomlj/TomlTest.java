@@ -1114,9 +1114,29 @@ class TomlTest {
         Arguments.of("a = [1, { b = [{ c = 2 }] }]\n"),
         Arguments.of("a = [1, { \"b c\" = 2 }]\n"),
         Arguments.of("a = [{ b = [1, { c = 2 }] }]\n"),
-        Arguments.of("a = { b = [1, { c = 2 }] }\n")
+        Arguments.of("a = { b = [1, { c = 2 }] }\n"),
+        Arguments.of("a = nan\nb = inf\nc = -inf\n"),
+        Arguments.of("a = [+nan, -nan, +inf, -inf, 1.5]\n"),
+        Arguments.of("\"\" = 1\n"),
+        Arguments.of("a.\"\".b = 1\n"),
+        Arguments.of("['']\nb = 1\n"),
+        Arguments.of("[[\"\"]]\nb = 1\n"),
+        Arguments.of("a = [{ \"\" = 1 }]\n")
     );
     // @formatter:on
+  }
+
+  @Test
+  void testSerializerArrayOfTablesOnItsOwn() {
+    TomlParseResult result = Toml.parse("[[a]]\nb = 1\n[[a]]\nc = { d = 2 }\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    TomlArray array = result.getArray("a");
+    assertNotNull(array);
+
+    String serializedToml = array.toToml();
+    TomlParseResult resultReparse = Toml.parse("a = " + serializedToml);
+    assertFalse(resultReparse.hasErrors(), () -> serializedToml + "\n" + joinErrors(resultReparse));
+    assertTrue(Toml.equals(result, resultReparse), () -> serializedToml);
   }
 
   private String joinErrors(TomlParseResult result) {

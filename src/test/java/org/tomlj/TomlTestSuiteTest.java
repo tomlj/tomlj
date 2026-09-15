@@ -49,7 +49,9 @@ import org.junit.jupiter.api.TestFactory;
  * passed in the {@code org.tomlj.tomlTestDir} system property. Each {@code files-toml-<version>} list names the cases
  * that apply to a TOML specification version. Valid cases must parse without errors and match the expected tagged JSON
  * document, compared using the same rules as the official {@code toml-test} runner: floats numerically, date/times as
- * instants, everything else as strings. Invalid cases must produce at least one error.
+ * instants, everything else as strings. Valid cases must also survive a round trip: their {@code toToml()} output must
+ * parse without errors at the same version and match the same expected document. Invalid cases must produce at least
+ * one error.
  */
 class TomlTestSuiteTest {
 
@@ -126,10 +128,21 @@ class TomlTestSuiteTest {
     TomlParseResult result = Toml.parse(toml, version);
     assertFalse(result.hasErrors(), () -> "Unexpected errors: " + result.errors());
     Object expected = new JsonReader(Files.readString(json, UTF_8)).read();
+    assertMatches(expected, result, "");
+
+    String serialized = result.toToml();
+    TomlParseResult reparsed = Toml.parse(serialized, version);
+    assertFalse(
+        reparsed.hasErrors(),
+        () -> "Unexpected errors after serializing to TOML: " + reparsed.errors() + "\n" + serialized);
+    assertMatches(expected, reparsed, "After serializing to TOML: ");
+  }
+
+  private static void assertMatches(Object expected, TomlParseResult result, String context) {
     Object actual = new JsonReader(result.toJson(VALUES_AS_OBJECTS_WITH_TYPE, ALL_VALUES_AS_STRINGS)).read();
     String difference = compare(expected, actual, "");
     if (difference != null) {
-      fail(difference);
+      fail(context + difference);
     }
   }
 

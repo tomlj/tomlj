@@ -75,7 +75,7 @@ final class TomlSerializer {
   static void toToml(TomlArray array, Appendable appendable) throws IOException {
     requireNonNull(array);
     requireNonNull(appendable);
-    toToml(array, appendable, 0, "");
+    appendArray(array, appendable, 0, "");
   }
 
   private static void toToml(TomlArray array, Appendable appendable, int indent, String path) throws IOException {
@@ -129,8 +129,10 @@ final class TomlSerializer {
         append(appendable, 0, "\"" + Toml.tomlEscape((String) value) + "\"");
         break;
       case INTEGER:
-      case FLOAT:
         append(appendable, 0, value.toString());
+        break;
+      case FLOAT:
+        append(appendable, 0, tomlFloat((Double) value));
         break;
       case OFFSET_DATE_TIME:
         append(appendable, 0, DateTimeFormatter.ISO_OFFSET_DATE_TIME.format((OffsetDateTime) value));
@@ -164,9 +166,19 @@ final class TomlSerializer {
     }
   }
 
+  private static String tomlFloat(double value) {
+    if (Double.isNaN(value)) {
+      return "nan";
+    }
+    if (Double.isInfinite(value)) {
+      return value > 0 ? "inf" : "-inf";
+    }
+    return Double.toString(value);
+  }
+
   private static String tomlKey(String key) {
     String escaped = Toml.tomlEscape(key).toString();
-    return escaped.matches("[a-zA-Z0-9_-]*") ? escaped : "\"" + escaped + "\"";
+    return escaped.matches("[a-zA-Z0-9_-]+") ? escaped : "\"" + escaped + "\"";
   }
 
   private static void append(Appendable appendable, int indent, String line) throws IOException {
