@@ -142,8 +142,22 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(Reader reader, TomlVersion version) throws IOException {
-    CharStream stream = CharStreams.fromReader(reader);
+    CharStream stream = CharStreams.fromString(readFully(reader));
     return Parser.parse(stream, version.canonical);
+  }
+
+  // CharStreams.fromReader duplicates a surrogate pair that a read splits across its 4096-char buffer, so read the
+  // whole input before handing it to ANTLR. Like fromReader, this closes the reader.
+  private static String readFully(Reader reader) throws IOException {
+    try (reader) {
+      StringBuilder builder = new StringBuilder();
+      char[] buffer = new char[8192];
+      int read;
+      while ((read = reader.read(buffer)) != -1) {
+        builder.append(buffer, 0, read);
+      }
+      return builder.toString();
+    }
   }
 
   /**
