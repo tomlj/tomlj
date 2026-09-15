@@ -31,7 +31,7 @@ final class ArrayVisitor extends TomlParserBaseVisitor<MutableTomlArray> {
     if (valContext != null) {
       Object value = valContext.accept(new ValueVisitor(version));
       if (value != null) {
-        TomlPosition position = new TomlPosition(ctx);
+        TomlPosition position = new TomlPosition(valContext);
         try {
           array.append(value, position);
         } catch (TomlInvalidTypeException e) {

@@ -443,6 +443,31 @@ class TomlTest {
   }
 
   @ParameterizedTest
+  @MethodSource("arrayElementPositionSupplier")
+  void shouldReturnArrayElementPositions(String input, int line0, int column0, int line1, int column1) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    TomlArray array = result.getArray("foo");
+    assertNotNull(array);
+    assertEquals(line0, array.inputPositionOf(0).line());
+    assertEquals(column0, array.inputPositionOf(0).column());
+    assertEquals(line1, array.inputPositionOf(1).line());
+    assertEquals(column1, array.inputPositionOf(1).column());
+  }
+
+  static Stream<Arguments> arrayElementPositionSupplier() {
+    // @formatter:off
+    return Stream.of(
+        Arguments.of("foo = [1, 2]", 1, 8, 1, 11),
+        Arguments.of("foo = [\n  1,\n  2\n]", 2, 3, 3, 3),
+        Arguments.of("foo = [\n  # comment\n  1,\n  2\n]", 3, 3, 4, 3),
+        Arguments.of("foo = [\n  {x = 1},\n  2\n]", 2, 3, 3, 3),
+        Arguments.of("foo = [\n  [1, 2],\n  3\n]", 2, 3, 3, 3)
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest
   @MethodSource("heterogeneousArraySupplier")
   void shouldParseHeterogeneousArray(String input, Object[] expected) {
     TomlParseResult result = Toml.parse(input);
