@@ -44,15 +44,34 @@ final class MutableTomlTable implements TomlTable {
   private final Map<String, Element> properties = new LinkedHashMap<>();
   private final TomlVersion version;
   private TomlPosition definedAt;
+  private final boolean inline;
 
   MutableTomlTable(TomlVersion version, TomlPosition definedAt) {
-    this.version = version;
-    this.definedAt = definedAt;
+    this(version, definedAt, false);
   }
 
   MutableTomlTable(TomlVersion version) {
+    this(version, null, false);
+  }
+
+  private MutableTomlTable(TomlVersion version, TomlPosition definedAt, boolean inline) {
     this.version = version;
-    this.definedAt = null;
+    this.definedAt = definedAt;
+    this.inline = inline;
+  }
+
+  /**
+   * Create a table for an inline table in a document.
+   *
+   * <p>
+   * Inline tables are self-contained: once closed, no table header or dotted key may add to them.
+   *
+   * @param version The TOML version.
+   * @param position The position of the inline table.
+   * @return A new, defined table.
+   */
+  static MutableTomlTable inline(TomlVersion version, TomlPosition position) {
+    return new MutableTomlTable(version, position, true);
   }
 
   boolean isDefined() {
@@ -306,6 +325,13 @@ final class MutableTomlTable implements TomlTable {
           table.properties.computeIfAbsent(path.get(i), k -> new Element(new MutableTomlTable(version), position));
       if (element.value instanceof MutableTomlTable) {
         table = (MutableTomlTable) element.value;
+        if (table.inline) {
+          String message = Toml.joinKeyPath(path.subList(0, i + 1))
+              + " is an inline table (defined at "
+              + table.definedAt
+              + ") and cannot be extended";
+          throw new TomlParseError(message, position);
+        }
         if (!followDefinedTables && table.definedAt != null) {
           String message = Toml.joinKeyPath(path.subList(0, i + 1)) + " already defined at " + table.definedAt;
           throw new TomlParseError(message, position);

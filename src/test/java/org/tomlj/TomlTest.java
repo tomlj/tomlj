@@ -521,7 +521,7 @@ class TomlTest {
     List<TomlParseError> errors = result.errors();
     assertFalse(errors.isEmpty());
     assertEquals(
-        "apple.color previously defined at line 1, column 11",
+        "apple is an inline table (defined at line 1, column 9) and cannot be extended",
         errors.get(0).getMessage(),
         () -> joinErrors(result));
     assertEquals(2, errors.get(0).position().line());
@@ -774,7 +774,14 @@ class TomlTest {
         Arguments.of("foo = [1]\n[[foo]]\nbar=2\n", 2, 1, "foo previously defined as a literal array at line 1, column 1"),
         Arguments.of("foo = []\n[[foo]]\nbar=2\n", 2, 1, "foo previously defined as a literal array at line 1, column 1"),
         Arguments.of("[[foo.bar]]\n[foo]\nbaz=2\nbar=3\n", 4, 1, "bar previously defined at line 1, column 1"),
-        Arguments.of("[[foo]]\nbaz=1\n[[foo.bar]]\nbaz=2\n[foo.bar]\nbaz=3\n", 5, 1, "foo.bar previously defined at line 3, column 1")
+        Arguments.of("[[foo]]\nbaz=1\n[[foo.bar]]\nbaz=2\n[foo.bar]\nbaz=3\n", 5, 1, "foo.bar previously defined at line 3, column 1"),
+
+        Arguments.of("a = { b = 1 }\n[a.c]\nd = 2\n", 2, 1, "a is an inline table (defined at line 1, column 5) and cannot be extended"),
+        Arguments.of("a = { b = 1 }\n[[a.c]]\nd = 2\n", 2, 1, "a is an inline table (defined at line 1, column 5) and cannot be extended"),
+        Arguments.of("a = { b = 1 }\na.c = 2\n", 2, 1, "a is an inline table (defined at line 1, column 5) and cannot be extended"),
+        Arguments.of("a = {}\n[a.c]\nd = 2\n", 2, 1, "a is an inline table (defined at line 1, column 5) and cannot be extended"),
+        Arguments.of("a = { b = { c = 1 }, b.d = 2 }\n", 1, 22, "b is an inline table (defined at line 1, column 11) and cannot be extended"),
+        Arguments.of("[x]\na = { b = 1 }\n[x.a.c]\nd = 2\n", 3, 1, "x.a is an inline table (defined at line 2, column 5) and cannot be extended")
     );
     // @formatter:on
   }

@@ -27,7 +27,7 @@ final class InlineTableVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
   public InlineTableVisitor(TomlVersion version, TomlPosition position) {
     this.version = version;
-    this.table = new MutableTomlTable(version, position);
+    this.table = MutableTomlTable.inline(version, position);
     this.openTables = new HashMap<>();
   }
 
