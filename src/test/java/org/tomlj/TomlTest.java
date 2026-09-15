@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.StringReader;
+import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -917,6 +919,25 @@ class TomlTest {
     assertEquals("Ýôú'ℓℓ λáƭè ₥è áƒƭèř ƭλïƨ - #", result.getString("the.test_string"));
     assertEquals(" Âñδ ωλèñ \"'ƨ ářè ïñ ƭλè ƨƭřïñϱ, áℓôñϱ ωïƭλ # \"", result.getString("the.hard.harder_test_string"));
     assertEquals("]", result.getArray("the.hard.'βïƭ#'.multi_line_array").getString(0));
+  }
+
+  @Test
+  void shouldParseSupplementaryCharacterAcrossReadBufferBoundary() throws Exception {
+    // Streamed input is read in 4096-char chunks, so move a surrogate pair across the first boundary
+    for (int padding = 4085; padding <= 4095; padding++) {
+      String value = "x".repeat(padding) + "\uD83D\uDE00";
+      String input = "key = \"" + value + "\"\n";
+      byte[] bytes = input.getBytes(StandardCharsets.UTF_8);
+      List<TomlParseResult> results = List
+          .of(
+              Toml.parse(new StringReader(input)),
+              Toml.parse(new ByteArrayInputStream(bytes)),
+              Toml.parse(Channels.newChannel(new ByteArrayInputStream(bytes))));
+      for (TomlParseResult result : results) {
+        assertFalse(result.hasErrors(), () -> joinErrors(result));
+        assertEquals(value, result.getString("key"));
+      }
+    }
   }
 
   @Test
