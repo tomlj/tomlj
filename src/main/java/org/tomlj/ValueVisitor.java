@@ -121,6 +121,10 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     LocalDate date = ctx.date().accept(new LocalDateVisitor());
     LocalTime time = ctx.time().accept(new LocalTimeVisitor(version));
     ZoneOffset offset = ctx.timeOffset().accept(new ZoneOffsetVisitor());
+    // A part is null when the parser recovered from a syntax error inside it, which it has already reported.
+    if (date == null || time == null || offset == null) {
+      return null;
+    }
     return OffsetDateTime.of(date, time, offset);
   }
 
@@ -128,6 +132,10 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
   public Object visitLocalDateTime(TomlParser.LocalDateTimeContext ctx) {
     LocalDate date = ctx.date().accept(new LocalDateVisitor());
     LocalTime time = ctx.time().accept(new LocalTimeVisitor(version));
+    // A part is null when the parser recovered from a syntax error inside it, which it has already reported.
+    if (date == null || time == null) {
+      return null;
+    }
     return LocalDateTime.of(date, time);
   }
 
