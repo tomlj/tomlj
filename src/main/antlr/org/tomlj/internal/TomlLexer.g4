@@ -67,17 +67,6 @@ Comment : COMMENT -> channel(COMMENTS);
 NewLine : NL;
 Error : .;
 
-
-mode KeyMode;
-
-KeyDot : '.' -> type(Dot);
-KeyQuotationMark : '"' -> type(QuotationMark), pushMode(BasicStringMode);
-KeyApostrophe : '\'' -> type(Apostrophe), pushMode(LiteralStringMode);
-KeyUnquotedKey : UNQUOTED_KEY -> type(UnquotedKey);
-
-KeyWS : WSChar+ -> type(WS), channel(WHITESPACE);
-KeyError : . -> type(Error);
-
 mode TomlKeyMode;
 
 TomlKeyDot : '.' -> type(Dot);
