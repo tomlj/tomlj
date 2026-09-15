@@ -102,7 +102,7 @@ final class Parser {
     parser.removeErrorListeners();
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
     parser.addErrorListener(errorListener);
-    List<String> keyList = parser.tomlKey().accept(new KeyVisitor(TomlVersion.HEAD));
+    TomlParser.TomlKeyContext tree = parser.tomlKey();
     List<TomlParseError> errors = errorListener.errors();
     if (!errors.isEmpty()) {
       TomlParseError e = errors.get(0);
@@ -113,6 +113,11 @@ final class Parser {
               + ", or use the List<String> key path overloads.",
           e);
     }
-    return keyList;
+    try {
+      return tree.accept(new KeyVisitor(TomlVersion.HEAD));
+    } catch (TomlParseError e) {
+      // An invalid escape sequence in a quoted key, which the hint about quoting would not help with
+      throw new IllegalArgumentException("Invalid key: " + e.getMessage(), e);
+    }
   }
 }

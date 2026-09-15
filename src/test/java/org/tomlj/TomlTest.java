@@ -93,6 +93,25 @@ class TomlTest {
     assertEquals("Invalid key: Unexpected '@', expected . or end-of-input" + INVALID_KEY_HINT, exception.getMessage());
   }
 
+  @ParameterizedTest
+  @MethodSource("invalidEscapeInDottedKeySupplier")
+  void shouldThrowExceptionForInvalidEscapeInDottedKey(String dottedKey, String expected) {
+    Exception exception = assertThrows(IllegalArgumentException.class, () -> Toml.parseDottedKey(dottedKey));
+    assertEquals(expected, exception.getMessage());
+    assertThrows(IllegalArgumentException.class, () -> Toml.parse("").get(dottedKey));
+  }
+
+  static Stream<Arguments> invalidEscapeInDottedKeySupplier() {
+    return Stream
+        .of(
+            Arguments.of("\"\\a\"", "Invalid key: Invalid escape sequence '\\a'"),
+            Arguments.of("foo.\"\\u12\"", "Invalid key: Invalid unicode escape sequence"),
+            Arguments.of("\"\\uD800\".foo", "Invalid key: Invalid unicode escape sequence"),
+            Arguments.of("\"\\U00110000\"", "Invalid key: Invalid unicode escape sequence"),
+            // A syntax error is reported in preference to an invalid escape sequence
+            Arguments.of("\"\\a\".bar@", "Invalid key: Unexpected '@', expected end-of-input" + INVALID_KEY_HINT));
+  }
+
   @Test
   void shouldLookupQuotedKeyWithSpecialCharacters() {
     String key = "@key#with$special%characters";
