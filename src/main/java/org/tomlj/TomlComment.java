@@ -20,7 +20,15 @@ import java.util.List;
 import org.antlr.v4.runtime.Token;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
-final class TomlComment {
+/**
+ * A comment in a TOML document, either attached to the entry it documents or unattached.
+ *
+ * <p>
+ * A comment attached to an entry is either the run of comment lines directly above it ({@link CommentPlacement#ABOVE})
+ * or the comment on its line ({@link CommentPlacement#AFTER}); every other comment is unattached, and belongs to the
+ * table or array it was written in. An entry has at most one comment of each placement.
+ */
+public final class TomlComment {
 
   // Each line as it was written after the '#'. A comment is held in the form the document held it, so that the model
   // alone reproduces its text, while the form callers see and write is the text after "# ": the getter drops one
@@ -78,7 +86,20 @@ final class TomlComment {
     this.placement = placement;
   }
 
-  List<String> lines() {
+  /**
+   * The text of each line, one entry per line of the run, in document order.
+   *
+   * <p>
+   * Each entry is the text after the {@code #}, with one leading space removed if there is one, so {@code # foo} and
+   * {@code #foo} both give {@code foo}, while a line written with two spaces keeps its second. A bare {@code #} gives
+   * an empty string. No entry contains a newline.
+   *
+   * <p>
+   * An attached {@link CommentPlacement#AFTER} comment has exactly one line.
+   *
+   * @return The text of each line, in document order. Unmodifiable.
+   */
+  public List<String> lines() {
     List<String> lines = new ArrayList<>(rawLines.size());
     for (String rawLine : rawLines) {
       lines.add(rawLine.startsWith(" ") ? rawLine.substring(1) : rawLine);
@@ -86,17 +107,37 @@ final class TomlComment {
     return Collections.unmodifiableList(lines);
   }
 
-  String text() {
+  /**
+   * The lines of this comment, joined with {@code \n}.
+   *
+   * @return The lines of this comment, joined with {@code \n}.
+   */
+  public String text() {
     return String.join("\n", lines());
   }
 
+  /**
+   * The position of the {@code #} opening the first line of this comment.
+   *
+   * <p>
+   * The lines of a run are contiguous, so line {@code i} of the run is on line {@code position().line() + i}.
+   *
+   * @return The position of the {@code #} opening the first line, or {@code null} if this comment was not read from a
+   *         document.
+   */
   @Nullable
-  TomlPosition position() {
+  public TomlPosition position() {
     return position;
   }
 
+  /**
+   * Where this comment sits relative to the entry it documents.
+   *
+   * @return {@link CommentPlacement#ABOVE} or {@link CommentPlacement#AFTER} for an attached comment, or {@code null}
+   *         for an unattached one.
+   */
   @Nullable
-  CommentPlacement placement() {
+  public CommentPlacement placement() {
     return placement;
   }
 

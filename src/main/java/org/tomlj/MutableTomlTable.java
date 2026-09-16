@@ -190,11 +190,13 @@ final class MutableTomlTable implements TomlTable, CommentContainer {
     comments.add(comment);
   }
 
-  List<TomlComment> comments() {
+  @Override
+  public List<TomlComment> comments() {
     return Collections.unmodifiableList(comments);
   }
 
-  List<TomlComment> comments(List<String> path) {
+  @Override
+  public List<TomlComment> comments(List<String> path) {
     if (path.isEmpty()) {
       return Collections.emptyList();
     }

@@ -14,6 +14,7 @@ package org.tomlj;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -555,5 +556,92 @@ class TomlCommentTest {
     MutableTomlTable table = parse("a = @ # c\n");
     assertFalse(table.keySet().contains("a"), "the erroneous pair should not have been recorded");
     assertTrue(unattached(table).isEmpty(), "the trailing comment should not have been recorded as unattached");
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------------------------------------------
+
+  @Test
+  void shouldReadAttachedCommentsThroughThePublicApi() {
+    TomlParseResult result = Toml.parse("# above\na.b = 1 # after\n");
+    List<TomlComment> comments = result.comments("a.b");
+    assertEquals(2, comments.size());
+    assertComment(comments.get(0), CommentPlacement.ABOVE, "above");
+    assertComment(comments.get(1), CommentPlacement.AFTER, "after");
+  }
+
+  @Test
+  void shouldReadCommentsForAQuotedDottedKeyThroughThePublicApi() {
+    TomlParseResult result = Toml.parse("# c\n\"x y\" = 1\n");
+    List<TomlComment> comments = result.comments("\"x y\"");
+    assertEquals(1, comments.size());
+    assertComment(comments.get(0), CommentPlacement.ABOVE, "c");
+  }
+
+  @Test
+  void shouldReturnAnEmptyListForAnUnsetOrUncommentedKeyThroughThePublicApi() {
+    TomlParseResult result = Toml.parse("a = 1\n");
+    assertTrue(result.comments("unset").isEmpty());
+    assertTrue(result.comments("a").isEmpty());
+  }
+
+  @Test
+  void shouldReadArrayTableHeaderCommentsFromTheArrayThroughThePublicApi() {
+    TomlParseResult result = Toml.parse("# h\n[[x]]\na = 1\n");
+    assertTrue(result.comments("x").isEmpty());
+
+    TomlArray array = result.getArray("x");
+    List<TomlComment> comments = array.comments(0);
+    assertEquals(1, comments.size());
+    assertComment(comments.get(0), CommentPlacement.ABOVE, "h");
+  }
+
+  @Test
+  void shouldReadUnattachedTableCommentsThroughThePublicApi() {
+    TomlParseResult result = Toml.parse("a = 1\n\n# footer\n");
+    List<TomlComment> comments = result.comments();
+    assertEquals(1, comments.size());
+    assertUnattached(comments.get(0), "footer");
+  }
+
+  @Test
+  void shouldReturnUnmodifiableListsThroughThePublicApi() {
+    TomlParseResult result = Toml.parse("# above\na = 1 # after\n\n# footer\n");
+
+    List<TomlComment> attached = result.comments("a");
+    assertThrows(UnsupportedOperationException.class, () -> attached.add(attached.get(0)));
+
+    List<TomlComment> unattached = result.comments();
+    assertThrows(UnsupportedOperationException.class, () -> unattached.add(unattached.get(0)));
+
+    TomlArray array = Toml.parse("a = [\n1 # after\n]\n").getArray("a");
+    List<TomlComment> elementComments = array.comments(0);
+    assertThrows(UnsupportedOperationException.class, () -> elementComments.add(elementComments.get(0)));
+
+    List<TomlComment> arrayUnattached = array.comments();
+    assertThrows(UnsupportedOperationException.class, () -> arrayUnattached.add(elementComments.get(0)));
+  }
+
+  @Test
+  void shouldReturnEmptyCommentsForAMissingTableThroughThePublicApi() {
+    TomlParseResult result = Toml.parse("a = 1\n");
+    TomlTable missing = result.getTableOrEmpty("nope");
+    assertTrue(missing.comments().isEmpty());
+    assertTrue(missing.comments("k").isEmpty());
+  }
+
+  @Test
+  void shouldReturnEmptyCommentsForAMissingArrayThroughThePublicApi() {
+    TomlParseResult result = Toml.parse("a = 1\n");
+    TomlArray missing = result.getArrayOrEmpty("nope");
+    assertTrue(missing.comments().isEmpty());
+    assertThrows(IndexOutOfBoundsException.class, () -> missing.comments(0));
+  }
+
+  @Test
+  void shouldThrowExceptionForAnUnparseableDottedKeyThroughThePublicApi() {
+    TomlParseResult result = Toml.parse("a = 1\n");
+    assertThrows(IllegalArgumentException.class, () -> result.comments("a@b"));
   }
 }

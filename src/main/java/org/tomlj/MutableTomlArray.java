@@ -147,11 +147,13 @@ class MutableTomlArray implements TomlArray, CommentContainer {
     comments.add(comment);
   }
 
-  List<TomlComment> comments() {
+  @Override
+  public List<TomlComment> comments() {
     return Collections.unmodifiableList(comments);
   }
 
-  List<TomlComment> comments(int index) {
+  @Override
+  public List<TomlComment> comments(int index) {
     return elements.get(index).comments;
   }
 

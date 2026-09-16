@@ -92,6 +92,16 @@ final class EmptyTomlArray implements TomlArray {
   }
 
   @Override
+  public List<TomlComment> comments(int index) {
+    throw new IndexOutOfBoundsException("Index: " + index + ", Size: 0");
+  }
+
+  @Override
+  public List<TomlComment> comments() {
+    return Collections.emptyList();
+  }
+
+  @Override
   public List<Object> toList() {
     return Collections.emptyList();
   }

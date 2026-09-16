@@ -154,6 +154,35 @@ public interface TomlArray {
   TomlPosition inputPositionOf(int index);
 
   /**
+   * Get the comments that document an element.
+   *
+   * <p>
+   * Returns the comments in document order: the run written directly above the element, if any, then the comment on its
+   * line, if any, so at most two, each stating its own {@link TomlComment#placement()}.
+   *
+   * <p>
+   * For an array of tables, each element's header comments are here: {@code [[x]]} is documented on the element table
+   * it opens, so its comments are read with {@code comments(0)} and so on.
+   *
+   * @param index The array index.
+   * @return The comments documenting the element, in document order. Unmodifiable.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  List<TomlComment> comments(int index);
+
+  /**
+   * Get the comments written in this array that document none of its elements.
+   *
+   * <p>
+   * These are the unattached comments: a run separated by a blank line from the element below it, a run before the
+   * closing bracket, or the comment ending a line no element was written on, in document order. The comments
+   * documenting an element are read with {@link #comments(int)}.
+   *
+   * @return The comments written in this array that document none of its elements, in document order. Unmodifiable.
+   */
+  List<TomlComment> comments();
+
+  /**
    * Get a string at a specified index.
    *
    * @param index The array index.

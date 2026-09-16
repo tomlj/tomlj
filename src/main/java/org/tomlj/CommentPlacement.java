@@ -12,6 +12,16 @@
  */
 package org.tomlj;
 
-enum CommentPlacement {
-  ABOVE, AFTER
+/**
+ * Where a comment sits relative to the entry it documents.
+ */
+public enum CommentPlacement {
+  /**
+   * A run of comment lines written directly above the entry it documents.
+   */
+  ABOVE,
+  /**
+   * The comment written on the same line as the entry, after it.
+   */
+  AFTER
 }

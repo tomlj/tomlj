@@ -76,6 +76,16 @@ final class Parser {
       }
 
       @Override
+      public List<TomlComment> comments(List<String> path) {
+        return table.comments(path);
+      }
+
+      @Override
+      public List<TomlComment> comments() {
+        return table.comments();
+      }
+
+      @Override
       public Map<String, Object> toMap() {
         return table.toMap();
       }
