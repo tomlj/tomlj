@@ -56,7 +56,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     if (hasLeadingZero(text)) {
       throw new TomlParseError("Leading zeros are not allowed", new TomlPosition(ctx));
     }
-    return toLong(text.replaceAll("_", ""), 10, ctx);
+    return toLong(stripUnderscores(text), 10, ctx);
   }
 
   private static boolean hasLeadingZero(String text) {
@@ -64,19 +64,26 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     return text.length() > (start + 1) && text.charAt(start) == '0';
   }
 
+  // Removes the underscores that a number may use to group its digits. Not replaceAll, which compiled a regular
+  // expression for every number in the document, where replace searches for the underscore directly and returns the
+  // number unchanged when it holds none.
+  private static String stripUnderscores(String text) {
+    return text.replace("_", "");
+  }
+
   @Override
   public Object visitHexInt(TomlParser.HexIntContext ctx) {
-    return toLong(singleTokenText(ctx).substring(2).replaceAll("_", ""), 16, ctx);
+    return toLong(stripUnderscores(singleTokenText(ctx).substring(2)), 16, ctx);
   }
 
   @Override
   public Object visitOctInt(TomlParser.OctIntContext ctx) {
-    return toLong(singleTokenText(ctx).substring(2).replaceAll("_", ""), 8, ctx);
+    return toLong(stripUnderscores(singleTokenText(ctx).substring(2)), 8, ctx);
   }
 
   @Override
   public Object visitBinInt(TomlParser.BinIntContext ctx) {
-    return toLong(singleTokenText(ctx).substring(2).replaceAll("_", ""), 2, ctx);
+    return toLong(stripUnderscores(singleTokenText(ctx).substring(2)), 2, ctx);
   }
 
   private Long toLong(String s, int radix, ParserRuleContext ctx) {
@@ -89,7 +96,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitRegularFloat(TomlParser.RegularFloatContext ctx) {
-    return toDouble(singleTokenText(ctx).replaceAll("_", ""), ctx);
+    return toDouble(stripUnderscores(singleTokenText(ctx)), ctx);
   }
 
   @Override

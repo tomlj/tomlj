@@ -283,6 +283,7 @@ class TomlTest {
         Arguments.of("foo = +5_433", 5433L),
         Arguments.of("foo = 0xff", 255L),
         Arguments.of("foo = 0xffbccd34", 4290563380L),
+        Arguments.of("foo = 0xDE_AD_be_ef", 3735928559L),
         Arguments.of("foo = 0o7656", 4014L),
         Arguments.of("foo = 0o0007_6543_21", 2054353L),
         Arguments.of("foo = 0b11111100010101_0100000000111111111", 8466858495L),
