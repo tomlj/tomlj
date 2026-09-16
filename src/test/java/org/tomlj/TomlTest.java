@@ -856,14 +856,17 @@ class TomlTest {
             "Unexpected end of line, expected \" or a character (line 2, column 4)",
             "Unexpected \", expected = (line 3, column 3)",
             "Unexpected \", expected a newline or end-of-input (line 3, column 5)")),
-        // The line that ends a multi-line array or inline table is reported once, and what is left of the value is
-        // then parsed as expressions, so each of its remaining lines is reported in its turn.
+        // The line that ends a multi-line array or inline table is reported once. What is left of the value was
+        // written as that value's content, so the lines up to the bracket or brace that closes it are passed over
+        // rather than reported one by one as expressions the document got wrong.
         Arguments.of("a = [\n  1,\n  @,\n]\nb = 1\n", List.of(
-            "Unexpected '@', expected ] or a newline (line 3, column 3)",
-            "Unexpected ']', expected a key, a table key, a newline, or end-of-input (line 4, column 1)")),
+            "Unexpected '@', expected ] or a newline (line 3, column 3)")),
         Arguments.of("a = {\n  x = 1,\n  @,\n}\nb = 2\n", List.of(
-            "Unexpected '@', expected } or a newline (line 3, column 3)",
-            "Unexpected '}', expected a key, a table key, a newline, or end-of-input (line 4, column 1)")),
+            "Unexpected '@', expected } or a newline (line 3, column 3)")),
+        // A mistake of the document's own, written after the value that was given up on, is still reported.
+        Arguments.of("a = [\n  1,\n  @,\n  2,\n]\n@@ junk\nb = 1\n", List.of(
+            "Unexpected '@', expected ] or a newline (line 3, column 3)",
+            "Unexpected '@', expected a key, a table key, a newline, or end-of-input (line 6, column 1)")),
         // A header the parser cannot complete is reported once, rather than again where the key it took ran out.
         Arguments.of("[#]\na = 1\n", List.of(
             "Unexpected end of line, expected a key or ] (line 1, column 4)")),

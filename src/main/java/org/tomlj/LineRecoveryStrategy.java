@@ -39,10 +39,20 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
 
   private static final IntervalSet LINE_END = IntervalSet.of(TomlParser.NewLine);
 
+  // The token the leftover of an abandoned value ends at. Until the parser reaches it, a line it cannot parse is that
+  // value's content rather than an expression the document got wrong.
+  private int leftoverEnd = -1;
+
   @Override
   public void sync(Parser recognizer) {
     if (recognizer.getContext() instanceof TomlParser.TomlContext
         && !recognizer.getExpectedTokens().contains(recognizer.getInputStream().LA(1))) {
+      if (recognizer.getInputStream().LT(1).getTokenIndex() < leftoverEnd) {
+        // What is left of a value the parser has given up on was written as that value's content, so each line of it
+        // fails as an expression for a mistake that has already been reported, once, where the value was given up on.
+        consumeUntil(recognizer, LINE_END);
+        return;
+      }
       // Reports nothing if already recovering, e.g. after an expression whose own recovery stopped before the line end.
       reportUnwantedToken(recognizer);
       consumeUntil(recognizer, LINE_END);
@@ -59,6 +69,10 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
       // Only a value the lexer has left is known to be unclosed: a line that cannot continue a value ends it here, but
       // a closing bracket or brace may still follow, as in an array whose element is a stray character.
       Token opened = recognizer.getInputStream().LA(1) == TomlParser.NewLine ? value.getStart() : null;
+      if (opened == null) {
+        // The lexer is still reading the value, so the lines that follow hold what is left of it.
+        leftoverEnd = endOfLeftover(recognizer);
+      }
       throw new UnterminatedValueException(recognizer, opened);
     }
     // Also resets the state the default strategy keeps for reporting what a later rule expected.
@@ -106,6 +120,36 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
     }
     // Computing what the parser expects walks the rule invocation stack, so it is left until last.
     return recognizer.getExpectedTokens().contains(input.LA(1)) ? null : value;
+  }
+
+  /**
+   * The token index just past what is left of the value being given up on: the delimiter that closes it, the header of
+   * a table, which the lexer leaves any value for, or the end of the input, whichever comes first.
+   */
+  private static int endOfLeftover(Parser recognizer) {
+    TokenStream input = recognizer.getInputStream();
+    int depth = 1;
+    boolean lineStart = false;
+    for (int ahead = 1;; ahead++) {
+      int type = input.LA(ahead);
+      if (type == Token.EOF) {
+        return input.LT(ahead).getTokenIndex();
+      }
+      if (lineStart && startsDocumentLine(type)) {
+        // A line the document can own is the document's: the lexer leaves a value for one, and a key/value pair
+        // written there is parsed, so the parser must report what it gets wrong rather than pass over it.
+        return input.LT(ahead).getTokenIndex();
+      }
+      if (type == TomlParser.ArrayStart || type == TomlParser.InlineTableStart) {
+        depth++;
+      } else if (type == TomlParser.ArrayEnd || type == TomlParser.InlineTableEnd) {
+        depth--;
+        if (depth == 0) {
+          return input.LT(ahead).getTokenIndex() + 1;
+        }
+      }
+      lineStart = type == TomlParser.NewLine;
+    }
   }
 
   /**
