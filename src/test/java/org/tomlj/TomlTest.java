@@ -776,6 +776,11 @@ class TomlTest {
         Arguments.of("a = [\n  1,\n  @,\n  [[2]],\n]\nb = 1\n", Set.of("b")),
         Arguments.of("a = [\n  1,\n  @,\n  [x.y],\n]\nb = 1\n", Set.of("b")),
         Arguments.of("a = {\n  b = 1,\n  @,\n  [2],\n}\nc = 1\n", Set.of("c")),
+        // A line of what is left of the value that an expression could be written as is passed over with the rest of
+        // it, rather than parsed as the key/value pair it is not.
+        Arguments.of("a = [\n  1,\n  @,\n  \"x\",\n]\nb = 1\n", Set.of("b")),
+        Arguments.of("a = [\n  1,\n  @,\n  'x',\n]\nb = 1\n", Set.of("b")),
+        Arguments.of("a = [\n  1,\n  @,\n  \"x\" = 1,\n]\nb = 1\n", Set.of("b")),
         // A string ends where its line does, so a value left unclosed around one ends there too and the lines below
         // it are the document's own.
         Arguments.of("[server]\nhost = [a\" # comment\nport = 8000\n", Set.of("server.port")),
@@ -881,6 +886,12 @@ class TomlTest {
             "Unexpected '@', expected ] or a newline (line 3, column 3)")),
         Arguments.of("a = {\n  x = 1,\n  @,\n}\nb = 2\n", List.of(
             "Unexpected '@', expected } or a newline (line 3, column 3)")),
+        // A quoted element of the abandoned value is a key nothing assigns to, so parsing that line would report the
+        // element as the document's mistake. It is passed over like every other line the value was given up on.
+        Arguments.of("a = [\n  1,\n  @,\n  \"x\",\n]\nb = 1\n", List.of(
+            "Unexpected '@', expected ] or a newline (line 3, column 3)")),
+        Arguments.of("a = [\n  1,\n  @,\n  'x',\n]\nb = 1\n", List.of(
+            "Unexpected '@', expected ] or a newline (line 3, column 3)")),
         // A mistake of the document's own, written after the value that was given up on, is still reported.
         Arguments.of("a = [\n  1,\n  @,\n  2,\n]\n@@ junk\nb = 1\n", List.of(
             "Unexpected '@', expected ] or a newline (line 3, column 3)",
