@@ -13,6 +13,7 @@
 package org.tomlj;
 
 import static org.tomlj.EmptyTomlArray.EMPTY_ARRAY;
+import static org.tomlj.ParseTrees.singleTokenText;
 import static org.tomlj.TomlVersion.V1_0_0;
 
 import org.tomlj.internal.TomlLexer;
@@ -50,7 +51,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitDecInt(TomlParser.DecIntContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     // The lexer matches a run of digits with a leading zero, as it may be the year or hour of a date or time.
     if (hasLeadingZero(text)) {
       throw new TomlParseError("Leading zeros are not allowed", new TomlPosition(ctx));
@@ -65,17 +66,17 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitHexInt(TomlParser.HexIntContext ctx) {
-    return toLong(ctx.getText().substring(2).replaceAll("_", ""), 16, ctx);
+    return toLong(singleTokenText(ctx).substring(2).replaceAll("_", ""), 16, ctx);
   }
 
   @Override
   public Object visitOctInt(TomlParser.OctIntContext ctx) {
-    return toLong(ctx.getText().substring(2).replaceAll("_", ""), 8, ctx);
+    return toLong(singleTokenText(ctx).substring(2).replaceAll("_", ""), 8, ctx);
   }
 
   @Override
   public Object visitBinInt(TomlParser.BinIntContext ctx) {
-    return toLong(ctx.getText().substring(2).replaceAll("_", ""), 2, ctx);
+    return toLong(singleTokenText(ctx).substring(2).replaceAll("_", ""), 2, ctx);
   }
 
   private Long toLong(String s, int radix, ParserRuleContext ctx) {
@@ -88,12 +89,12 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitRegularFloat(TomlParser.RegularFloatContext ctx) {
-    return toDouble(ctx.getText().replaceAll("_", ""), ctx);
+    return toDouble(singleTokenText(ctx).replaceAll("_", ""), ctx);
   }
 
   @Override
   public Object visitRegularFloatInf(TomlParser.RegularFloatInfContext ctx) {
-    return (ctx.getText().startsWith("-")) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+    return (singleTokenText(ctx).startsWith("-")) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
   }
 
   @Override

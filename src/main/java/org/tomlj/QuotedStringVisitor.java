@@ -12,6 +12,7 @@
  */
 package org.tomlj;
 
+import static org.tomlj.ParseTrees.singleTokenText;
 import static org.tomlj.TomlVersion.V0_5_0;
 import static org.tomlj.TomlVersion.V1_0_0;
 
@@ -41,12 +42,12 @@ final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
 
   @Override
   public StringBuilder visitBasicUnescaped(TomlParser.BasicUnescapedContext ctx) {
-    return appendRun(ctx.getText(), ctx);
+    return appendRun(singleTokenText(ctx), ctx);
   }
 
   @Override
   public StringBuilder visitMlBasicUnescaped(TomlParser.MlBasicUnescapedContext ctx) {
-    return appendRun(ctx.getText(), ctx);
+    return appendRun(singleTokenText(ctx), ctx);
   }
 
   private StringBuilder appendText(String text, ParserRuleContext ctx) {
@@ -72,7 +73,7 @@ final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
 
   @Override
   public StringBuilder visitEscaped(TomlParser.EscapedContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     if (text.isEmpty()) {
       return builder;
     }

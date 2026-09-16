@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static org.tomlj.ParseTrees.singleTokenText;
+
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
@@ -27,7 +29,7 @@ final class LocalDateVisitor extends TomlParserBaseVisitor<LocalDate> {
 
   @Override
   public LocalDate visitYear(TomlParser.YearContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     if (text.length() != 4) {
       throw new TomlParseError("Invalid year (valid range 0000..9999)", new TomlPosition(ctx));
     }
@@ -43,7 +45,7 @@ final class LocalDateVisitor extends TomlParserBaseVisitor<LocalDate> {
 
   @Override
   public LocalDate visitMonth(TomlParser.MonthContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     if (text.length() != 2) {
       throw new TomlParseError("Invalid month (valid range 01..12)", new TomlPosition(ctx));
     }
@@ -62,7 +64,7 @@ final class LocalDateVisitor extends TomlParserBaseVisitor<LocalDate> {
 
   @Override
   public LocalDate visitDay(TomlParser.DayContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     if (text.length() != 2) {
       throw new TomlParseError("Invalid day (valid range 01..28/31)", new TomlPosition(ctx));
     }
