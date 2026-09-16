@@ -131,6 +131,13 @@ generateGrammarSource {
   def libDir = file(outputDirectory.path + "/org/tomlj/internal")
   arguments << "-lib" << libDir.absolutePath
   doFirst { libDir.mkdirs() }
+
+  // TomlParser.g4 takes its token numbers from TomlLexer.g4 (tokenVocab), but Gradle's AntlrTask hands ANTLR only the
+  // grammars that changed, so a lexer-only edit regenerates the lexer alone and leaves a parser built against the old
+  // numbers, which compiles and then parses wrongly. Declaring the grammars a second time, as an input the task cannot
+  // take incrementally, makes Gradle run it with no incremental changes whenever any grammar changes, and the task
+  // then regenerates every grammar.
+  inputs.files(source).withPropertyName('allGrammars').withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 configurations {
