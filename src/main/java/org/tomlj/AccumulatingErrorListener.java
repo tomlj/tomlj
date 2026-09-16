@@ -31,6 +31,28 @@ import org.antlr.v4.runtime.misc.IntervalSet;
 
 final class AccumulatingErrorListener extends BaseErrorListener implements ErrorReporter {
 
+  // The tokens a key and a value can start with, which are named as "a key" and "a value" where all of them are
+  // expected. Anywhere else the tokens that are expected are named one by one, as they are the whole of what fits.
+  private static final IntervalSet KEY_START =
+      new IntervalSet(TomlLexer.UnquotedKey, TomlLexer.Apostrophe, TomlLexer.QuotationMark);
+  private static final IntervalSet VALUE_START = new IntervalSet(
+      TomlLexer.Apostrophe,
+      TomlLexer.QuotationMark,
+      TomlLexer.TripleApostrophe,
+      TomlLexer.TripleQuotationMark,
+      TomlLexer.DecimalInteger,
+      TomlLexer.BinaryInteger,
+      TomlLexer.OctalInteger,
+      TomlLexer.HexInteger,
+      TomlLexer.FloatingPoint,
+      TomlLexer.FloatingPointInf,
+      TomlLexer.FloatingPointNaN,
+      TomlLexer.TrueBoolean,
+      TomlLexer.FalseBoolean,
+      TomlLexer.DateDigits,
+      TomlLexer.ArrayStart,
+      TomlLexer.InlineTableStart);
+
   private final List<TomlParseError> errors = new ArrayList<>();
   private final List<Integer> syntaxErrorLines = new ArrayList<>();
   private int lastOffendingTokenIndex = -1;
@@ -130,16 +152,35 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     return getExpected(expectedTokens);
   }
 
+  /**
+   * Check whether every token of {@code subset} is in {@code set}.
+   */
+  private static boolean contains(IntervalSet set, IntervalSet subset) {
+    return subset.subtract(set).isNil();
+  }
+
   private static String getExpected(IntervalSet expectedTokens) {
-    List<String> sortedNames = expectedTokens
+    // Where every token that could start a key or a value is expected, the word says what the list of them says, and
+    // the reader has one thing to look for rather than nine. A value is checked first, as a string starts either.
+    IntervalSet remaining = expectedTokens;
+    List<TokenName> names = new ArrayList<>();
+    if (contains(remaining, VALUE_START)) {
+      names.add(TokenName.VALUE);
+      remaining = remaining.subtract(VALUE_START);
+    }
+    if (contains(remaining, KEY_START)) {
+      names.add(TokenName.KEY);
+      remaining = remaining.subtract(KEY_START);
+    }
+    remaining
         .getIntervals()
         .stream()
         .flatMap(i -> IntStream.rangeClosed(i.a, i.b).boxed())
         .flatMap(TokenName::namesForToken)
-        .sorted()
-        .distinct()
-        .map(TokenName::displayName)
-        .collect(Collectors.toList());
+        .forEach(names::add);
+
+    List<String> sortedNames =
+        names.stream().sorted().distinct().map(TokenName::displayName).collect(Collectors.toList());
 
     StringBuilder builder = new StringBuilder();
     int count = sortedNames.size();
