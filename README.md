@@ -48,6 +48,8 @@ if (port > 65535) {
   `LocalDateTime`, `LocalDate` and `LocalTime`. Each getter returns `null` if the key is missing,
   throws `TomlInvalidTypeException` if the value is a different type, and has an overload that takes
   a default.
+* **Comments are kept.** Every comment in a document is parsed into the model, attached to the entry
+  it documents or held by the table or array it was written in. See [Comments](#comments).
 * **Few dependencies.** The ANTLR runtime is the only library needed to run it, and the `all`
   artifact bundles that in, so there is nothing else to add. Works on Java 9 and later.
 
@@ -75,6 +77,35 @@ those when working with keys from `keySet()` or `entrySet()`:
 String quoted = result.getString("\"@key#with$special%characters\"");
 String literal = result.getString(Collections.singletonList("@key#with$special%characters"));
 ```
+
+### Comments
+
+Every comment in a document is kept. A comment on the same line as an entry, or a run of comment
+lines directly above it, documents that entry. Every other comment is unattached, and belongs to the
+table or array it was written in:
+
+```toml
+# The port clients connect to.
+port = 8080 # not 80
+
+# Everything below is optional.
+
+[server]
+```
+
+```java
+for (TomlComment comment : result.comments("port")) {
+  System.out.println(comment.placement() + ": " + comment.text());
+}
+// ABOVE: The port clients connect to.
+// AFTER: not 80
+
+result.comments().get(0).text(); // "Everything below is optional."
+```
+
+A comment's text is what follows `# `, one string per line in `lines()`. Each `[[x]]` header is
+documented on the element it opens, so its comments are read with `getArray("x").comments(0)`.
+`toToml()` does not write comments yet.
 
 ### Specification version
 
