@@ -28,11 +28,14 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 final class ValueVisitor extends TomlParserBaseVisitor<Object> {
@@ -167,36 +170,111 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     return ctx.time().accept(new LocalTimeVisitor(version));
   }
 
+  /**
+   * Read an array, with the comments written between its brackets.
+   *
+   * <p>
+   * Walked as one flat sequence of values, line breaks and commas, because what a comment documents is what was written
+   * beside it: a line break holds the comment ending the line of the value before it and the run above the value after
+   * it, and the array itself holds every comment that documents neither.
+   */
   @Override
   public Object visitArray(TomlParser.ArrayContext ctx) {
-    TomlParser.ArrayValuesContext valuesContext = ctx.arrayValues();
-    if (valuesContext == null) {
+    // An array with nothing in it but comments still has to hold them, so it cannot be the shared empty array.
+    List<TomlParser.LineBreakContext> lineBreaks = ctx.lineBreak();
+    if (ctx.arrayValues() == null && (lineBreaks.isEmpty() || !Comments.holdsComments(lineBreaks.get(0)))) {
       return EMPTY_ARRAY;
     }
-    return valuesContext.accept(new ArrayVisitor(version));
+    MutableTomlArray array = MutableTomlArray.create(version);
+    List<ParseTree> nodes = Comments.flatten(ctx);
+    for (int i = 0; i < nodes.size(); ++i) {
+      ParseTree node = nodes.get(i);
+      if (node instanceof TomlParser.ValContext) {
+        append(array, (TomlParser.ValContext) node, nodes, i);
+      } else if (node instanceof TomlParser.LineBreakContext) {
+        Comments.unattached(nodes, i, array);
+      }
+    }
+    return array;
   }
 
+  private void append(MutableTomlArray array, TomlParser.ValContext ctx, List<ParseTree> nodes, int index) {
+    List<TomlComment> comments = TomlComment.attached(Comments.above(nodes, index), Comments.after(nodes, index));
+    Object value = ctx.accept(this);
+    if (value == null) {
+      return;
+    }
+    TomlPosition position = new TomlPosition(ctx);
+    try {
+      array.append(value, position, comments);
+    } catch (TomlInvalidTypeException e) {
+      throw new TomlParseError(e.getMessage(), position);
+    }
+  }
+
+  /**
+   * Read an inline table, with the comments written between its braces.
+   *
+   * <p>
+   * Walked as one flat sequence, as {@link #visitArray} is, with the table's key/value pairs where an array has its
+   * values.
+   */
   @Override
   public Object visitInlineTable(TomlParser.InlineTableContext ctx) {
     if (!version.after(V1_0_0)) {
       checkSingleLineInlineTable(ctx);
     }
-    TomlParser.InlineTableValuesContext valuesContext = ctx.inlineTableValues();
-    if (valuesContext == null) {
-      return MutableTomlTable.inline(version, new TomlPosition(ctx));
+    MutableTomlTable table = MutableTomlTable.inline(version, new TomlPosition(ctx));
+    // The tables that dotted keys open within this one, which close with it: nothing written later may add to them.
+    Map<MutableTomlTable, TomlPosition> openTables = null;
+    List<ParseTree> nodes = Comments.flatten(ctx);
+    for (int i = 0; i < nodes.size(); ++i) {
+      ParseTree node = nodes.get(i);
+      if (node instanceof TomlParser.KeyvalContext) {
+        if (openTables == null) {
+          openTables = new HashMap<>();
+        }
+        set(table, openTables, (TomlParser.KeyvalContext) node, nodes, i);
+      } else if (node instanceof TomlParser.LineBreakContext) {
+        Comments.unattached(nodes, i, table);
+      }
     }
-    InlineTableVisitor visitor = new InlineTableVisitor(version, new TomlPosition(ctx));
-    MutableTomlTable result = valuesContext.accept(visitor);
-    visitor.defineOpenTables();
-    return result;
+    if (openTables != null) {
+      openTables.forEach(MutableTomlTable::define);
+    }
+    return table;
+  }
+
+  private void set(
+      MutableTomlTable table,
+      Map<MutableTomlTable, TomlPosition> openTables,
+      TomlParser.KeyvalContext ctx,
+      List<ParseTree> nodes,
+      int index) {
+    TomlParser.KeyContext keyContext = ctx.key();
+    TomlParser.ValContext valContext = ctx.val();
+    if (keyContext == null || valContext == null) {
+      return;
+    }
+    List<String> path = keyContext.accept(new KeyVisitor(version));
+    if (path == null || path.isEmpty()) {
+      return;
+    }
+    List<TomlComment> comments = TomlComment.attached(Comments.above(nodes, index), Comments.after(nodes, index));
+    Object value = valContext.accept(this);
+    if (value != null) {
+      table
+          .set(path, value, new TomlPosition(ctx), comments)
+          .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
+    }
   }
 
   // Newlines and trailing commas in inline tables were added in TOML 1.1.0. Newlines inside the values of an inline
   // table (multi-line strings and arrays) are not direct children of the inline table rules, so are not collected.
   private static void checkSingleLineInlineTable(TomlParser.InlineTableContext ctx) {
     List<Token> unsupported = new ArrayList<>();
-    for (TomlParser.GapContext gap : ctx.gap()) {
-      unsupported.add(gap.NewLine(0).getSymbol());
+    for (TomlParser.LineBreakContext lineBreak : ctx.lineBreak()) {
+      unsupported.add(lineBreak.NewLine(0).getSymbol());
     }
     TerminalNode trailingComma = ctx.Comma();
     if (trailingComma != null) {
@@ -204,12 +282,12 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     }
     TomlParser.InlineTableValuesContext valuesContext = ctx.inlineTableValues();
     if (valuesContext != null) {
-      for (TomlParser.GapContext gap : valuesContext.gap()) {
-        unsupported.add(gap.NewLine(0).getSymbol());
+      for (TomlParser.LineBreakContext lineBreak : valuesContext.lineBreak()) {
+        unsupported.add(lineBreak.NewLine(0).getSymbol());
       }
       for (TomlParser.InlineTableValueContext value : valuesContext.inlineTableValue()) {
-        if (value.gap() != null) {
-          unsupported.add(value.gap().NewLine(0).getSymbol());
+        if (value.lineBreak() != null) {
+          unsupported.add(value.lineBreak().NewLine(0).getSymbol());
         }
       }
     }

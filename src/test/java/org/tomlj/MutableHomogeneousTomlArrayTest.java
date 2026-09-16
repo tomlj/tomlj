@@ -41,7 +41,8 @@ class MutableHomogeneousTomlArrayTest {
 
   @Test
   void arrayContainsTypeAfterAddingItem() {
-    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false).append("foo", positionAt(2, 3));
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
+    array.append("foo", positionAt(2, 3));
     assertFalse(array.isEmpty());
     assertEquals(1, array.size());
     assertTrue(array.containsStrings());

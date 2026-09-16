@@ -31,6 +31,8 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   private final ErrorReporter errorReporter;
   private final MutableTomlTable rootTable;
   private MutableTomlTable currentTable;
+  // The comments documenting the expression being visited, which the document rule reads from the tree around it.
+  private List<TomlComment> attached = Collections.emptyList();
   // The number of tables and arrays enclosing the entries of currentTable, not counting the root table. Starts at 0.
   private int currentDepth;
   private final Map<MutableTomlTable, TomlPosition> openTables;
@@ -47,8 +49,60 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
     this.maxNestingDepth = maxNestingDepth;
   }
 
+  /**
+   * Visit the lines of the document, handing each expression the comments written around it.
+   *
+   * <p>
+   * Walked here rather than left to {@link #visitChildren}, because what a comment documents is what the tree holds
+   * beside it: the run before an expression and the end of its line are the comments attached to it, and every other
+   * run is unattached, and belongs to a container. A run glued to the line above it belongs to the container open where
+   * it was written, which is known as it is reached; a run a blank line separates from what precedes it belongs to the
+   * container of the expression that follows, which is not, so those are held until that expression is reached.
+   */
+  @Override
+  public MutableTomlTable visitToml(TomlParser.TomlContext ctx) {
+    List<TomlComment> separated = null;
+    int childCount = ctx.getChildCount();
+    for (int i = 0; i < childCount; ++i) {
+      ParseTree child = ctx.getChild(i);
+      ParseTree previous = (i > 0) ? ctx.getChild(i - 1) : null;
+      ParseTree beforePrevious = (i > 1) ? ctx.getChild(i - 2) : null;
+      ParseTree next = ((i + 1) < childCount) ? ctx.getChild(i + 1) : null;
+      if (child instanceof TomlParser.ExpressionContext) {
+        if (separated != null) {
+          // A header is written in the document rather than in the section it opens, so the runs before it belong to
+          // the root table rather than to that section.
+          CommentContainer container =
+              (((TomlParser.ExpressionContext) child).table() != null) ? rootTable : currentTable;
+          separated.forEach(container::addComment);
+          separated = null;
+        }
+        attached = TomlComment.attached(Comments.above(previous), Comments.after(next));
+        child.accept(this);
+      } else if (child instanceof TomlParser.CommentRunContext && !(next instanceof TomlParser.ExpressionContext)) {
+        // A run directly above an expression is handed to it when it is reached; this one documents nothing.
+        TomlComment comment = Comments.of((TomlParser.CommentRunContext) child, null);
+        if (Comments.glued(previous, beforePrevious)) {
+          currentTable.addComment(comment);
+        } else {
+          if (separated == null) {
+            separated = new ArrayList<>();
+          }
+          separated.add(comment);
+        }
+      }
+    }
+    if (separated != null) {
+      // No expression follows the runs left at the end of the document, so they belong to the document itself.
+      separated.forEach(rootTable::addComment);
+    }
+    return rootTable;
+  }
+
   @Override
   public MutableTomlTable visitKeyval(TomlParser.KeyvalContext ctx) {
+    // A key/value pair is written inside whatever section is open, and so is any comment written around it.
+    List<TomlComment> comments = attached;
     TomlParser.KeyContext keyContext = ctx.key();
     TomlParser.ValContext valContext = ctx.val();
     if (keyContext == null || valContext == null) {
@@ -69,7 +123,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
           throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
         }
         currentTable
-            .set(path, value, new TomlPosition(ctx))
+            .set(path, value, new TomlPosition(ctx), comments)
             .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
       }
       return rootTable;
@@ -81,6 +135,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
   @Override
   public MutableTomlTable visitStandardTable(TomlParser.StandardTableContext ctx) {
+    List<TomlComment> comments = attached;
     defineOpenTables();
     if (hasRecoveredKey(ctx, TomlParser.TableKeyEnd)) {
       return rootTable;
@@ -100,7 +155,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       if (depth > maxNestingDepth) {
         throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
       }
-      currentTable = rootTable.createTable(path, new TomlPosition(ctx));
+      currentTable = rootTable.createTable(path, new TomlPosition(ctx), comments);
       currentDepth = depth + 1;
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
@@ -110,6 +165,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
 
   @Override
   public MutableTomlTable visitArrayTable(TomlParser.ArrayTableContext ctx) {
+    List<TomlComment> comments = attached;
     defineOpenTables();
     if (hasRecoveredKey(ctx, TomlParser.ArrayTableKeyEnd)) {
       return rootTable;
@@ -130,7 +186,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       if ((long) depth + 1 > maxNestingDepth) {
         throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
       }
-      currentTable = rootTable.createTableArray(path, new TomlPosition(ctx));
+      currentTable = rootTable.createTableArray(path, new TomlPosition(ctx), comments);
       currentDepth = depth + 2;
     } catch (TomlParseError e) {
       errorReporter.reportError(e);

@@ -29,19 +29,24 @@ import java.util.stream.Stream;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
-final class MutableTomlTable implements TomlTable {
+final class MutableTomlTable implements TomlTable, CommentContainer {
 
   private static class Element {
     final Object value;
     final TomlPosition position;
+    // The comments documenting this entry: the run above it, then the comment trailing it.
+    final List<TomlComment> comments;
 
-    private Element(Object value, TomlPosition position) {
+    private Element(Object value, TomlPosition position, List<TomlComment> comments) {
       this.value = value;
       this.position = position;
+      this.comments = comments;
     }
   }
 
   private final Map<String, Element> properties = new LinkedHashMap<>();
+  // The comments written in this table that document none of its entries, in document order.
+  private final List<TomlComment> comments = new ArrayList<>();
   private final TomlVersion version;
   private TomlPosition definedAt;
   private final boolean inline;
@@ -180,6 +185,23 @@ final class MutableTomlTable implements TomlTable {
     return (element != null) ? element.position : null;
   }
 
+  @Override
+  public void addComment(TomlComment comment) {
+    comments.add(comment);
+  }
+
+  List<TomlComment> comments() {
+    return Collections.unmodifiableList(comments);
+  }
+
+  List<TomlComment> comments(List<String> path) {
+    if (path.isEmpty()) {
+      return Collections.emptyList();
+    }
+    Element element = getElement(path);
+    return (element != null) ? element.comments : Collections.emptyList();
+  }
+
   private Element getElement(List<String> path) {
     MutableTomlTable table = this;
     int depth = path.size();
@@ -204,6 +226,10 @@ final class MutableTomlTable implements TomlTable {
   }
 
   MutableTomlTable createTable(List<String> path, TomlPosition position) {
+    return createTable(path, position, Collections.emptyList());
+  }
+
+  MutableTomlTable createTable(List<String> path, TomlPosition position, List<TomlComment> comments) {
     if (path.isEmpty()) {
       return this;
     }
@@ -215,14 +241,14 @@ final class MutableTomlTable implements TomlTable {
     Element element = table.properties.get(key);
     if (element == null) {
       final MutableTomlTable newTable = new MutableTomlTable(version, position);
-      table.properties.put(key, new Element(newTable, position));
+      table.properties.put(key, new Element(newTable, position, comments));
       return newTable;
     }
     if (element.value instanceof MutableTomlTable) {
       final MutableTomlTable subTable = (MutableTomlTable) element.value;
       if (!subTable.isDefined()) {
         subTable.define(position);
-        table.properties.put(key, new Element(subTable, position));
+        table.properties.put(key, new Element(subTable, position, comments));
         return subTable;
       }
     }
@@ -231,6 +257,10 @@ final class MutableTomlTable implements TomlTable {
   }
 
   MutableTomlTable createTableArray(List<String> path, TomlPosition position) {
+    return createTableArray(path, position, Collections.emptyList());
+  }
+
+  MutableTomlTable createTableArray(List<String> path, TomlPosition position, List<TomlComment> comments) {
     if (path.isEmpty()) {
       throw new IllegalArgumentException("empty path");
     }
@@ -239,8 +269,10 @@ final class MutableTomlTable implements TomlTable {
     final MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true).table;
 
     String key = path.get(depth - 1);
-    Element element =
-        table.properties.computeIfAbsent(key, k -> new Element(MutableTomlArray.create(version, true), position));
+    Element element = table.properties
+        .computeIfAbsent(
+            key,
+            k -> new Element(MutableTomlArray.create(version, true), position, Collections.emptyList()));
     if (!(element.value instanceof TomlArray)) {
       String message = Toml.joinKeyPath(path) + " is not an array (previously defined at " + element.position + ")";
       throw new TomlParseError(message, position);
@@ -251,7 +283,9 @@ final class MutableTomlTable implements TomlTable {
     }
     MutableTomlArray array = (MutableTomlArray) element.value;
     MutableTomlTable newTable = new MutableTomlTable(version);
-    array.append(newTable, position);
+    // Each header of an array of tables is an expression of its own, so its comments belong to the element it opens
+    // rather than to the array as a whole.
+    array.append(newTable, position, comments);
     return newTable;
   }
 
@@ -266,6 +300,14 @@ final class MutableTomlTable implements TomlTable {
       List<String> path,
       Object value,
       TomlPosition position) {
+    return set(path, value, position, Collections.emptyList());
+  }
+
+  List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> set(
+      List<String> path,
+      Object value,
+      TomlPosition position,
+      List<TomlComment> comments) {
     int depth = path.size();
     assert (depth > 0);
     if (value instanceof Integer) {
@@ -276,7 +318,7 @@ final class MutableTomlTable implements TomlTable {
     final EnsureTableResult result = ensureTable(path.subList(0, depth - 1), position, false, false);
     final MutableTomlTable table = result.table;
 
-    Element prevElem = table.properties.putIfAbsent(path.get(depth - 1), new Element(value, position));
+    Element prevElem = table.properties.putIfAbsent(path.get(depth - 1), new Element(value, position, comments));
     if (prevElem != null) {
       String pathString = Toml.joinKeyPath(path);
       String message = pathString + " previously defined at " + prevElem.position;
@@ -321,8 +363,10 @@ final class MutableTomlTable implements TomlTable {
 
     ArrayList<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> elements = new ArrayList<>();
     for (int i = 0; i < depth; ++i) {
-      Element element =
-          table.properties.computeIfAbsent(path.get(i), k -> new Element(new MutableTomlTable(version), position));
+      Element element = table.properties
+          .computeIfAbsent(
+              path.get(i),
+              k -> new Element(new MutableTomlTable(version), position, Collections.emptyList()));
       if (element.value instanceof MutableTomlTable) {
         table = (MutableTomlTable) element.value;
         if (table.inline) {

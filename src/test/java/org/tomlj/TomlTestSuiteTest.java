@@ -83,7 +83,7 @@ class TomlTestSuiteTest {
         .map(file -> DynamicTest.dynamicTest(file, () -> run(suiteDir, file, version, knownFailures.contains(file))));
   }
 
-  private static Path suiteDir() {
+  static Path suiteDir() {
     Path dir = Paths.get(System.getProperty("org.tomlj.tomlTestDir", "build/toml-test"));
     if (!Files.isDirectory(dir)) {
       throw new IllegalStateException(

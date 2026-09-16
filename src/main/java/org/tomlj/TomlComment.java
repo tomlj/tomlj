@@ -1,0 +1,107 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file
+ * to You under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+package org.tomlj;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import org.antlr.v4.runtime.Token;
+import org.checkerframework.checker.nullness.qual.Nullable;
+
+final class TomlComment {
+
+  // Each line as it was written after the '#'. A comment is held in the form the document held it, so that the model
+  // alone reproduces its text, while the form callers see and write is the text after "# ": the getter drops one
+  // leading space and the setter puts one back, so reading a comment and writing it back unchanged changes nothing.
+  private final List<String> rawLines;
+  private final TomlPosition position;
+  private final @Nullable CommentPlacement placement;
+
+  /**
+   * Record a comment from the tokens the lexer matched for it.
+   *
+   * <p>
+   * Built from the tokens rather than from text extracted at the call site, so that the source-preserving writer can
+   * later record a span here without the recording side having to find the tokens again.
+   *
+   * @param tokens The comment tokens, one per line, on consecutive lines of the document.
+   * @param placement Where the comment sits relative to what it documents, or {@code null} if it documents nothing.
+   * @return A comment.
+   */
+  static TomlComment of(List<Token> tokens, @Nullable CommentPlacement placement) {
+    assert !tokens.isEmpty();
+    List<String> rawLines = new ArrayList<>(tokens.size());
+    for (Token token : tokens) {
+      // Every comment token begins with the '#' that opened it, which is delimiter syntax rather than content.
+      rawLines.add(token.getText().substring(1));
+    }
+    Token first = tokens.get(0);
+    TomlPosition position = TomlPosition.positionAt(first.getLine(), first.getCharPositionInLine() + 1);
+    return new TomlComment(rawLines, position, placement);
+  }
+
+  /**
+   * Collect the comments attached to one expression, in the order they were written.
+   *
+   * @param above The run written above the expression, or {@code null} if there is none.
+   * @param after The comment trailing the expression, or {@code null} if there is none.
+   * @return The comments, as an unmodifiable list of at most two.
+   */
+  static List<TomlComment> attached(@Nullable TomlComment above, @Nullable TomlComment after) {
+    if (above == null && after == null) {
+      return Collections.emptyList();
+    }
+    if (above == null) {
+      return Collections.singletonList(after);
+    }
+    if (after == null) {
+      return Collections.singletonList(above);
+    }
+    return Collections.unmodifiableList(Arrays.asList(above, after));
+  }
+
+  private TomlComment(List<String> rawLines, TomlPosition position, @Nullable CommentPlacement placement) {
+    this.rawLines = rawLines;
+    this.position = position;
+    this.placement = placement;
+  }
+
+  List<String> lines() {
+    List<String> lines = new ArrayList<>(rawLines.size());
+    for (String rawLine : rawLines) {
+      lines.add(rawLine.startsWith(" ") ? rawLine.substring(1) : rawLine);
+    }
+    return Collections.unmodifiableList(lines);
+  }
+
+  String text() {
+    return String.join("\n", lines());
+  }
+
+  @Nullable
+  TomlPosition position() {
+    return position;
+  }
+
+  @Nullable
+  CommentPlacement placement() {
+    return placement;
+  }
+
+  @Override
+  public String toString() {
+    return "TomlComment{" + text() + ", " + placement + " at " + position + "}";
+  }
+}
