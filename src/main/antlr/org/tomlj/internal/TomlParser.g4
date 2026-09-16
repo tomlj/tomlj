@@ -1,6 +1,6 @@
 parser grammar TomlParser;
 
-options { tokenVocab=TomlLexer; superClass=AbstractTomlParser; }
+options { tokenVocab=TomlLexer; superClass=AbstractTomlParser; contextSuperClass=AbstractTomlParserRuleContext; }
 
 @header {
 package org.tomlj.internal;
