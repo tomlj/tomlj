@@ -81,11 +81,17 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
 
   @Override
   protected Token singleTokenDeletion(Parser recognizer) {
+    Token token = recognizer.getInputStream().LT(1);
+    // Deleting a newline carries the expression the parser is recovering on into the line below, e.g. letting a table
+    // header whose key is missing take the key of the next line, and the key/value pair written there with it. What a
+    // line is missing is not on the next line, so a newline is never the stray token deletion is meant for.
+    if (token.getType() == TomlParser.NewLine) {
+      return null;
+    }
     // A run of string characters outside a string (e.g. the rest of a line after a broken string) is a single token,
     // but it is not the single stray token that deletion is meant for: deleting it lets the parser carry on as though
     // the line were whole, e.g. still inside an inline table whose closing brace was in the run, and fail on the lines
     // that follow. Recover as the default strategy does from more than one unexpected token.
-    Token token = recognizer.getInputStream().LT(1);
     if (token.getType() == TomlParser.StringChars) {
       String text = token.getText();
       if (text.codePointCount(0, text.length()) > 1) {

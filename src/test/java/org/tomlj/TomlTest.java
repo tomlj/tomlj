@@ -734,6 +734,24 @@ class TomlTest {
         // A header whose quoted key is rejected is skipped, and parsing carries on after it.
         Arguments.of("[\"\\a\"]\n[tbl]\nb = 2\n", Set.of("tbl.b")),
         Arguments.of("[[\"\\a\"]]\n[tbl]\nb = 2\n", Set.of("tbl.b")),
+        // A header the parser had to repair does not name the table the document meant, so it is skipped, leaving the
+        // key/value pairs that follow it in the table that is already open.
+        Arguments.of("[a b]\nc = 1\n", Set.of("c")),
+        Arguments.of("[a.]\nb = 1\n", Set.of("b")),
+        Arguments.of("[a = 1]\nb = 1\n", Set.of("b")),
+        Arguments.of("[\"a]\nb = 1\n", Set.of("b")),
+        Arguments.of("[']\na = 1\n", Set.of("a")),
+        Arguments.of("[[a]\nb = 1\n", Set.of("b")),
+        Arguments.of("[a]]\nb = 1\n", Set.of("b")),
+        Arguments.of("[tbl]\nx = 1\n[a b]\ny = 2\n", Set.of("tbl.x", "tbl.y")),
+        // A header missing only its closing bracket names its table all the same.
+        Arguments.of("[a\nb = 1\n", Set.of("a.b")),
+        Arguments.of("[a.b\nc = 1\n", Set.of("a.b.c")),
+        Arguments.of("[[a\nb = 1\n", Set.of("a")),
+        // A header cannot take its key from the next line, so the pair written there is still parsed.
+        Arguments.of("[#]\na = 1\n", Set.of("a")),
+        Arguments.of("[\na = 1\n", Set.of("a")),
+        Arguments.of("[\n\"b\" = 1\n", Set.of("b")),
         Arguments.of("a = [1,\n  2\nb = 3\n", Set.of()),
         // Here and in the inline table case below, the unterminated value takes the table header, so the key/value pair
         // after it is parsed into the root table.
@@ -808,9 +826,10 @@ class TomlTest {
         Arguments.of("\"a\rbc def\" = 1\nb = 2\n", List.of(
             "Unexpected '\\r', expected \" or a character (line 1, column 3)",
             "Unexpected ' ', expected . or = (line 1, column 11)")),
+        // Each line's unterminated string is reported where it ends, as nothing the parser matches spans a line break.
         Arguments.of("a = { b = \"\n\"ab\ncd\"\"\" }\ne = 2\n", List.of(
             "Unexpected end of line, expected \" or a character (line 1, column 12)",
-            "Unexpected 'a', expected }, a comma, or a newline (line 2, column 2)",
+            "Unexpected end of line, expected \" or a character (line 2, column 4)",
             "Unexpected \", expected = (line 3, column 3)",
             "Unexpected \", expected a newline or end-of-input (line 3, column 5)")),
         // The line that ends a multi-line array or inline table is reported once, and what is left of the value is
@@ -820,7 +839,12 @@ class TomlTest {
             "Unexpected ']', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 4, column 1)")),
         Arguments.of("a = {\n  x = 1,\n  @,\n}\nb = 2\n", List.of(
             "Unexpected '@', expected } or a newline (line 3, column 3)",
-            "Unexpected '}', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 4, column 1)"))
+            "Unexpected '}', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 4, column 1)")),
+        // A header the parser cannot complete is reported once, rather than again where the key it took ran out.
+        Arguments.of("[#]\na = 1\n", List.of(
+            "Unexpected end of line, expected a-z, A-Z, 0-9, ], ', or \" (line 1, column 4)")),
+        Arguments.of("[\na = 1\n", List.of(
+            "Unexpected end of line, expected a-z, A-Z, 0-9, ], ', or \" (line 1, column 2)"))
     );
     // @formatter:on
   }
