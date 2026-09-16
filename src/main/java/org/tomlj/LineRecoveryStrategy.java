@@ -19,6 +19,7 @@ import org.antlr.v4.runtime.InputMismatchException;
 import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.misc.IntervalSet;
 
 /**
@@ -48,9 +49,10 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
     if (endsUnterminatedValue(recognizer)) {
       // An array or inline table may hold newlines between its elements, so the default strategy treats a line it
       // cannot parse as input to skip within the value, and carries on matching the lines after it - to the end of the
-      // document, since nothing closes the value. A line that cannot continue the value ends it instead: the rule
-      // reports the line's first token and recovers, which stops at the end of that line, leaving the document rule to
-      // parse the lines that follow.
+      // document, since nothing closes the value. Ending the value here leaves the rest of the document to the document
+      // rule instead. A line that cannot continue the value is reported and skipped, as the rule's own recovery stops
+      // at the end of a line; a line the lexer has already left the value for is kept whole, as the value ends before
+      // the newline that starts it and the document rule matches that newline.
       throw new InputMismatchException(recognizer);
     }
     // Also resets the state the default strategy keeps for reporting what a later rule expected.
@@ -58,25 +60,50 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
   }
 
   /**
-   * Check whether the parser is inside an array or inline table, at the start of a line that cannot continue it.
+   * Check whether the value the parser is inside ends here: either the line that follows belongs to the document, or
+   * this line cannot continue the value.
    */
   private boolean endsUnterminatedValue(Parser recognizer) {
     if (inErrorRecoveryMode(recognizer)) {
       return false;
     }
-    Token previous = recognizer.getInputStream().LT(-1);
-    if (previous == null || previous.getType() != TomlParser.NewLine) {
-      return false;
+    TokenStream input = recognizer.getInputStream();
+    boolean beforeNewLine = input.LA(1) == TomlParser.NewLine;
+    if (beforeNewLine) {
+      if (!startsDocumentLine(input.LA(2))) {
+        return false;
+      }
+    } else {
+      Token previous = input.LT(-1);
+      if (previous == null || previous.getType() != TomlParser.NewLine) {
+        return false;
+      }
     }
-    boolean inValue = false;
+    RuleContext value = null;
     for (RuleContext context = recognizer.getContext(); context != null; context = context.parent) {
       if (context instanceof TomlParser.ArrayContext || context instanceof TomlParser.InlineTableContext) {
-        inValue = true;
+        value = context;
         break;
       }
     }
+    if (value == null) {
+      return false;
+    }
+    if (beforeNewLine) {
+      // An inline table holds key/value pairs of its own, so only a table header ends one; the lexer leaves it for
+      // nothing else.
+      return input.LA(2) != TomlParser.UnquotedKey || value instanceof TomlParser.ArrayContext;
+    }
     // Computing what the parser expects walks the rule invocation stack, so it is left until last.
-    return inValue && !recognizer.getExpectedTokens().contains(recognizer.getInputStream().LA(1));
+    return !recognizer.getExpectedTokens().contains(input.LA(1));
+  }
+
+  /**
+   * Check whether a token type can only start a line of the document. Inside a value the lexer produces one only where
+   * it has left a value the document never closed, having read the line that follows as the document's own.
+   */
+  private static boolean startsDocumentLine(int type) {
+    return type == TomlParser.TableKeyStart || type == TomlParser.ArrayTableKeyStart || type == TomlParser.UnquotedKey;
   }
 
   @Override

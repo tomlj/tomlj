@@ -25,7 +25,7 @@ fragment UNQUOTED_KEY : KeyChar+;
 fragment LENIENT_UNQUOTED_KEY : KeyChar | KeyChar (KeyChar | WSChar)* KeyChar;
 
 Dot : '.';
-Equals : '=' { resetArrayDepth(); } -> pushMode(ValueMode);
+Equals : '=' { resetValueState(); } -> pushMode(ValueMode);
 QuotationMark : '"' -> pushMode(BasicStringMode);
 Apostrophe : '\'' -> pushMode(LiteralStringMode);
 TableKeyStart : '[';
@@ -87,12 +87,11 @@ ArrayEnd : ']' { if (inArray()) { arrayDepth--; pushValueModeIfInArray(); } } ->
 InlineTableStart : '{' { pushValueModeIfInArray(); pushArrayDepth(); } -> mode(InlineTableMode);
 
 ValueComma : ',' -> type(Comma);
-// A newline outside an array ends the key/value pair, so the value is missing and the mode must be left.
-ValueNewLine: NL { if (!inArray()) { popMode(); } } -> type(NewLine);
+ValueNewLine: NL { valueNewLine(); } -> type(NewLine);
 ValueWS : WSChar+ -> type(WS), channel(WHITESPACE);
 ValueComment : COMMENT -> type(Comment), channel(COMMENTS);
 
-ValueError : . -> type(Error), popMode;
+ValueError : . { valueError(); } -> type(Error);
 
 
 mode BasicStringMode;
@@ -186,5 +185,5 @@ InlineTableUnquotedKey : UNQUOTED_KEY -> type(UnquotedKey);
 
 InlineTableWS : WSChar+ -> type(WS), channel(WHITESPACE);
 InlineTableComment : COMMENT -> type(Comment), channel(COMMENTS);
-InlineTableNewLine : NL -> type(NewLine);
-InlineTableError : . -> type(Error), popMode;
+InlineTableNewLine : NL { inlineTableNewLine(); } -> type(NewLine);
+InlineTableError : . { inlineTableError(); } -> type(Error);

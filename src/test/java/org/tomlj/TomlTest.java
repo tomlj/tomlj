@@ -478,7 +478,12 @@ class TomlTest {
                 new Object[] {LocalDate.of(1993, 8, 4), LocalDate.of(1993, 8, 4)}),
         Arguments.of("foo = [\n'''bar\nbaz''',\n'baz'\n]", new Object[] {"bar\nbaz", "baz"}),
         Arguments.of("foo = [['bar']]", new Object[] {new Object[] {"bar"}}),
-        Arguments.of("foo = [ 1,\n2\n,3,4]", new Object[] {1L, 2L, 3L, 4L})
+        Arguments.of("foo = [ 1,\n2\n,3,4]", new Object[] {1L, 2L, 3L, 4L}),
+        // A line of an array that reads like a table header is an element: only a key no value could be leaves the
+        // array, so that an unclosed one does not swallow the rest of the document.
+        Arguments.of("foo = [\n  [2],\n]\n", new Object[] {new Object[] {2L}}),
+        Arguments.of("foo = [\n  [1, 2],\n  [3],\n]\n", new Object[] {new Object[] {1L, 2L}, new Object[] {3L}}),
+        Arguments.of("foo = [\n  [1.5],\n  ['bar'],\n]\n", new Object[] {new Object[] {1.5d}, new Object[] {"bar"}})
     );
     // @formatter:on
   }
@@ -752,19 +757,27 @@ class TomlTest {
         Arguments.of("[#]\na = 1\n", Set.of("a")),
         Arguments.of("[\na = 1\n", Set.of("a")),
         Arguments.of("[\n\"b\" = 1\n", Set.of("b")),
-        Arguments.of("a = [1,\n  2\nb = 3\n", Set.of()),
-        // Here and in the inline table case below, the unterminated value takes the table header, so the key/value pair
-        // after it is parsed into the root table.
-        Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", Set.of("b")),
+        // A value the document never closes is left where the line that follows can only be the document's, so a table
+        // header after one opens its table, and a key/value pair after an array is parsed rather than read as an
+        // element. An inline table holds key/value pairs of its own, so only a header ends one.
+        Arguments.of("a = [1,\n  2\nb = 3\n", Set.of("b")),
+        Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", Set.of("tbl.b")),
         Arguments.of("a = { x = 1, y = 2\nb = 3\n", Set.of()),
         Arguments.of("a = { x = 1,\n  y = 2\nb = 3\n", Set.of()),
-        Arguments.of("a = { x = 1,\n  y = 2\n[tbl]\nb = 3\n", Set.of("b")),
+        Arguments.of("a = { x = 1,\n  y = 2\n[tbl]\nb = 3\n", Set.of("tbl.b")),
         // A line that cannot continue an array or inline table ends it, so the lines after it are parsed as usual
         // rather than swallowed by the value.
         Arguments.of("a = [\n  1,\n  @,\n]\nb = 1\n", Set.of("b")),
         Arguments.of("a = {\n  x = 1,\n  @,\n}\nb = 2\n", Set.of("b")),
-        Arguments.of("a = [\n  1,\nb = 3\nc = 4\n", Set.of("c")),
+        Arguments.of("a = [\n  1,\nb = 3\nc = 4\n", Set.of("b", "c")),
         Arguments.of("a = [\n  [\n    1,\n    @,\n  ],\n]\nb = 1\n", Set.of("b")),
+        // A stray character does not leave the array or inline table it is in, so the lines after it are read as its
+        // content: a line like `[2],` stays an element rather than opening a table that takes the pairs below it.
+        Arguments.of("a = [\n  1,\n  @,\n  [2],\n]\nb = 1\n", Set.of("b")),
+        Arguments.of("a = [\n  1,\n  @,\n  [tbl],\n]\nb = 1\n", Set.of("b")),
+        Arguments.of("a = [\n  1,\n  @,\n  [[2]],\n]\nb = 1\n", Set.of("b")),
+        Arguments.of("a = [\n  1,\n  @,\n  [x.y],\n]\nb = 1\n", Set.of("b")),
+        Arguments.of("a = {\n  b = 1,\n  @,\n  [2],\n}\nc = 1\n", Set.of("c")),
         Arguments.of("a =\n", Set.of()),
         Arguments.of("a = \nb = 2\nc = 3\n", Set.of("b", "c")),
         Arguments.of("a = 1\nb =\n\nc = 3\n", Set.of("a", "c")),
@@ -812,8 +825,12 @@ class TomlTest {
   static Stream<Arguments> syntaxErrorReportSupplier() {
     // @formatter:off
     return Stream.of(
-        Arguments.of("a = [1,\n  2\nb = 3\n", List.of("Unexpected 'b', expected ], a comma, or a newline (line 3, column 1)")),
-        Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", List.of("Unexpected '[', expected ], a comma, or a newline (line 3, column 1)")),
+        // An unterminated value ends at the end of the line before the one the lexer left it for, so it is reported
+        // against the line it was left unclosed on rather than against the first line that belongs to the document.
+        Arguments.of("a = [1,\n  2\nb = 3\n", List.of(
+            "Unexpected end of line, expected ], a comma, or a newline (line 2, column 4)")),
+        Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", List.of(
+            "Unexpected end of line, expected ], a comma, or a newline (line 2, column 4)")),
         Arguments.of("@@ x\na = 1\n$$ y\nb = 2\n", List.of(
             "Unexpected '@', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 1, column 1)",
             "Unexpected '$', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 3, column 1)")),
