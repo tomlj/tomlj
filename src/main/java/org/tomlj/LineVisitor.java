@@ -82,6 +82,9 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   @Override
   public MutableTomlTable visitStandardTable(TomlParser.StandardTableContext ctx) {
     defineOpenTables();
+    if (hasRecoveredKey(ctx, TomlParser.TableKeyEnd)) {
+      return rootTable;
+    }
     TomlParser.KeyContext keyContext = ctx.key();
     if (keyContext == null) {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
@@ -108,6 +111,9 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   @Override
   public MutableTomlTable visitArrayTable(TomlParser.ArrayTableContext ctx) {
     defineOpenTables();
+    if (hasRecoveredKey(ctx, TomlParser.ArrayTableKeyEnd)) {
+      return rootTable;
+    }
     TomlParser.KeyContext keyContext = ctx.key();
     if (keyContext == null) {
       errorReporter.reportError(new TomlParseError("Empty table key", new TomlPosition(ctx)));
@@ -198,6 +204,39 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       return true;
     }
     return errorReporter.hasSyntaxErrorBetween(start.getLine(), stop.getLine()) || hasRecognitionError(ctx);
+  }
+
+  /**
+   * Check whether a table header's key was changed by error recovery.
+   *
+   * <p>
+   * The parser recovers from syntax errors and still produces a header, e.g. {@code [a b]} yields the header of table
+   * {@code a} by discarding {@code b}, and {@code [']} yields the header of a table named {@code ]} by completing the
+   * unterminated string. Such a header does not name the table the document meant, so it is discarded rather than
+   * opened, leaving the key/value pairs that follow it in the table the document was already in.
+   *
+   * <p>
+   * A header the parser completed by conjuring its closing bracket is the exception: nothing was discarded, and the key
+   * read is the one written, so {@code [a} opens table {@code a} with only the missing bracket reported.
+   */
+  private static boolean hasRecoveredKey(ParserRuleContext ctx, int endTokenType) {
+    if (ctx.exception != null) {
+      return true;
+    }
+    for (int i = 0; i < ctx.getChildCount(); i++) {
+      ParseTree child = ctx.getChild(i);
+      if (child instanceof ErrorNode) {
+        // A token the parser conjured is not in the input, so it has no index; any other error node is input that the
+        // parser discarded to make the header match.
+        Token symbol = ((ErrorNode) child).getSymbol();
+        if (symbol.getTokenIndex() >= 0 || symbol.getType() != endTokenType) {
+          return true;
+        }
+      } else if (hasRecognitionError(child)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static boolean hasRecognitionError(ParseTree tree) {
