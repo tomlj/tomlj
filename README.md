@@ -94,13 +94,13 @@ To include using Maven:
 <dependency>
   <groupId>org.tomlj</groupId>
   <artifactId>tomlj</artifactId>
-  <version>1.2.0</version>
+  <version>1.3.0</version>
 </dependency>
 ```
 
-To include using Gradle: `implementation 'org.tomlj:tomlj:1.2.0'`
+To include using Gradle: `implementation 'org.tomlj:tomlj:1.3.0'`
 
-For a single jar with ANTLR included, use the `all` classifier: `org.tomlj:tomlj:1.2.0:all`
+For a single jar with ANTLR included, use the `all` classifier: `org.tomlj:tomlj:1.3.0:all`
 
 ## Links
 
