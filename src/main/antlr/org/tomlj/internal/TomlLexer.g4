@@ -1,71 +1,13 @@
 lexer grammar TomlLexer;
 
+options { superClass=AbstractTomlLexer; }
+
 channels { COMMENTS, WHITESPACE }
 
 tokens { TripleQuotationMark, TripleApostrophe, StringChars, Comma }
 
 @header {
 package org.tomlj.internal;
-}
-
-@members {
-  // State is made public to allow incremental lexers to save and restore it (e.g. NetBeans)
-  public final IntegerStack arrayDepthStack = new IntegerStack();
-  public int arrayDepth = 0;
-
-  private boolean inArray() {
-    return arrayDepth > 0;
-  }
-
-  private void pushValueModeIfInArray() {
-    if (inArray()) {
-        pushMode(ValueMode);
-    }
-  }
-
-  private void resetArrayDepth() {
-    arrayDepthStack.clear();
-    arrayDepth = 0;
-  }
-
-  private void pushArrayDepth() {
-    arrayDepthStack.push(arrayDepth);
-    arrayDepth = 0;
-  }
-
-  private void popArrayDepth() {
-    arrayDepth = arrayDepthStack.pop();
-  }
-
-  // A run of digits starts a date or a time when a dash or a colon follows it, and is a decimal integer otherwise.
-  // An action reads that following character. A semantic predicate can read it too, but ANTLR then caches no DFA edge
-  // for input that reaches the predicate, leaving every digit of every number to ATN simulation: with one here, an
-  // array of 500,000 integers lexed about 60 times slower.
-  private void decimalIntegerOrDateStart() {
-    if ("-:".indexOf(_input.LA(1)) < 0) {
-      pushValueModeIfInArray();
-      popMode();
-    } else if (isDigits(getText())) {
-      pushValueModeIfInArray();
-      setType(DateDigits);
-      mode(DateMode);
-    } else {
-      // A dash or a colon follows, but a run holding a sign or an underscore starts no date or time, and a dash or a
-      // colon ends no integer.
-      setType(Error);
-      popMode();
-    }
-  }
-
-  private static boolean isDigits(String text) {
-    for (int i = 0; i < text.length(); i++) {
-      char c = text.charAt(i);
-      if (c < '0' || c > '9') {
-        return false;
-      }
-    }
-    return true;
-  }
 }
 
 fragment WSChar : [ \t];
@@ -118,7 +60,8 @@ ValueTripleApostrophe : '\'\'\'' NL? { pushValueModeIfInArray(); } -> type(Tripl
 // Integers, dates and times
 // One rule matches the digits that start any of them, as they are told apart only by what follows. Digit+ also matches
 // a run with a leading zero, which is no integer but may be a year or an hour; ValueVisitor rejects the ones that are
-// left as integers.
+// left as integers. AbstractTomlLexer.decimalIntegerOrDateStart types the token from the character that follows, and
+// says why it reads that character in an action rather than a semantic predicate.
 fragment DecInt : [-+]? (Digit | Digit1_9 ('_'? Digit)+);
 DecimalInteger : (DecInt | Digit+) { decimalIntegerOrDateStart(); };
 HexInteger : '0x' HexDig ('_'? HexDig)* { pushValueModeIfInArray(); } -> popMode;
