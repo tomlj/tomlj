@@ -87,7 +87,7 @@ public abstract class AbstractTomlParser extends Parser {
         outermost = (TomlParser.KeyvalContext) ctx;
         TomlParser.KeyContext key = outermost.key();
         if (key != null) {
-          depth += key.simpleKey().size();
+          depth += simpleKeyCount(key);
         }
       }
     }
@@ -99,6 +99,19 @@ public abstract class AbstractTomlParser extends Parser {
       skipValue();
       throw e;
     }
+  }
+
+  // The number of keys in a dotted key. Counted over the children rather than read from key.simpleKey().size(), as the
+  // generated accessor copies every matching child into a new list, and only its size is wanted here. checkNestingDepth
+  // runs once per value, so that list would otherwise be built once per value in the document.
+  private static int simpleKeyCount(TomlParser.KeyContext key) {
+    int count = 0;
+    for (int i = 0; i < key.getChildCount(); i++) {
+      if (key.getChild(i) instanceof TomlParser.SimpleKeyContext) {
+        count++;
+      }
+    }
+    return count;
   }
 
   // Consumes the tokens of the value about to be parsed: a single token, or an array or inline table together with
