@@ -1,18 +1,60 @@
 # TomlJ: A Java parser for Tom's Obvious, Minimal Language (TOML)
 
-TomlJ is a complete [TOML](https://github.com/toml-lang/toml) parser with the
-following attributes:
+TomlJ is a complete [TOML](https://toml.io/) parser for Java, built on the
+[ANTLR](https://github.com/antlr/antlr4/) parser-generator and runtime library.
 
-* Supports the latest TOML specification version (1.1.0).
-* Provides detailed error reporting, including error position.
-* Performs error recovery, allowing parsing to continue after an error.
+```java
+TomlParseResult result = Toml.parse(Paths.get("config.toml"));
+result.errors().forEach(error -> System.err.println(error.toString()));
 
-It uses the [ANTLR](https://github.com/antlr/antlr4/) parser-generator and
-runtime library.
+String host = result.getString("server.host");
+long port = result.getLong("server.port", () -> 8080);
+```
+
+## Error reporting and recovery
+
+*TomlJ never throws on invalid input.* Every error is recorded with its position, and parsing
+continues at the next expression, so one run finds every problem in a file instead of stopping at
+the first. Editors, IDEs and linters need this, and so does any tool that wants to show a user the
+whole list of things to fix rather than one mistake per run.
+
+Every error says what was expected and where. If something was left unclosed, it also points back at
+where that was opened:
+
+```java
+Toml.parse("deps = [\n  \"a\",\n  \"b\"\n").errors();
+// Unexpected end of input, expected ], a comma, or a newline;
+//   the array opened at line 1, column 8 is unclosed (line 4, column 1)
+```
+
+Values know where they came from as well, so your own checks can point at the file the same way:
+
+```java
+long port = result.getLong("server.port");
+if (port > 65535) {
+  System.err.println("config.toml:" + result.inputPositionOf("server.port").line() + ": port out of range");
+}
+```
+
+## Also worth knowing
+
+* **Complete, and tested against the spec.** TomlJ supports TOML 1.1.0. Every build runs the
+  official [toml-test](https://github.com/toml-lang/toml-test) suite for 1.0.0 and 1.1.0: valid
+  files must give exactly the expected values, and invalid files must be rejected.
+* **Reads older versions too.** `TomlVersion` picks any version from `V0_4_0` to `V1_1_0`. Newer
+  syntax is then reported as an error instead of being accepted.
+* **A typed getter for every TOML type**, returning `String`, `Long`, `Double`, `Boolean`,
+  `TomlArray` or `TomlTable`, and the four date and time types as `java.time`'s `OffsetDateTime`,
+  `LocalDateTime`, `LocalDate` and `LocalTime`. Each getter returns `null` if the key is missing,
+  throws `TomlInvalidTypeException` if the value is a different type, and has an overload that takes
+  a default.
+* **Few dependencies.** The ANTLR runtime is the only library needed to run it, and the `all`
+  artifact bundles that in, so there is nothing else to add. Works on Java 9 and later.
 
 ## Usage
 
-Parsing is straightforward:
+You can parse a `String`, `Path`, `InputStream`, `Reader` or `ReadableByteChannel`. Check
+`hasErrors()` before using the result:
 
 ```java
 Path source = Paths.get("/path/to/file.toml");
@@ -22,24 +64,30 @@ result.errors().forEach(error -> System.err.println(error.toString()));
 String value = result.getString("a. dotted . key");
 ```
 
-Parsing never throws for invalid input. Every error is recorded in `result.errors()`, with its line and column,
-and parsing continues with the next expression so that the rest of the document is still available. Check
-`result.hasErrors()` before relying on the result. A key/value pair that contains a syntax error, such as
-`key = 4uoxyz`, is reported as an error and omitted from the result.
+### Keys
 
-Methods that take a `String` key parse it as a dotted key using TOML syntax, so keys containing characters
-outside `A-Z`, `a-z`, `0-9`, `_` and `-` must be quoted, exactly as in a TOML document. Methods that take a
-`List<String>` treat each element as a literal key with no quoting needed, which makes them the right choice
-when iterating over `keySet()` or `entrySet()`:
+Methods that take a `String` key read it as a dotted key, using TOML syntax. Keys with characters
+outside `A-Z`, `a-z`, `0-9`, `_` and `-` must be quoted, just as they would be in a TOML file.
+Methods that take a `List<String>` use each element as a key exactly as given, with no quoting. Use
+those when working with keys from `keySet()` or `entrySet()`:
 
 ```java
 String quoted = result.getString("\"@key#with$special%characters\"");
 String literal = result.getString(Collections.singletonList("@key#with$special%characters"));
 ```
 
+### Specification version
+
+Parsing uses the newest supported version of TOML unless you ask for an older one. To check a file
+against an earlier version, pass a `TomlVersion`:
+
+```java
+TomlParseResult result = Toml.parse(source, TomlVersion.V1_0_0);
+```
+
 ## Getting TomlJ
 
-TomlJ is published to a Maven Central.
+TomlJ is published to Maven Central.
 
 To include using Maven:
 ```xml
@@ -52,9 +100,10 @@ To include using Maven:
 
 To include using Gradle: `implementation 'org.tomlj:tomlj:1.2.0'`
 
+For a single jar with ANTLR included, use the `all` classifier: `org.tomlj:tomlj:1.2.0:all`
+
 ## Links
 
 - [GitHub project](https://github.com/tomlj/tomlj)
 - [Online Java documentation](https://tomlj.org/docs/java/latest/org/tomlj/package-summary.html)
 - [Issue tracker: Report a defect or feature request](https://github.com/tomlj/tomlj/issues/new)
-- [StackOverflow: Ask "how-to" and "why-didn't-it-work" questions](https://stackoverflow.com/questions/ask?tags=tomlj)
