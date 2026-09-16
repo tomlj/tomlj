@@ -59,6 +59,52 @@ class TomlLexerTest {
     assertEquals("Error '1_979'", firstValueToken("a = 1_979-05-27"));
   }
 
+  @Test
+  void anUnclosedValueIsLeftWhereTheNextLineCanOnlyBeTheDocument() {
+    // Nothing closes the array, so without leaving it the lexer would read `[tbl]` as an array nested inside it, and
+    // the pair below as its content.
+    assertEquals(
+        List
+            .of(
+                "UnquotedKey",
+                "Equals",
+                "ArrayStart",
+                "DecimalInteger",
+                "Comma",
+                "NewLine",
+                "TableKeyStart",
+                "UnquotedKey",
+                "TableKeyEnd",
+                "NewLine",
+                "UnquotedKey",
+                "Equals",
+                "DecimalInteger",
+                "NewLine"),
+        tokenNames("a = [1,\n[tbl]\nb = 2\n"));
+  }
+
+  @Test
+  void aStrayCharacterDoesNotLeaveTheArray() {
+    // `[2]` is an element of the array the document does close, not the header of a table named 2.
+    assertEquals(
+        List
+            .of(
+                "UnquotedKey",
+                "Equals",
+                "ArrayStart",
+                "Error",
+                "Comma",
+                "NewLine",
+                "ArrayStart",
+                "DecimalInteger",
+                "ArrayEnd",
+                "Comma",
+                "NewLine",
+                "ArrayEnd",
+                "NewLine"),
+        tokenNames("a = [@,\n[2],\n]\n"));
+  }
+
   private static String firstValueToken(String input) {
     TomlLexer lexer = new TomlLexer(CharStreams.fromString(input));
     boolean afterEquals = false;
@@ -77,6 +123,16 @@ class TomlLexerTest {
         .stream()
         .filter(token -> token.getType() == TomlLexer.StringChars || token.getType() == TomlLexer.EscapeSequence)
         .map(Token::getText)
+        .collect(Collectors.toList());
+  }
+
+  private static List<String> tokenNames(String input) {
+    TomlLexer lexer = new TomlLexer(CharStreams.fromString(input));
+    return lexer
+        .getAllTokens()
+        .stream()
+        .filter(token -> token.getChannel() == Token.DEFAULT_CHANNEL)
+        .map(token -> lexer.getVocabulary().getSymbolicName(token.getType()))
         .collect(Collectors.toList());
   }
 }

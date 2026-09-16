@@ -19,7 +19,9 @@ import java.util.BitSet;
 import java.util.stream.Stream;
 
 enum TokenName {
-  // Ordered by display preference
+  // Ordered by display preference. KEY and VALUE name no token type of their own: they stand for every token that
+  // could start a key or a value, which AccumulatingErrorListener puts in place of the list of them.
+  KEY("a key"),
   LOWER_ALPHA("a-z", TomlLexer.UnquotedKey),
   UPPER_ALPHA("A-Z", TomlLexer.UnquotedKey),
   DIGITS("0-9", TomlLexer.UnquotedKey),
@@ -33,6 +35,7 @@ enum TokenName {
   EQUALS("=", TomlLexer.Equals),
   COMMA("a comma", TomlLexer.Comma),
   Z("Z", TomlLexer.Z),
+  VALUE("a value"),
   APOSTROPHE("'", TomlLexer.Apostrophe),
   QUOTATION_MARK("\"", TomlLexer.QuotationMark),
   TRIPLE_APOSTROPHE("'''", TomlLexer.TripleApostrophe),

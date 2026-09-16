@@ -14,6 +14,7 @@ package org.tomlj;
 
 import org.tomlj.internal.AbstractTomlParser;
 import org.tomlj.internal.TomlLexer;
+import org.tomlj.internal.TomlParser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,12 +25,37 @@ import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.InputMismatchException;
 import org.antlr.v4.runtime.NoViableAltException;
 import org.antlr.v4.runtime.Parser;
+import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
+import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.IntervalSet;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 final class AccumulatingErrorListener extends BaseErrorListener implements ErrorReporter {
+
+  // The tokens a key and a value can start with, which are named as "a key" and "a value" where all of them are
+  // expected. Anywhere else the tokens that are expected are named one by one, as they are the whole of what fits.
+  private static final IntervalSet KEY_START =
+      new IntervalSet(TomlLexer.UnquotedKey, TomlLexer.Apostrophe, TomlLexer.QuotationMark);
+  private static final IntervalSet VALUE_START = new IntervalSet(
+      TomlLexer.Apostrophe,
+      TomlLexer.QuotationMark,
+      TomlLexer.TripleApostrophe,
+      TomlLexer.TripleQuotationMark,
+      TomlLexer.DecimalInteger,
+      TomlLexer.BinaryInteger,
+      TomlLexer.OctalInteger,
+      TomlLexer.HexInteger,
+      TomlLexer.FloatingPoint,
+      TomlLexer.FloatingPointInf,
+      TomlLexer.FloatingPointNaN,
+      TomlLexer.TrueBoolean,
+      TomlLexer.FalseBoolean,
+      TomlLexer.DateDigits,
+      TomlLexer.ArrayStart,
+      TomlLexer.InlineTableStart);
 
   private final List<TomlParseError> errors = new ArrayList<>();
   private final List<Integer> syntaxErrorLines = new ArrayList<>();
@@ -62,14 +88,17 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
       return;
     }
 
+    Token opened = openingOfUnclosedValue(e, offendingSymbol, recognizer);
+
     if (e instanceof InputMismatchException || e instanceof NoViableAltException) {
-      String message = getMessage(e.getOffendingToken(), getExpected(e));
+      String message = getMessage(e.getOffendingToken(), getExpected(e), opened);
       reportError(message, position);
       return;
     }
 
     if (offendingSymbol instanceof Token && recognizer instanceof Parser) {
-      String message = getMessage((Token) offendingSymbol, getExpected(((Parser) recognizer).getExpectedTokens()));
+      String message =
+          getMessage((Token) offendingSymbol, getExpected(((Parser) recognizer).getExpectedTokens()), opened);
       reportError(message, position);
       return;
     }
@@ -100,8 +129,42 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     return errors;
   }
 
-  private String getMessage(Token token, String expected) {
-    return "Unexpected " + getTokenName(token) + ", expected " + expected;
+  private String getMessage(Token token, String expected, @Nullable Token opened) {
+    String message = "Unexpected " + getTokenName(token) + ", expected " + expected;
+    if (opened == null || opened.getLine() >= token.getLine()) {
+      // A value opened on the line being reported on is already in front of the reader.
+      return message;
+    }
+    String kind = opened.getType() == TomlLexer.InlineTableStart ? "inline table" : "array";
+    TomlPosition position = TomlPosition.positionAt(opened.getLine(), opened.getCharPositionInLine() + 1);
+    return message + "; the " + kind + " opened at " + position + " is unclosed";
+  }
+
+  /**
+   * The bracket or brace that opened an array or inline table that nothing closes, where this error is the end of that
+   * value, and null everywhere else. What such a document is missing is the closing delimiter, and the line it is
+   * missing from is rarely the line the error is reported on.
+   */
+  @Nullable
+  private static Token openingOfUnclosedValue(
+      @Nullable RecognitionException e,
+      @Nullable Object offendingSymbol,
+      Recognizer<?, ?> recognizer) {
+    if (e instanceof LineRecoveryStrategy.UnterminatedValueException) {
+      return ((LineRecoveryStrategy.UnterminatedValueException) e).opened();
+    }
+    // At the end of the input, a value the parser is still inside can never be closed.
+    if (!(offendingSymbol instanceof Token)
+        || ((Token) offendingSymbol).getType() != TomlLexer.EOF
+        || !(recognizer instanceof Parser)) {
+      return null;
+    }
+    for (RuleContext context = ((Parser) recognizer).getContext(); context != null; context = context.parent) {
+      if (context instanceof TomlParser.ArrayContext || context instanceof TomlParser.InlineTableContext) {
+        return ((ParserRuleContext) context).getStart();
+      }
+    }
+    return null;
   }
 
   private static String getTokenName(Token token) {
@@ -130,16 +193,35 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     return getExpected(expectedTokens);
   }
 
+  /**
+   * Check whether every token of {@code subset} is in {@code set}.
+   */
+  private static boolean contains(IntervalSet set, IntervalSet subset) {
+    return subset.subtract(set).isNil();
+  }
+
   private static String getExpected(IntervalSet expectedTokens) {
-    List<String> sortedNames = expectedTokens
+    // Where every token that could start a key or a value is expected, the word says what the list of them says, and
+    // the reader has one thing to look for rather than nine. A value is checked first, as a string starts either.
+    IntervalSet remaining = expectedTokens;
+    List<TokenName> names = new ArrayList<>();
+    if (contains(remaining, VALUE_START)) {
+      names.add(TokenName.VALUE);
+      remaining = remaining.subtract(VALUE_START);
+    }
+    if (contains(remaining, KEY_START)) {
+      names.add(TokenName.KEY);
+      remaining = remaining.subtract(KEY_START);
+    }
+    remaining
         .getIntervals()
         .stream()
         .flatMap(i -> IntStream.rangeClosed(i.a, i.b).boxed())
         .flatMap(TokenName::namesForToken)
-        .sorted()
-        .distinct()
-        .map(TokenName::displayName)
-        .collect(Collectors.toList());
+        .forEach(names::add);
+
+    List<String> sortedNames =
+        names.stream().sorted().distinct().map(TokenName::displayName).collect(Collectors.toList());
 
     StringBuilder builder = new StringBuilder();
     int count = sortedNames.size();
