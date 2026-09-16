@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static org.tomlj.ParseTrees.singleTokenText;
+
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
@@ -29,7 +31,7 @@ final class KeyVisitor extends TomlParserBaseVisitor<List<String>> {
 
   @Override
   public List<String> visitUnquotedKey(TomlParser.UnquotedKeyContext ctx) {
-    keys.add(ctx.getText());
+    keys.add(singleTokenText(ctx));
     return keys;
   }
 

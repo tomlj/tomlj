@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static org.tomlj.ParseTrees.singleTokenText;
+
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
@@ -53,7 +55,7 @@ final class ZoneOffsetVisitor extends TomlParserBaseVisitor<ZoneOffset> {
 
   @Override
   public ZoneOffset visitMinuteOffset(TomlParser.MinuteOffsetContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     if (text.length() != 2) {
       throw new TomlParseError("Invalid zone offset minutes (valid range 0..59)", new TomlPosition(ctx));
     }

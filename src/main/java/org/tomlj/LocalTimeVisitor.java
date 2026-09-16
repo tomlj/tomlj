@@ -12,6 +12,7 @@
  */
 package org.tomlj;
 
+import static org.tomlj.ParseTrees.singleTokenText;
 import static org.tomlj.TomlVersion.V1_0_0;
 
 import org.tomlj.internal.TomlParser;
@@ -44,7 +45,7 @@ final class LocalTimeVisitor extends TomlParserBaseVisitor<LocalTime> {
 
   @Override
   public LocalTime visitHour(TomlParser.HourContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     if (text.length() != 2) {
       throw new TomlParseError("Invalid hour (valid range 00..23)", new TomlPosition(ctx));
     }
@@ -63,7 +64,7 @@ final class LocalTimeVisitor extends TomlParserBaseVisitor<LocalTime> {
 
   @Override
   public LocalTime visitMinute(TomlParser.MinuteContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     if (text.length() != 2) {
       throw new TomlParseError("Invalid minutes (valid range 00..59)", new TomlPosition(ctx));
     }
@@ -82,7 +83,7 @@ final class LocalTimeVisitor extends TomlParserBaseVisitor<LocalTime> {
 
   @Override
   public LocalTime visitSecond(TomlParser.SecondContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     if (text.length() != 2) {
       throw new TomlParseError("Invalid seconds (valid range 00..59)", new TomlPosition(ctx));
     }
@@ -101,7 +102,7 @@ final class LocalTimeVisitor extends TomlParserBaseVisitor<LocalTime> {
 
   @Override
   public LocalTime visitSecondFraction(TomlParser.SecondFractionContext ctx) {
-    String text = ctx.getText();
+    String text = singleTokenText(ctx);
     if (text.isEmpty() || text.length() > 9) {
       throw new TomlParseError("Invalid nanoseconds (valid range 0..999999999)", new TomlPosition(ctx));
     }
