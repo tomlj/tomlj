@@ -29,16 +29,8 @@ final class Parser {
   private Parser() {}
 
   static TomlParseResult parse(CharStream stream, TomlParseOptions options) {
-    TomlLexer lexer = new TomlLexer(stream);
-    TomlParser parser = new TomlParser(new CommonTokenStream(lexer));
-    parser.setErrorHandler(new LineRecoveryStrategy());
-    parser.removeErrorListeners();
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
-    parser.addErrorListener(errorListener);
-    parser.setMaxNestingDepth(options.maxNestingDepth());
-    ParseTree tree = parser.toml();
-    TomlTable table =
-        tree.accept(new LineVisitor(options.version().canonical, errorListener, options.maxNestingDepth()));
+    MutableTomlTable table = parseTable(stream, options, errorListener);
 
     return new TomlParseResult() {
       @Override
@@ -84,6 +76,16 @@ final class Parser {
       }
 
       @Override
+      public List<TomlComment> comments(List<String> path) {
+        return table.comments(path);
+      }
+
+      @Override
+      public List<TomlComment> comments() {
+        return table.comments();
+      }
+
+      @Override
       public Map<String, Object> toMap() {
         return table.toMap();
       }
@@ -95,9 +97,38 @@ final class Parser {
     };
   }
 
+  /**
+   * Parse a document into the table it describes.
+   *
+   * <p>
+   * This is the whole of parsing; {@link #parse(CharStream, TomlParseOptions)} only pairs the table with the errors
+   * reported while reading it. Tests use it to reach what the table holds but {@link TomlParseResult} does not expose.
+   *
+   * @param stream The document.
+   * @param options The parse options.
+   * @param errorListener Where syntax errors and parse errors are reported.
+   * @return The table the document describes, which is incomplete if any error was reported.
+   */
+  static MutableTomlTable parseTable(
+      CharStream stream,
+      TomlParseOptions options,
+      AccumulatingErrorListener errorListener) {
+    TomlLexer lexer = new TomlLexer(stream);
+    CommonTokenStream tokens = new CommonTokenStream(lexer);
+    TomlParser parser = new TomlParser(tokens);
+    parser.setErrorHandler(new LineRecoveryStrategy());
+    parser.removeErrorListeners();
+    parser.addErrorListener(errorListener);
+    parser.setMaxNestingDepth(options.maxNestingDepth());
+    ParseTree tree = parser.toml();
+    LineVisitor visitor = new LineVisitor(options.version().canonical, errorListener, options.maxNestingDepth());
+    return tree.accept(visitor);
+  }
+
   static List<String> parseDottedKey(String dottedKey) {
     TomlLexer lexer = new TomlLexer(CharStreams.fromString(dottedKey));
     lexer.mode(TomlLexer.TomlKeyMode);
+    lexer.setEndOfInputEndsLine(false);
     TomlParser parser = new TomlParser(new CommonTokenStream(lexer));
     parser.removeErrorListeners();
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();

@@ -15,6 +15,7 @@ package org.tomlj.internal;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.IntStream;
 import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.IntegerStack;
 
 /**
@@ -33,8 +34,53 @@ public abstract class AbstractTomlLexer extends Lexer {
   // Whether a stray character has been read in the value being lexed, which no line that follows can complete.
   private boolean strayInValue = false;
 
+  // Whether the end of the input ends a line, see nextToken().
+  private boolean endOfInputEndsLine = true;
+  // Whether anything has been read on the current line, other than whitespace.
+  private boolean lineOpen = false;
+
   AbstractTomlLexer(CharStream input) {
     super(input);
+  }
+
+  /**
+   * Read the end of the input as the end of a line, or not.
+   *
+   * <p>
+   * On, which is the default, a document whose last line has no newline is read as though it had one, so that the
+   * parser sees every line ended the same way and no rule needs to say that a line may end at the end of the input
+   * instead. Off for parsing a key on its own, which is no line.
+   *
+   * @param endsLine Whether the end of the input ends a line.
+   */
+  public void setEndOfInputEndsLine(boolean endsLine) {
+    this.endOfInputEndsLine = endsLine;
+  }
+
+  @Override
+  public Token nextToken() {
+    Token token = super.nextToken();
+    if (token.getType() == Token.EOF) {
+      if (!lineOpen || !endOfInputEndsLine) {
+        return token;
+      }
+      // A newline that is not in the input, given the position of the end of the input and no text.
+      lineOpen = false;
+      return _factory
+          .create(
+              _tokenFactorySourcePair,
+              TomlLexer.NewLine,
+              "",
+              Token.DEFAULT_CHANNEL,
+              token.getStartIndex(),
+              token.getStartIndex() - 1,
+              token.getLine(),
+              token.getCharPositionInLine());
+    }
+    if (token.getChannel() == Token.DEFAULT_CHANNEL) {
+      lineOpen = token.getType() != TomlLexer.NewLine;
+    }
+    return token;
   }
 
   boolean inArray() {

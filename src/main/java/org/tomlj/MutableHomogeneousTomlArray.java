@@ -13,6 +13,7 @@
 package org.tomlj;
 
 
+import java.util.List;
 import java.util.Optional;
 
 final class MutableHomogeneousTomlArray extends MutableTomlArray {
@@ -74,7 +75,7 @@ final class MutableHomogeneousTomlArray extends MutableTomlArray {
   }
 
   @Override
-  public MutableHomogeneousTomlArray append(Object value, TomlPosition position) {
+  public MutableHomogeneousTomlArray append(Object value, TomlPosition position, List<TomlComment> comments) {
     if (value instanceof Integer) {
       value = ((Integer) value).longValue();
     }
@@ -94,7 +95,7 @@ final class MutableHomogeneousTomlArray extends MutableTomlArray {
     }
 
     try {
-      super.append(value, position);
+      super.append(value, position, comments);
     } catch (Throwable e) {
       type = origType;
       throw e;

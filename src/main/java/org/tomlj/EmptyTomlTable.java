@@ -68,6 +68,16 @@ final class EmptyTomlTable implements TomlTable {
   }
 
   @Override
+  public List<TomlComment> comments(List<String> path) {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public List<TomlComment> comments() {
+    return Collections.emptyList();
+  }
+
+  @Override
   public Map<String, Object> toMap() {
     return Collections.emptyMap();
   }

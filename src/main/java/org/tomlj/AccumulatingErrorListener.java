@@ -37,6 +37,8 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
 
   // The tokens a key and a value can start with, which are named as "a key" and "a value" where all of them are
   // expected. Anywhere else the tokens that are expected are named one by one, as they are the whole of what fits.
+  private static final IntervalSet COMMENT = new IntervalSet(TomlLexer.Comment);
+  private static final IntervalSet END_OF_INPUT = new IntervalSet(TomlLexer.EOF);
   private static final IntervalSet KEY_START =
       new IntervalSet(TomlLexer.UnquotedKey, TomlLexer.Apostrophe, TomlLexer.QuotationMark);
   private static final IntervalSet VALUE_START = new IntervalSet(
@@ -91,14 +93,15 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     Token opened = openingOfUnclosedValue(e, offendingSymbol, recognizer);
 
     if (e instanceof InputMismatchException || e instanceof NoViableAltException) {
-      String message = getMessage(e.getOffendingToken(), getExpected(e), opened);
+      String message = getMessage(e.getOffendingToken(), getExpected(e.getExpectedTokens(), e.getCtx()), opened);
       reportError(message, position);
       return;
     }
 
     if (offendingSymbol instanceof Token && recognizer instanceof Parser) {
+      Parser parser = (Parser) recognizer;
       String message =
-          getMessage((Token) offendingSymbol, getExpected(((Parser) recognizer).getExpectedTokens()), opened);
+          getMessage((Token) offendingSymbol, getExpected(parser.getExpectedTokens(), parser.getContext()), opened);
       reportError(message, position);
       return;
     }
@@ -151,7 +154,10 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
       @Nullable Object offendingSymbol,
       Recognizer<?, ?> recognizer) {
     if (e instanceof LineRecoveryStrategy.UnterminatedValueException) {
-      return ((LineRecoveryStrategy.UnterminatedValueException) e).opened();
+      Token opened = ((LineRecoveryStrategy.UnterminatedValueException) e).opened();
+      if (opened != null) {
+        return opened;
+      }
     }
     // At the end of the input, a value the parser is still inside can never be closed.
     if (!(offendingSymbol instanceof Token)
@@ -171,7 +177,9 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     int tokenType = token.getType();
     switch (tokenType) {
       case TomlLexer.NewLine:
-        return "end of line";
+        // The lexer ends the last line of the input with a newline of its own, which has no text, where the document
+        // has none.
+        return token.getText().isEmpty() ? "end of input" : "end of line";
       case TomlLexer.EOF:
         return "end of input";
       default:
@@ -188,8 +196,12 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     }
   }
 
-  private static String getExpected(RecognitionException e) {
-    IntervalSet expectedTokens = e.getExpectedTokens();
+  private static String getExpected(IntervalSet expectedTokens, @Nullable RuleContext context) {
+    // The lexer ends the last line of the input with a newline where the document has none, so where a line of the
+    // document may end, the input may end as well, though the parser never sees it there.
+    if (expectedTokens.contains(TomlLexer.NewLine) && context instanceof TomlParser.TomlContext) {
+      return getExpected(expectedTokens.or(END_OF_INPUT));
+    }
     return getExpected(expectedTokens);
   }
 
@@ -203,7 +215,8 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
   private static String getExpected(IntervalSet expectedTokens) {
     // Where every token that could start a key or a value is expected, the word says what the list of them says, and
     // the reader has one thing to look for rather than nine. A value is checked first, as a string starts either.
-    IntervalSet remaining = expectedTokens;
+    // A comment may be written wherever a newline may, so naming it in every list would be noise rather than help.
+    IntervalSet remaining = expectedTokens.subtract(COMMENT);
     List<TokenName> names = new ArrayList<>();
     if (contains(remaining, VALUE_START)) {
       names.add(TokenName.VALUE);

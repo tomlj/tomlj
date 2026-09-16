@@ -35,7 +35,7 @@ ArrayTableKeyEnd : ']]';
 UnquotedKey : UNQUOTED_KEY;
 
 WS : WSChar+ -> channel(WHITESPACE);
-Comment : COMMENT -> channel(COMMENTS);
+Comment : COMMENT;
 NewLine : NL;
 Error : .;
 
@@ -89,7 +89,7 @@ InlineTableStart : '{' { pushValueModeIfInArray(); pushArrayDepth(); } -> mode(I
 ValueComma : ',' -> type(Comma);
 ValueNewLine: NL { valueNewLine(); } -> type(NewLine);
 ValueWS : WSChar+ -> type(WS), channel(WHITESPACE);
-ValueComment : COMMENT -> type(Comment), channel(COMMENTS);
+ValueComment : COMMENT -> type(Comment);
 
 ValueError : . { valueError(); } -> type(Error);
 
@@ -163,7 +163,7 @@ TimeDelimiter : [Tt] | (' ' { _input.LA(1) >= '0' && _input.LA(1) <= '9' }?);
 DateDigits : Digit+;
 
 DateWS : WSChar+ -> type(WS), channel(WHITESPACE), popMode;
-DateComment : COMMENT -> type(Comment), channel(COMMENTS), popMode;
+DateComment : COMMENT -> type(Comment), popMode;
 DateNewLine: NL -> type(NewLine), popMode;
 DateComma: ',' -> type(Comma), popMode;
 // DateStart pushed ValueMode inside an array, so leave it before closing the array as ArrayEnd does.
@@ -184,6 +184,6 @@ InlineTableApostrophe : '\'' -> type(Apostrophe), pushMode(LiteralStringMode);
 InlineTableUnquotedKey : UNQUOTED_KEY -> type(UnquotedKey);
 
 InlineTableWS : WSChar+ -> type(WS), channel(WHITESPACE);
-InlineTableComment : COMMENT -> type(Comment), channel(COMMENTS);
+InlineTableComment : COMMENT -> type(Comment);
 InlineTableNewLine : NL { inlineTableNewLine(); } -> type(NewLine);
 InlineTableError : . { inlineTableError(); } -> type(Error);

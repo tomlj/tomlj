@@ -15,10 +15,11 @@ package org.tomlj;
 import static org.tomlj.TomlVersion.V0_5_0;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-class MutableTomlArray implements TomlArray {
+class MutableTomlArray implements TomlArray, CommentContainer {
 
   static MutableTomlArray create(TomlVersion version) {
     return create(version, false);
@@ -31,14 +32,19 @@ class MutableTomlArray implements TomlArray {
   private static class Element {
     final Object value;
     final TomlPosition position;
+    // The comments documenting this element: the run above it, then the comment trailing it.
+    final List<TomlComment> comments;
 
-    private Element(Object value, TomlPosition position) {
+    private Element(Object value, TomlPosition position, List<TomlComment> comments) {
       this.value = value;
       this.position = position;
+      this.comments = comments;
     }
   }
 
   private final List<Element> elements = new ArrayList<>();
+  // The comments written in this array that document none of its elements, in document order.
+  private final List<TomlComment> comments = new ArrayList<>();
   private final boolean isTableArray;
 
   MutableTomlArray(boolean isTableArray) {
@@ -120,6 +126,10 @@ class MutableTomlArray implements TomlArray {
   }
 
   MutableTomlArray append(Object value, TomlPosition position) {
+    return append(value, position, Collections.emptyList());
+  }
+
+  MutableTomlArray append(Object value, TomlPosition position, List<TomlComment> comments) {
     if (value instanceof Integer) {
       value = ((Integer) value).longValue();
     }
@@ -128,8 +138,23 @@ class MutableTomlArray implements TomlArray {
       throw new IllegalArgumentException("Unsupported type " + value.getClass().getSimpleName());
     }
 
-    elements.add(new Element(value, position));
+    elements.add(new Element(value, position, comments));
     return this;
+  }
+
+  @Override
+  public void addComment(TomlComment comment) {
+    comments.add(comment);
+  }
+
+  @Override
+  public List<TomlComment> comments() {
+    return Collections.unmodifiableList(comments);
+  }
+
+  @Override
+  public List<TomlComment> comments(int index) {
+    return elements.get(index).comments;
   }
 
   @Override

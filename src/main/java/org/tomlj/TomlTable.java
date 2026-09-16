@@ -50,6 +50,10 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * {@code String} methods unless the key is a bare key. The keys returned by {@link #dottedKeySet()} and
  * {@link #dottedEntrySet()} are already quoted where necessary and can be passed to the {@code String} methods.
  * {@link Toml#joinKeyPath(List)} converts a key path into a dotted key.
+ *
+ * <p>
+ * The comments of a document are kept, and are read from the table or array they were written in; see
+ * {@link TomlComment}.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
@@ -271,6 +275,62 @@ public interface TomlTable {
    */
   @Nullable
   TomlPosition inputPositionOf(List<String> path);
+
+  /**
+   * Get the comments that document a key.
+   *
+   * <p>
+   * Returns the comments in document order: the run written directly above the key, if any, then the comment on its
+   * line, if any, so at most two, each stating its own {@link TomlComment#placement()}.
+   *
+   * <p>
+   * Returns an empty list if the key was not set in the document or has no comments; use {@link #contains(String)} to
+   * tell those apart.
+   *
+   * <p>
+   * The headers of an array of tables, {@code [[x]]}, are each documented on the element table they open, so
+   * {@code comments("x")} is empty and those comments are read with {@code getArray("x").comments(0)} and so on.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @return The comments documenting the key, in document order. Unmodifiable.
+   * @throws IllegalArgumentException If the key cannot be parsed.
+   */
+  default List<TomlComment> comments(String dottedKey) {
+    requireNonNull(dottedKey);
+    return comments(Parser.parseDottedKey(dottedKey));
+  }
+
+  /**
+   * Get the comments that document a key.
+   *
+   * <p>
+   * Returns the comments in document order: the run written directly above the key, if any, then the comment on its
+   * line, if any, so at most two, each stating its own {@link TomlComment#placement()}.
+   *
+   * <p>
+   * Returns an empty list if the key was not set in the document or has no comments; use {@link #contains(List)} to
+   * tell those apart.
+   *
+   * <p>
+   * The headers of an array of tables, {@code [[x]]}, are each documented on the element table they open, so
+   * {@code comments("x")} is empty and those comments are read with {@code getArray("x").comments(0)} and so on.
+   *
+   * @param path The key path.
+   * @return The comments documenting the key, in document order. Unmodifiable.
+   */
+  List<TomlComment> comments(List<String> path);
+
+  /**
+   * Get the comments written in this table that document none of its entries.
+   *
+   * <p>
+   * These are the unattached comments: a run separated by a blank line from the entry below it, a run at the end of a
+   * section or of the document, or, in an inline table, the comment ending a line no entry was written on, in document
+   * order. The comments documenting an entry are read with {@link #comments(String)} and {@link #comments(List)}.
+   *
+   * @return The comments written in this table that document none of its entries, in document order. Unmodifiable.
+   */
+  List<TomlComment> comments();
 
   /**
    * Check if a value in the TOML document is a string.

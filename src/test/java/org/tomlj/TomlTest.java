@@ -899,7 +899,7 @@ class TomlTest {
             "Unexpected '@', expected a key, a table key, a newline, or end-of-input (line 6, column 1)")),
         // A header the parser cannot complete is reported once, rather than again where the key it took ran out.
         Arguments.of("[#]\na = 1\n", List.of(
-            "Unexpected end of line, expected a key or ] (line 1, column 4)")),
+            "Unexpected '#]', expected a key or ] (line 1, column 2)")),
         Arguments.of("[\na = 1\n", List.of(
             "Unexpected end of line, expected a key or ] (line 1, column 2)"))
     );
