@@ -105,6 +105,39 @@ class TomlLexerTest {
         tokenNames("a = [@,\n[2],\n]\n"));
   }
 
+  @Test
+  void anUnclosedStringEndsWithItsLine() {
+    // The string ends where its line does, and the array ends with it, so `b = 2` is a line of the document.
+    assertEquals(
+        List
+            .of(
+                "UnquotedKey",
+                "Equals",
+                "ArrayStart",
+                "QuotationMark",
+                "StringChars",
+                "NewLine",
+                "UnquotedKey",
+                "Equals",
+                "DecimalInteger",
+                "NewLine"),
+        tokenNames("a = [\"x\nb = 2\n"));
+    // A line that no document line can be is the array's own content, and the array carries on.
+    assertEquals(
+        List
+            .of(
+                "UnquotedKey",
+                "Equals",
+                "ArrayStart",
+                "Apostrophe",
+                "StringChars",
+                "NewLine",
+                "DecimalInteger",
+                "ArrayEnd",
+                "NewLine"),
+        tokenNames("a = ['x\n2]\n"));
+  }
+
   private static String firstValueToken(String input) {
     TomlLexer lexer = new TomlLexer(CharStreams.fromString(input));
     boolean afterEquals = false;

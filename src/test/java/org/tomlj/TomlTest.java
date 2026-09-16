@@ -776,6 +776,15 @@ class TomlTest {
         Arguments.of("a = [\n  1,\n  @,\n  [[2]],\n]\nb = 1\n", Set.of("b")),
         Arguments.of("a = [\n  1,\n  @,\n  [x.y],\n]\nb = 1\n", Set.of("b")),
         Arguments.of("a = {\n  b = 1,\n  @,\n  [2],\n}\nc = 1\n", Set.of("c")),
+        // A string ends where its line does, so a value left unclosed around one ends there too and the lines below
+        // it are the document's own.
+        Arguments.of("[server]\nhost = [a\" # comment\nport = 8000\n", Set.of("server.port")),
+        Arguments.of("[server]\nhost = [\"a\nport = 8000\n", Set.of("server.port")),
+        Arguments.of("[server]\nhost = ['a\nport = 8000\n", Set.of("server.port")),
+        Arguments.of("[server]\nhost = [\"a\n[other]\nport = 8000\n", Set.of("other.port")),
+        Arguments.of("a = { b = \"x\nc = 2\n", Set.of("c")),
+        // A line that no line of the document can be is the value's content still, unclosed string or not.
+        Arguments.of("a = [\"x\n2]\nb = 3\n", Set.of("b")),
         Arguments.of("a =\n", Set.of()),
         Arguments.of("a = \nb = 2\nc = 3\n", Set.of("b", "c")),
         Arguments.of("a = 1\nb =\n\nc = 3\n", Set.of("a", "c")),
@@ -856,6 +865,15 @@ class TomlTest {
             "Unexpected end of line, expected \" or a character (line 2, column 4)",
             "Unexpected \", expected = (line 3, column 3)",
             "Unexpected \", expected a newline or end-of-input (line 3, column 5)")),
+        // A string ends where its line does, so a value holding one the line never closed is reported where the
+        // string ends, and not again on the line below, which the value no longer takes as its content.
+        Arguments.of("[server]\nhost = [a\" # comment\nport = 8000\n", List.of(
+            "Unexpected 'a', expected ], a value, or a newline (line 2, column 9)",
+            "Unexpected end of line, expected \" or a character (line 2, column 21)")),
+        Arguments.of("[server]\nhost = [\"a\nport = 8000\n", List.of(
+            "Unexpected end of line, expected \" or a character (line 2, column 11)")),
+        Arguments.of("[server]\nhost = ['a\nport = 8000\n", List.of(
+            "Unexpected end of line, expected ' or a character (line 2, column 11)")),
         // The line that ends a multi-line array or inline table is reported once. What is left of the value was
         // written as that value's content, so the lines up to the bracket or brace that closes it are passed over
         // rather than reported one by one as expressions the document got wrong.

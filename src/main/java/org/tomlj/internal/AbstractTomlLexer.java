@@ -87,6 +87,23 @@ public abstract class AbstractTomlLexer extends Lexer {
     }
   }
 
+  /**
+   * Leave the string being read and, where a value is left around it, end that value if the line that follows belongs
+   * to the document.
+   *
+   * <p>
+   * A string its line does not close ends at the end of that line, so the newline that ends it is the value's too, and
+   * without this check only the newline after the next line would be.
+   */
+  void stringNewLine() {
+    popMode();
+    if (_mode == TomlLexer.ValueMode) {
+      valueNewLine();
+    } else if (_mode == TomlLexer.InlineTableMode) {
+      inlineTableNewLine();
+    }
+  }
+
   // A stray character does not leave an array or an inline table: what follows it was written as the value's content,
   // and reading that as the document's turns an element like `[2],` into the header of a table named 2, which then
   // holds the pairs of the lines below. Outside an array there is no value left to read, as a key/value pair ends with
