@@ -45,18 +45,22 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
 
   @Override
   public void sync(Parser recognizer) {
-    if (recognizer.getContext() instanceof TomlParser.TomlContext
-        && !recognizer.getExpectedTokens().contains(recognizer.getInputStream().LA(1))) {
+    if (recognizer.getContext() instanceof TomlParser.TomlContext) {
       if (recognizer.getInputStream().LT(1).getTokenIndex() < leftoverEnd) {
         // What is left of a value the parser has given up on was written as that value's content, so each line of it
-        // fails as an expression for a mistake that has already been reported, once, where the value was given up on.
+        // is passed over, the mistake having been reported once, where the value was given up on. A line of it that an
+        // expression could be written as is passed over as well: it is content the document never held, and parsing it
+        // reports what it gets wrong, e.g. a string element as a key with no value after it.
         consumeUntil(recognizer, LINE_END);
         return;
       }
-      // Reports nothing if already recovering, e.g. after an expression whose own recovery stopped before the line end.
-      reportUnwantedToken(recognizer);
-      consumeUntil(recognizer, LINE_END);
-      return;
+      if (!recognizer.getExpectedTokens().contains(recognizer.getInputStream().LA(1))) {
+        // Reports nothing if already recovering, e.g. after an expression whose own recovery stopped before the line
+        // end.
+        reportUnwantedToken(recognizer);
+        consumeUntil(recognizer, LINE_END);
+        return;
+      }
     }
     ParserRuleContext value = unterminatedValue(recognizer);
     if (value != null) {

@@ -105,7 +105,7 @@ EscapeSequence
   | '\\u' HexDig HexDig HexDig HexDig
   | '\\U' HexDig HexDig HexDig HexDig HexDig HexDig HexDig HexDig;
 
-BasicStringNewLine: NL -> type(NewLine), popMode;
+BasicStringNewLine: NL { stringNewLine(); } -> type(NewLine);
 BasicStringError : . -> type(Error), popMode;
 
 
@@ -136,7 +136,7 @@ mode LiteralStringMode;
 LiteralStringEnd : '\'' -> type(Apostrophe), popMode;
 LiteralStringChars : ~[\u0000-\u0008\u000A-\u001F'\u007F\uD800-\uDFFF]+ -> type(StringChars);
 
-LiteralStringNewLine: NL -> type(NewLine), popMode;
+LiteralStringNewLine: NL { stringNewLine(); } -> type(NewLine);
 LiteralStringError : . -> type(Error), popMode;
 
 
