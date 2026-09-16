@@ -1,41 +1,13 @@
 lexer grammar TomlLexer;
 
+options { superClass=AbstractTomlLexer; }
+
 channels { COMMENTS, WHITESPACE }
 
 tokens { TripleQuotationMark, TripleApostrophe, StringChars, Comma }
 
 @header {
 package org.tomlj.internal;
-}
-
-@members {
-  // State is made public to allow incremental lexers to save and restore it (e.g. NetBeans)
-  public final IntegerStack arrayDepthStack = new IntegerStack();
-  public int arrayDepth = 0;
-
-  private boolean inArray() {
-    return arrayDepth > 0;
-  }
-
-  private void pushValueModeIfInArray() {
-    if (inArray()) {
-        pushMode(ValueMode);
-    }
-  }
-
-  private void resetArrayDepth() {
-    arrayDepthStack.clear();
-    arrayDepth = 0;
-  }
-
-  private void pushArrayDepth() {
-    arrayDepthStack.push(arrayDepth);
-    arrayDepth = 0;
-  }
-
-  private void popArrayDepth() {
-    arrayDepth = arrayDepthStack.pop();
-  }
 }
 
 fragment WSChar : [ \t];
@@ -85,9 +57,13 @@ ValueTripleQuotationMark : '"""' NL? { pushValueModeIfInArray(); } -> type(Tripl
 ValueApostrophe : '\'' { pushValueModeIfInArray(); } -> type(Apostrophe), mode(LiteralStringMode);
 ValueTripleApostrophe : '\'\'\'' NL? { pushValueModeIfInArray(); } -> type(TripleApostrophe), mode(MLLiteralStringMode);
 
-// Integers
+// Integers, dates and times
+// One rule matches the digits that start any of them, as they are told apart only by what follows. Digit+ also matches
+// a run with a leading zero, which is no integer but may be a year or an hour; ValueVisitor rejects the ones that are
+// left as integers. AbstractTomlLexer.decimalIntegerOrDateStart types the token from the character that follows, and
+// says why it reads that character in an action rather than a semantic predicate.
 fragment DecInt : [-+]? (Digit | Digit1_9 ('_'? Digit)+);
-DecimalInteger : DecInt { "-:".indexOf(_input.LA(1)) < 0 }? { pushValueModeIfInArray(); } -> popMode;
+DecimalInteger : (DecInt | Digit+) { decimalIntegerOrDateStart(); };
 HexInteger : '0x' HexDig ('_'? HexDig)* { pushValueModeIfInArray(); } -> popMode;
 OctalInteger : '0o' Digit0_7 ('_'? Digit0_7)* { pushValueModeIfInArray(); } -> popMode;
 BinaryInteger : '0b' Digit0_1 ('_'? Digit0_1)* { pushValueModeIfInArray(); } -> popMode;
@@ -102,9 +78,6 @@ FloatingPointNaN : [-+]? 'nan' { pushValueModeIfInArray(); } -> popMode;
 // Boolean
 TrueBoolean : 'true' { pushValueModeIfInArray(); } -> popMode;
 FalseBoolean : 'false' { pushValueModeIfInArray(); } -> popMode;
-
-// Date and Time
-DateStart : Digit+ { "-:".indexOf(_input.LA(1)) >= 0 }? { pushValueModeIfInArray(); } -> type(DateDigits), mode(DateMode);
 
 // Array
 ArrayStart : '[' { arrayDepth++; };

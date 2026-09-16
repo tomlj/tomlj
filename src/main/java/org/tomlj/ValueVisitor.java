@@ -50,7 +50,17 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitDecInt(TomlParser.DecIntContext ctx) {
-    return toLong(ctx.getText().replaceAll("_", ""), 10, ctx);
+    String text = ctx.getText();
+    // The lexer matches a run of digits with a leading zero, as it may be the year or hour of a date or time.
+    if (hasLeadingZero(text)) {
+      throw new TomlParseError("Leading zeros are not allowed", new TomlPosition(ctx));
+    }
+    return toLong(text.replaceAll("_", ""), 10, ctx);
+  }
+
+  private static boolean hasLeadingZero(String text) {
+    int start = (text.charAt(0) == '+' || text.charAt(0) == '-') ? 1 : 0;
+    return text.length() > (start + 1) && text.charAt(start) == '0';
   }
 
   @Override
