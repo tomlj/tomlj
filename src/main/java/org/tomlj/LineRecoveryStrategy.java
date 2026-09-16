@@ -15,7 +15,9 @@ package org.tomlj;
 import org.tomlj.internal.TomlParser;
 
 import org.antlr.v4.runtime.DefaultErrorStrategy;
+import org.antlr.v4.runtime.InputMismatchException;
 import org.antlr.v4.runtime.Parser;
+import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.IntervalSet;
 
@@ -27,7 +29,8 @@ import org.antlr.v4.runtime.misc.IntervalSet;
  * only resynchronizes if it can delete a single token, and otherwise abandons the document rule, discarding every later
  * line. In the document rule this strategy instead reports the unexpected token, skips to the end of the line and lets
  * parsing continue on the next line. Errors inside an expression are left to the default strategy, whose recovery
- * already stops at the end of the line.
+ * already stops at the end of the line, except within an array or inline table, where a value may span lines and the
+ * default strategy would otherwise carry the value on over every line that follows.
  */
 final class LineRecoveryStrategy extends DefaultErrorStrategy {
 
@@ -42,8 +45,38 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
       consumeUntil(recognizer, LINE_END);
       return;
     }
+    if (endsUnterminatedValue(recognizer)) {
+      // An array or inline table may hold newlines between its elements, so the default strategy treats a line it
+      // cannot parse as input to skip within the value, and carries on matching the lines after it - to the end of the
+      // document, since nothing closes the value. A line that cannot continue the value ends it instead: the rule
+      // reports the line's first token and recovers, which stops at the end of that line, leaving the document rule to
+      // parse the lines that follow.
+      throw new InputMismatchException(recognizer);
+    }
     // Also resets the state the default strategy keeps for reporting what a later rule expected.
     super.sync(recognizer);
+  }
+
+  /**
+   * Check whether the parser is inside an array or inline table, at the start of a line that cannot continue it.
+   */
+  private boolean endsUnterminatedValue(Parser recognizer) {
+    if (inErrorRecoveryMode(recognizer)) {
+      return false;
+    }
+    Token previous = recognizer.getInputStream().LT(-1);
+    if (previous == null || previous.getType() != TomlParser.NewLine) {
+      return false;
+    }
+    boolean inValue = false;
+    for (RuleContext context = recognizer.getContext(); context != null; context = context.parent) {
+      if (context instanceof TomlParser.ArrayContext || context instanceof TomlParser.InlineTableContext) {
+        inValue = true;
+        break;
+      }
+    }
+    // Computing what the parser expects walks the rule invocation stack, so it is left until last.
+    return inValue && !recognizer.getExpectedTokens().contains(recognizer.getInputStream().LA(1));
   }
 
   @Override

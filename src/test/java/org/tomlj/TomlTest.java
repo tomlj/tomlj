@@ -740,6 +740,12 @@ class TomlTest {
         Arguments.of("a = { x = 1, y = 2\nb = 3\n", Set.of()),
         Arguments.of("a = { x = 1,\n  y = 2\nb = 3\n", Set.of()),
         Arguments.of("a = { x = 1,\n  y = 2\n[tbl]\nb = 3\n", Set.of("b")),
+        // A line that cannot continue an array or inline table ends it, so the lines after it are parsed as usual
+        // rather than swallowed by the value.
+        Arguments.of("a = [\n  1,\n  @,\n]\nb = 1\n", Set.of("b")),
+        Arguments.of("a = {\n  x = 1,\n  @,\n}\nb = 2\n", Set.of("b")),
+        Arguments.of("a = [\n  1,\nb = 3\nc = 4\n", Set.of("c")),
+        Arguments.of("a = [\n  [\n    1,\n    @,\n  ],\n]\nb = 1\n", Set.of("b")),
         Arguments.of("a =\n", Set.of()),
         Arguments.of("a = \nb = 2\nc = 3\n", Set.of("b", "c")),
         Arguments.of("a = 1\nb =\n\nc = 3\n", Set.of("a", "c")),
@@ -803,7 +809,15 @@ class TomlTest {
             "Unexpected end of line, expected \" or a character (line 1, column 12)",
             "Unexpected 'a', expected }, a comma, or a newline (line 2, column 2)",
             "Unexpected \", expected = (line 3, column 3)",
-            "Unexpected \", expected a newline or end-of-input (line 3, column 5)"))
+            "Unexpected \", expected a newline or end-of-input (line 3, column 5)")),
+        // The line that ends a multi-line array or inline table is reported once, and what is left of the value is
+        // then parsed as expressions, so each of its remaining lines is reported in its turn.
+        Arguments.of("a = [\n  1,\n  @,\n]\nb = 1\n", List.of(
+            "Unexpected '@', expected ] or a newline (line 3, column 3)",
+            "Unexpected ']', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 4, column 1)")),
+        Arguments.of("a = {\n  x = 1,\n  @,\n}\nb = 2\n", List.of(
+            "Unexpected '@', expected } or a newline (line 3, column 3)",
+            "Unexpected '}', expected a-z, A-Z, 0-9, ', \", a table key, a newline, or end-of-input (line 4, column 1)"))
     );
     // @formatter:on
   }
