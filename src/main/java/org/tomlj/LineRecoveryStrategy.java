@@ -18,6 +18,7 @@ import org.antlr.v4.runtime.DefaultErrorStrategy;
 import org.antlr.v4.runtime.InputMismatchException;
 import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
@@ -89,16 +90,18 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
    */
   @Nullable
   private ParserRuleContext unterminatedValue(Parser recognizer) {
-    if (inErrorRecoveryMode(recognizer)) {
-      return null;
-    }
     TokenStream input = recognizer.getInputStream();
     boolean beforeNewLine = input.LA(1) == TomlParser.NewLine;
     if (beforeNewLine) {
+      // Checked while recovering from an error inside the value as well: the lexer has read the line that follows as
+      // the document's, so the value ends here whatever went wrong inside it.
       if (!startsDocumentLine(input.LA(2))) {
         return null;
       }
     } else {
+      if (inErrorRecoveryMode(recognizer)) {
+        return null;
+      }
       Token previous = input.LT(-1);
       if (previous == null || previous.getType() != TomlParser.NewLine) {
         return null;
@@ -162,6 +165,31 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
    */
   private static boolean startsDocumentLine(int type) {
     return type == TomlParser.TableKeyStart || type == TomlParser.ArrayTableKeyStart || type == TomlParser.UnquotedKey;
+  }
+
+  /**
+   * Recover where the document rule fails to match a token.
+   *
+   * <p>
+   * The only token the document rule matches after calling another rule is the newline ending an expression's line, so
+   * what it fails to match there is input left on the line after the expression and the comment following it: a
+   * character no comment may hold, as everything else is caught where the rule decides what the line holds next. As
+   * there, the input is reported and the rest of the line skipped, and the newline ending it is matched, so that the
+   * document rule carries on with the next line rather than giving up the document.
+   */
+  @Override
+  public Token recoverInline(Parser recognizer) throws RecognitionException {
+    if (recognizer.getContext() instanceof TomlParser.TomlContext) {
+      reportUnwantedToken(recognizer);
+      consumeUntil(recognizer, LINE_END);
+      Token lineEnd = recognizer.getCurrentToken();
+      if (lineEnd.getType() == TomlParser.NewLine) {
+        reportMatch(recognizer);
+        recognizer.consume();
+        return lineEnd;
+      }
+    }
+    return super.recoverInline(recognizer);
   }
 
   @Override

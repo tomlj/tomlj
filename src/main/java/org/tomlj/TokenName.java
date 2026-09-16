@@ -49,9 +49,10 @@ enum TokenName {
   ARRAY("an array", TomlLexer.ArrayStart),
   INLINE_TABLE("a table", TomlLexer.InlineTableStart),
   TABLE("a table key", TomlLexer.TableKeyStart, TomlLexer.ArrayTableKeyStart),
+  COMMENT("a comment", TomlLexer.Comment),
   NEWLINE("a newline", TomlLexer.NewLine),
   EOF("end-of-input", TomlLexer.EOF),
-  NULL("NULL", 0, TomlLexer.WS, TomlLexer.Comment, TomlLexer.MLBasicStringLineEndBackslash, TomlLexer.Error);
+  NULL("NULL", 0, TomlLexer.WS, TomlLexer.MLBasicStringLineEndBackslash, TomlLexer.Error);
 
   private final String displayName;
   @SuppressWarnings("ImmutableEnumChecker")

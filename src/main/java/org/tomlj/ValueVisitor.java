@@ -194,21 +194,29 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
   // Newlines and trailing commas in inline tables were added in TOML 1.1.0. Newlines inside the values of an inline
   // table (multi-line strings and arrays) are not direct children of the inline table rules, so are not collected.
   private static void checkSingleLineInlineTable(TomlParser.InlineTableContext ctx) {
-    List<TerminalNode> unsupported = new ArrayList<>(ctx.NewLine());
+    List<Token> unsupported = new ArrayList<>();
+    for (TomlParser.GapContext gap : ctx.gap()) {
+      unsupported.add(gap.NewLine(0).getSymbol());
+    }
     TerminalNode trailingComma = ctx.Comma();
     if (trailingComma != null) {
-      unsupported.add(trailingComma);
+      unsupported.add(trailingComma.getSymbol());
     }
     TomlParser.InlineTableValuesContext valuesContext = ctx.inlineTableValues();
     if (valuesContext != null) {
-      unsupported.addAll(valuesContext.NewLine());
-      valuesContext.inlineTableValue().forEach(value -> unsupported.addAll(value.NewLine()));
+      for (TomlParser.GapContext gap : valuesContext.gap()) {
+        unsupported.add(gap.NewLine(0).getSymbol());
+      }
+      for (TomlParser.InlineTableValueContext value : valuesContext.inlineTableValue()) {
+        if (value.gap() != null) {
+          unsupported.add(value.gap().NewLine(0).getSymbol());
+        }
+      }
     }
     if (unsupported.isEmpty()) {
       return;
     }
-    Token first =
-        Collections.min(unsupported, Comparator.comparingInt(node -> node.getSymbol().getTokenIndex())).getSymbol();
+    Token first = Collections.min(unsupported, Comparator.comparingInt(Token::getTokenIndex));
     String message = (first.getType() == TomlLexer.Comma) ? "A trailing comma is not allowed in an inline table"
         : "Newlines are not allowed in an inline table";
     throw new TomlParseError(

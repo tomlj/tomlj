@@ -7,10 +7,18 @@ package org.tomlj.internal;
 }
 
 // Document parser
-// Each line is an optional expression, so every decision here needs only one token of lookahead. That lets
-// LineRecoveryStrategy skip the rest of a line that cannot be parsed, rather than a failed prediction discarding
-// the rest of the document.
-toml : expression? (NewLine expression?)* EOF;
+// The lexer ends the last line of the input with a newline where the document has none, so every expression is
+// followed by the end of its line. Each line starts with an expression, a comment or a newline, so every decision
+// here needs only one token of lookahead, and LineRecoveryStrategy can skip the rest of a line that cannot be parsed.
+toml : (expression Comment? NewLine | NewLine | commentRun)* EOF;
+
+// A run of comment lines. It takes the newline that ends its last line, so the run is directly followed by whatever
+// it is written above.
+commentRun : Comment (NewLine Comment)* NewLine;
+
+// The end of a line inside an array or an inline table, with the comment written on it, and the blank lines and
+// comment runs that follow it.
+lineBreak : Comment? NewLine (NewLine | commentRun)*;
 
 expression
   : keyval
@@ -154,9 +162,11 @@ second : DateDigits;
 
 
 // Array
-array : ArrayStart (arrayValues NewLine* Comma?)? NewLine* ArrayEnd;
-arrayValues : arrayValue (NewLine* Comma arrayValue)*;
-arrayValue : NewLine* val;
+// A value or a comma is only reached after the newlines before it, so where the line after a newline cannot continue
+// the array, prediction fails before the newline is consumed and LineRecoveryStrategy ends the array there.
+array : ArrayStart (arrayValues (lineBreak? Comma)?)? lineBreak? ArrayEnd;
+arrayValues : arrayValue (lineBreak? Comma arrayValue)*;
+arrayValue : lineBreak? val;
 
 
 // Table
@@ -171,9 +181,9 @@ standardTable : TableKeyStart key? TableKeyEnd;
 
 
 // Inline Table
-inlineTable : InlineTableStart (inlineTableValues NewLine* Comma?)? NewLine* InlineTableEnd;
-inlineTableValues : inlineTableValue (NewLine* Comma inlineTableValue)*;
-inlineTableValue : NewLine* keyval;
+inlineTable : InlineTableStart (inlineTableValues (lineBreak? Comma)?)? lineBreak? InlineTableEnd;
+inlineTableValues : inlineTableValue (lineBreak? Comma inlineTableValue)*;
+inlineTableValue : lineBreak? keyval;
 
 
 // Array Table
