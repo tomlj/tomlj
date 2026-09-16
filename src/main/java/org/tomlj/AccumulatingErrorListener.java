@@ -14,6 +14,7 @@ package org.tomlj;
 
 import org.tomlj.internal.AbstractTomlParser;
 import org.tomlj.internal.TomlLexer;
+import org.tomlj.internal.TomlParser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +25,13 @@ import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.InputMismatchException;
 import org.antlr.v4.runtime.NoViableAltException;
 import org.antlr.v4.runtime.Parser;
+import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
+import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.IntervalSet;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 final class AccumulatingErrorListener extends BaseErrorListener implements ErrorReporter {
 
@@ -84,14 +88,17 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
       return;
     }
 
+    Token opened = openingOfUnclosedValue(e, offendingSymbol, recognizer);
+
     if (e instanceof InputMismatchException || e instanceof NoViableAltException) {
-      String message = getMessage(e.getOffendingToken(), getExpected(e));
+      String message = getMessage(e.getOffendingToken(), getExpected(e), opened);
       reportError(message, position);
       return;
     }
 
     if (offendingSymbol instanceof Token && recognizer instanceof Parser) {
-      String message = getMessage((Token) offendingSymbol, getExpected(((Parser) recognizer).getExpectedTokens()));
+      String message =
+          getMessage((Token) offendingSymbol, getExpected(((Parser) recognizer).getExpectedTokens()), opened);
       reportError(message, position);
       return;
     }
@@ -122,8 +129,42 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     return errors;
   }
 
-  private String getMessage(Token token, String expected) {
-    return "Unexpected " + getTokenName(token) + ", expected " + expected;
+  private String getMessage(Token token, String expected, @Nullable Token opened) {
+    String message = "Unexpected " + getTokenName(token) + ", expected " + expected;
+    if (opened == null || opened.getLine() >= token.getLine()) {
+      // A value opened on the line being reported on is already in front of the reader.
+      return message;
+    }
+    String kind = opened.getType() == TomlLexer.InlineTableStart ? "inline table" : "array";
+    TomlPosition position = TomlPosition.positionAt(opened.getLine(), opened.getCharPositionInLine() + 1);
+    return message + "; the " + kind + " opened at " + position + " is unclosed";
+  }
+
+  /**
+   * The bracket or brace that opened an array or inline table that nothing closes, where this error is the end of that
+   * value, and null everywhere else. What such a document is missing is the closing delimiter, and the line it is
+   * missing from is rarely the line the error is reported on.
+   */
+  @Nullable
+  private static Token openingOfUnclosedValue(
+      @Nullable RecognitionException e,
+      @Nullable Object offendingSymbol,
+      Recognizer<?, ?> recognizer) {
+    if (e instanceof LineRecoveryStrategy.UnterminatedValueException) {
+      return ((LineRecoveryStrategy.UnterminatedValueException) e).opened();
+    }
+    // At the end of the input, a value the parser is still inside can never be closed.
+    if (!(offendingSymbol instanceof Token)
+        || ((Token) offendingSymbol).getType() != TomlLexer.EOF
+        || !(recognizer instanceof Parser)) {
+      return null;
+    }
+    for (RuleContext context = ((Parser) recognizer).getContext(); context != null; context = context.parent) {
+      if (context instanceof TomlParser.ArrayContext || context instanceof TomlParser.InlineTableContext) {
+        return ((ParserRuleContext) context).getStart();
+      }
+    }
+    return null;
   }
 
   private static String getTokenName(Token token) {

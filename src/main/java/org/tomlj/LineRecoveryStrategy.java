@@ -17,10 +17,12 @@ import org.tomlj.internal.TomlParser;
 import org.antlr.v4.runtime.DefaultErrorStrategy;
 import org.antlr.v4.runtime.InputMismatchException;
 import org.antlr.v4.runtime.Parser;
+import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.misc.IntervalSet;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * An error strategy that recovers from unexpected input between expressions by skipping the rest of the line.
@@ -46,56 +48,64 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
       consumeUntil(recognizer, LINE_END);
       return;
     }
-    if (endsUnterminatedValue(recognizer)) {
+    ParserRuleContext value = unterminatedValue(recognizer);
+    if (value != null) {
       // An array or inline table may hold newlines between its elements, so the default strategy treats a line it
       // cannot parse as input to skip within the value, and carries on matching the lines after it - to the end of the
       // document, since nothing closes the value. Ending the value here leaves the rest of the document to the document
       // rule instead. A line that cannot continue the value is reported and skipped, as the rule's own recovery stops
       // at the end of a line; a line the lexer has already left the value for is kept whole, as the value ends before
       // the newline that starts it and the document rule matches that newline.
-      throw new InputMismatchException(recognizer);
+      // Only a value the lexer has left is known to be unclosed: a line that cannot continue a value ends it here, but
+      // a closing bracket or brace may still follow, as in an array whose element is a stray character.
+      Token opened = recognizer.getInputStream().LA(1) == TomlParser.NewLine ? value.getStart() : null;
+      throw new UnterminatedValueException(recognizer, opened);
     }
     // Also resets the state the default strategy keeps for reporting what a later rule expected.
     super.sync(recognizer);
   }
 
   /**
-   * Check whether the value the parser is inside ends here: either the line that follows belongs to the document, or
-   * this line cannot continue the value.
+   * The array or inline table the parser is inside that ends here, because the line that follows belongs to the
+   * document or because this line cannot continue it, or null where the value carries on.
    */
-  private boolean endsUnterminatedValue(Parser recognizer) {
+  @Nullable
+  private ParserRuleContext unterminatedValue(Parser recognizer) {
     if (inErrorRecoveryMode(recognizer)) {
-      return false;
+      return null;
     }
     TokenStream input = recognizer.getInputStream();
     boolean beforeNewLine = input.LA(1) == TomlParser.NewLine;
     if (beforeNewLine) {
       if (!startsDocumentLine(input.LA(2))) {
-        return false;
+        return null;
       }
     } else {
       Token previous = input.LT(-1);
       if (previous == null || previous.getType() != TomlParser.NewLine) {
-        return false;
+        return null;
       }
     }
-    RuleContext value = null;
+    ParserRuleContext value = null;
     for (RuleContext context = recognizer.getContext(); context != null; context = context.parent) {
       if (context instanceof TomlParser.ArrayContext || context instanceof TomlParser.InlineTableContext) {
-        value = context;
+        value = (ParserRuleContext) context;
         break;
       }
     }
     if (value == null) {
-      return false;
+      return null;
     }
     if (beforeNewLine) {
       // An inline table holds key/value pairs of its own, so only a table header ends one; the lexer leaves it for
       // nothing else.
-      return input.LA(2) != TomlParser.UnquotedKey || value instanceof TomlParser.ArrayContext;
+      if (input.LA(2) == TomlParser.UnquotedKey && value instanceof TomlParser.InlineTableContext) {
+        return null;
+      }
+      return value;
     }
     // Computing what the parser expects walks the rule invocation stack, so it is left until last.
-    return !recognizer.getExpectedTokens().contains(input.LA(1));
+    return recognizer.getExpectedTokens().contains(input.LA(1)) ? null : value;
   }
 
   /**
@@ -126,5 +136,27 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
       }
     }
     return super.singleTokenDeletion(recognizer);
+  }
+
+  /**
+   * A mismatch that ends an array or inline table, carrying the bracket or brace that opened it where nothing closes
+   * it. The error is reported where the value is left, which is rarely the line the delimiter is missing from.
+   */
+  static final class UnterminatedValueException extends InputMismatchException {
+
+    private static final long serialVersionUID = 1L;
+
+    @Nullable
+    private final transient Token opened;
+
+    UnterminatedValueException(Parser recognizer, @Nullable Token opened) {
+      super(recognizer);
+      this.opened = opened;
+    }
+
+    @Nullable
+    Token opened() {
+      return opened;
+    }
   }
 }
