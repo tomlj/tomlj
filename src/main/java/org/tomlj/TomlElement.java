@@ -19,7 +19,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  *
  * <p>
  * {@link TomlTable#elements()} and {@link TomlArray#elements()} list the elements of a table or array in document
- * order. Each is a {@link TomlKeyValue} in a table, a {@link TomlValue} in an array, or an unattached
+ * order. Each is an entry, a {@link TomlKeyValue} in a table or a plain {@link TomlEntry} in an array, or an unattached
  * {@link TomlComment}.
  */
 public interface TomlElement {
