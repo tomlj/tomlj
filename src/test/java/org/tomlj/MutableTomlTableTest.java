@@ -16,7 +16,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.tomlj.EmptyTomlArray.EMPTY_ARRAY;
 import static org.tomlj.EmptyTomlTable.EMPTY_TABLE;
 import static org.tomlj.TomlPosition.positionAt;
-import static org.tomlj.TomlVersion.HEAD;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -37,14 +36,14 @@ class MutableTomlTableTest {
 
   @Test
   void emptyTableIsEmpty() {
-    TomlTable table = new MutableTomlTable(HEAD);
+    TomlTable table = new MutableTomlTable();
     assertTrue(table.isEmpty());
     assertEquals(0, table.size());
   }
 
   @Test
   void getMissingPropertyReturnsNull() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("bar", "one", positionAt(1, 1));
     table.set("foo.baz", "two", positionAt(1, 1));
     assertNull(table.get("baz"));
@@ -54,7 +53,7 @@ class MutableTomlTableTest {
 
   @Test
   void getStringProperty() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("foo.bar", "one", positionAt(1, 1));
     assertTrue(table.isString("foo.bar"));
     assertEquals("one", table.getString("foo.bar"));
@@ -62,7 +61,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldCreateParentTables() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> intermediates =
         table.set("foo.bar", "one", positionAt(1, 1));
     assertTrue(table.isTable("foo"));
@@ -74,7 +73,7 @@ class MutableTomlTableTest {
 
   @Test
   void cannotReplaceProperty() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("foo.bar", "one", positionAt(1, 3));
     TomlParseError e = assertThrows(TomlParseError.class, () -> table.set("foo.bar", "two", positionAt(2, 5)));
     assertEquals("foo.bar previously defined at line 1, column 3", e.getMessage());
@@ -83,7 +82,7 @@ class MutableTomlTableTest {
   @ParameterizedTest
   @MethodSource("quotesComplexKeyInErrorSupplier")
   void quotesComplexKeysInError(List<String> path, String expected) {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set(path, "one", positionAt(1, 3));
     TomlParseError e = assertThrows(TomlParseError.class, () -> table.set(path, "two", positionAt(2, 5)));
     assertEquals(expected + " previously defined at line 1, column 3", e.getMessage());
@@ -99,7 +98,7 @@ class MutableTomlTableTest {
 
   @Test
   void cannotTreatNonTableAsTable() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("foo.bar", "one", positionAt(5, 3));
     TomlParseError e = assertThrows(TomlParseError.class, () -> table.set("foo.bar.baz", "two", positionAt(2, 5)));
     assertEquals("foo.bar is not a table (previously defined at line 5, column 3)", e.getMessage());
@@ -107,7 +106,7 @@ class MutableTomlTableTest {
 
   @Test
   void ignoresWhitespaceAroundUnquotedKeys() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("foo.bar", 4, positionAt(5, 3));
     assertEquals(Long.valueOf(4), table.getLong(" foo . bar"));
     table.set(Arrays.asList(" Bar ", " B A Z "), 9, positionAt(5, 3));
@@ -116,14 +115,14 @@ class MutableTomlTableTest {
 
   @Test
   void throwsForInvalidKey() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> table.get("foo.=bar"));
     assertEquals("Invalid key: Unexpected '=', expected a key" + TomlTest.INVALID_KEY_HINT, e.getMessage());
   }
 
   @Test
   void shouldReturnInputPosition() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("bar", "one", positionAt(4, 3));
     table.set("foo.baz", "two", positionAt(15, 2));
     assertEquals(positionAt(4, 3), table.inputPositionOf("bar"));
@@ -135,7 +134,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnKeySet() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("bar", "one", positionAt(4, 3));
     table.set("foo.baz", "two", positionAt(15, 2));
     assertEquals(new HashSet<>(Arrays.asList("bar", "foo")), table.keySet());
@@ -143,7 +142,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnDottedKeySet() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("bar", "one", positionAt(4, 3));
     table.set("foo.baz", "two", positionAt(15, 2));
     table.set("foo.buz.bar", "three", positionAt(15, 2));
@@ -155,7 +154,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnEntrySet() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("bar", "one", positionAt(4, 3));
     table.set("foo.baz", "two", positionAt(15, 2));
     assertEquals(
@@ -169,7 +168,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnDottedEntrySet() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("bar", "one", positionAt(4, 3));
     table.set("foo.baz", "two", positionAt(15, 2));
     table.set("foo.buz.bar", "three", positionAt(15, 2));
@@ -195,7 +194,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldSerializeToJSON() {
-    MutableTomlTable table = new MutableTomlTable(HEAD);
+    MutableTomlTable table = new MutableTomlTable();
     table.set("bar", "one", positionAt(2, 1));
     table.set("foo.baz", "two", positionAt(3, 2));
     table.set("foo.buz", EMPTY_ARRAY, positionAt(3, 2));

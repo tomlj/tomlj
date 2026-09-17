@@ -218,7 +218,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     if (!version.after(V1_0_0)) {
       checkSingleLineInlineTable(ctx);
     }
-    MutableTomlTable table = MutableTomlTable.inline(version, new TomlPosition(ctx));
+    MutableTomlTable table = MutableTomlTable.inline(new TomlPosition(ctx));
     // The tables that dotted keys open within this one, which close with it: nothing written later may add to them.
     Map<MutableTomlTable, TomlPosition> openTables = null;
     List<ParseTree> nodes = Comments.flatten(ctx);

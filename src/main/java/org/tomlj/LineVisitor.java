@@ -41,7 +41,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   LineVisitor(TomlVersion version, ErrorReporter errorReporter, int maxNestingDepth) {
     this.version = version;
     this.errorReporter = errorReporter;
-    this.rootTable = new MutableTomlTable(version, TomlPosition.positionAt(1, 1));
+    this.rootTable = new MutableTomlTable(TomlPosition.positionAt(1, 1));
     this.currentTable = rootTable;
     this.openTables = new HashMap<>();
     this.maxNestingDepth = maxNestingDepth;

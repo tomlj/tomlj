@@ -31,7 +31,6 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements TomlTable {
 
   private final Map<String, Entry.KeyValue> properties = new LinkedHashMap<>();
-  private final TomlVersion version;
 
   // Not final: a table created implicitly by a dotted key or by a leading key of a header such as [a.b] has no
   // position until a header defines this table itself, at which point it takes the header's position; see #define. The
@@ -41,16 +40,15 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
 
   private final boolean inline;
 
-  MutableTomlTable(TomlVersion version, @Nullable TomlPosition position) {
-    this(version, position, false);
+  MutableTomlTable(@Nullable TomlPosition position) {
+    this(position, false);
   }
 
-  MutableTomlTable(TomlVersion version) {
-    this(version, null, false);
+  MutableTomlTable() {
+    this(null, false);
   }
 
-  private MutableTomlTable(TomlVersion version, @Nullable TomlPosition position, boolean inline) {
-    this.version = version;
+  private MutableTomlTable(@Nullable TomlPosition position, boolean inline) {
     this.position = position;
     this.inline = inline;
   }
@@ -61,12 +59,11 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
    * <p>
    * Inline tables are self-contained: once closed, no table header or dotted key may add to them.
    *
-   * @param version The TOML version.
    * @param position The position of the inline table.
    * @return A new, defined table.
    */
-  static MutableTomlTable inline(TomlVersion version, TomlPosition position) {
-    return new MutableTomlTable(version, position, true);
+  static MutableTomlTable inline(TomlPosition position) {
+    return new MutableTomlTable(position, true);
   }
 
   boolean isDefined() {
@@ -254,7 +251,7 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
     String key = path.get(depth - 1);
     Entry.KeyValue element = table.properties.get(key);
     if (element == null) {
-      final MutableTomlTable newTable = new MutableTomlTable(version, position);
+      final MutableTomlTable newTable = new MutableTomlTable(position);
       table.put(key, newTable, position, comments);
       return newTable;
     }
@@ -300,7 +297,7 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
     MutableTomlArray array = (MutableTomlArray) element.element;
     // The new table's own position is the header's, since [[x]] gives each element table it opens a position of its
     // own rather than sharing the array's.
-    MutableTomlTable newTable = new MutableTomlTable(version, position);
+    MutableTomlTable newTable = new MutableTomlTable(position);
     // Each header of an array of tables is an expression of its own, so its comments belong to the element it opens
     // rather than to the array as a whole.
     array.append(Entry.Value.of(newTable, position, comments));
@@ -404,7 +401,7 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
       String key = path.get(i);
       Entry.KeyValue element = table.properties.get(key);
       if (element == null) {
-        element = table.put(key, new MutableTomlTable(version), position, Collections.emptyList());
+        element = table.put(key, new MutableTomlTable(), position, Collections.emptyList());
       }
       if (element.element instanceof MutableTomlTable) {
         table = (MutableTomlTable) element.element;
