@@ -130,16 +130,6 @@ class TomlTest {
     assertEquals("Invalid key: Unexpected '@', expected a key" + INVALID_KEY_HINT, exception.getMessage());
   }
 
-  @Test
-  void shouldNotParseDottedKeysAtV0_4_0OrEarlier() {
-    TomlParseResult result = Toml.parse("[foo]\n bar.baz = 1", TomlVersion.V0_4_0);
-    assertTrue(result.hasErrors());
-    TomlParseError error = result.errors().get(0);
-    assertEquals("Dotted keys are not supported", error.getMessage());
-    assertEquals(2, error.position().line());
-    assertEquals(2, error.position().column());
-  }
-
   @ParameterizedTest
   @MethodSource("stringSupplier")
   void shouldParseString(String input, String expected) {
@@ -485,30 +475,6 @@ class TomlTest {
         Arguments.of("foo = [\n  [1.5],\n  ['bar'],\n]\n", new Object[] {new Object[] {1.5d}, new Object[] {"bar"}})
     );
     // @formatter:on
-  }
-
-  @Test
-  @SuppressWarnings("deprecation")
-  void shouldReportAnEmptyArrayAsContainingNoTypeBeforeV0_5_0() {
-    TomlParseResult result = Toml.parse("foo = []", TomlVersion.V0_4_0);
-    assertFalse(result.hasErrors(), () -> joinErrors(result));
-    TomlArray array = result.getArray("foo");
-    assertNotNull(array);
-    assertTrue(array.isEmpty());
-    assertFalse(array.containsStrings());
-    assertFalse(array.containsLongs());
-    assertFalse(array.containsTables());
-  }
-
-  @Test
-  @SuppressWarnings("deprecation")
-  void shouldRejectContainsTypeOnAnEmptyArrayAfterV0_5_0() {
-    TomlParseResult result = Toml.parse("foo = []", TomlVersion.V1_0_0);
-    assertFalse(result.hasErrors(), () -> joinErrors(result));
-    TomlArray array = result.getArray("foo");
-    assertNotNull(array);
-    assertTrue(array.isEmpty());
-    assertThrows(UnsupportedOperationException.class, array::containsStrings);
   }
 
   @ParameterizedTest
@@ -1155,32 +1121,6 @@ class TomlTest {
   }
 
   @ParameterizedTest
-  @MethodSource("errorCaseSupplier_V0_5_0")
-  void shouldHandleParseErrors_V0_5_0(String input, int line, int column, String expected) {
-    TomlParseResult result = Toml.parse(input, TomlVersion.V0_5_0);
-    List<TomlParseError> errors = result.errors();
-    assertFalse(errors.isEmpty());
-    assertEquals(expected, errors.get(0).getMessage(), () -> joinErrors(result));
-    assertEquals(line, errors.get(0).position().line());
-    assertEquals(column, errors.get(0).position().column());
-  }
-
-  static Stream<Arguments> errorCaseSupplier_V0_5_0() {
-    // @formatter:off
-    return Stream.of(
-        Arguments.of("\"foo\tbar\" = 1", 1, 5, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
-        Arguments.of("[\"foo\tbar\"]", 1, 6, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
-        Arguments.of("[[\"foo\tbar\"]]", 1, 7, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
-        Arguments.of("foo = \"bar\tbaz\"", 1, 11, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
-        Arguments.of("foo = \"\"\"a\\nbar\tbaz\"\"\"", 1, 16, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
-        Arguments.of("foo = \"\"\"\nbar\tbaz\"\"\"", 2, 4, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
-        Arguments.of("foo = \"\uD83D\uDE00\tbar\"", 1, 9, "Use \\t to represent a tab in a string (TOML versions before 1.0.0)"),
-        Arguments.of("foo = [ 1, 'bar' ]", 1, 12, "Cannot add a string to an array containing integers")
-    );
-    // @formatter:on
-  }
-
-  @ParameterizedTest
   @MethodSource("nestingTooDeepSupplier")
   void shouldReportNestingTooDeepOnce(String input) {
     TomlParseResult result = Toml.parse(input);
@@ -1240,7 +1180,7 @@ class TomlTest {
   void testTomlV0_4_0Example() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/example-v0.4.0.toml");
     assertNotNull(is);
-    TomlParseResult result = Toml.parse(is, TomlVersion.V0_4_0);
+    TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
 
     assertEquals("value", result.getString("table.key"));
@@ -1256,7 +1196,7 @@ class TomlTest {
   void testHardExample() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/hard_example.toml");
     assertNotNull(is);
-    TomlParseResult result = Toml.parse(is, TomlVersion.V0_4_0);
+    TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
 
     assertEquals("You'll hate me after this - #", result.getString("the.test_string"));
@@ -1268,7 +1208,7 @@ class TomlTest {
   void testHardExampleUnicode() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/hard_example_unicode.toml");
     assertNotNull(is);
-    TomlParseResult result = Toml.parse(is, TomlVersion.V0_4_0);
+    TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
 
     assertEquals("Ýôú'ℓℓ λáƭè ₥è áƒƭèř ƭλïƨ - #", result.getString("the.test_string"));
@@ -1299,7 +1239,7 @@ class TomlTest {
   void testCrateExample() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/crate-example.toml");
     assertNotNull(is);
-    TomlParseResult result = Toml.parse(is, TomlVersion.V0_4_0);
+    TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
 
     assertEquals("a fun test case", result.getString("package.name"));
@@ -1322,7 +1262,7 @@ class TomlTest {
   void testSpecExample() throws Exception {
     InputStream is = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.toml");
     assertNotNull(is);
-    TomlParseResult result = Toml.parse(is, TomlVersion.V0_5_0);
+    TomlParseResult result = Toml.parse(is);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
 
     assertEquals("Tom Preston-Werner", result.getString("owner.name"));
@@ -1331,7 +1271,6 @@ class TomlTest {
     assertEquals("10.0.0.2", result.getString("servers.beta.ip"));
     TomlArray clientHosts = result.getArray("clients.hosts");
     assertNotNull(clientHosts);
-    assertTrue(clientHosts.containsStrings());
     assertEquals(Arrays.asList("alpha", "omega"), clientHosts.toList());
   }
 
@@ -1423,7 +1362,7 @@ class TomlTest {
     String expectedJson = new String(jsonStream.readAllBytes(), StandardCharsets.UTF_8);
     InputStream tomlStream = this.getClass().getResourceAsStream("/org/tomlj/toml-v0.5.0-spec-example.toml");
     assertNotNull(tomlStream);
-    TomlParseResult result = Toml.parse(tomlStream, TomlVersion.V0_5_0);
+    TomlParseResult result = Toml.parse(tomlStream);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
     assertEquals(expectedJson.replace("\n", System.lineSeparator()), result.toJson());
   }

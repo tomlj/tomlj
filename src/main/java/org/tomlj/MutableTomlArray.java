@@ -12,39 +12,11 @@
  */
 package org.tomlj;
 
-import static org.tomlj.TomlVersion.V0_5_0;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArray {
-
-  /**
-   * Create an array for an array written in a document.
-   *
-   * @param version The TOML version.
-   * @param position The position of the array's opening {@code [}, or of its first {@code [[x]]} header if it is an
-   *        array of tables.
-   * @return A new array.
-   */
-  static MutableTomlArray create(TomlVersion version, TomlPosition position) {
-    return create(version, position, false);
-  }
-
-  /**
-   * Create an array for an array written in a document.
-   *
-   * @param version The TOML version.
-   * @param position The position of the array's opening {@code [}, or of its first {@code [[x]]} header if it is an
-   *        array of tables.
-   * @param tableArray {@code true} if this array holds the tables of a {@code [[x]]} header.
-   * @return A new array.
-   */
-  static MutableTomlArray create(TomlVersion version, TomlPosition position, boolean tableArray) {
-    return version.after(V0_5_0) ? new MutableTomlArray(tableArray, position)
-        : new MutableHomogeneousTomlArray(tableArray, position);
-  }
 
   // The values of this array, in document order; the index into this list is the array index. This is a separate
   // index over the same value elements that elements() holds, kept for lookup by position.
@@ -55,6 +27,13 @@ class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArra
   // as soon as it is created, whereas a table can also be created implicitly by a dotted key and defined later.
   private final TomlPosition position;
 
+  /**
+   * Create an array for an array written in a document.
+   *
+   * @param isTableArray {@code true} if this array holds the tables of a {@code [[x]]} header.
+   * @param position The position of the array's opening {@code [}, or of its first {@code [[x]]} header if it is an
+   *        array of tables.
+   */
   MutableTomlArray(boolean isTableArray, TomlPosition position) {
     this.isTableArray = isTableArray;
     this.position = position;
@@ -67,56 +46,6 @@ class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArra
   @Override
   public TomlPosition position() {
     return position;
-  }
-
-  @Override
-  public boolean containsStrings() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsLongs() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsDoubles() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsBooleans() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsOffsetDateTimes() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsLocalDateTimes() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsLocalDates() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsLocalTimes() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsArrays() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsTables() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
   }
 
   @Override

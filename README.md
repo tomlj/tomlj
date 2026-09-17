@@ -41,8 +41,8 @@ if (port > 65535) {
 * **Complete, and tested against the spec.** TomlJ supports TOML 1.1.0. Every build runs the
   official [toml-test](https://github.com/toml-lang/toml-test) suite for 1.0.0 and 1.1.0: valid
   files must give exactly the expected values, and invalid files must be rejected.
-* **Reads older versions too.** `TomlVersion` picks any version from `V0_4_0` to `V1_1_0`. Newer
-  syntax is then reported as an error instead of being accepted.
+* **Reads TOML 1.0.0 too.** `TomlVersion.V1_0_0` reports 1.1.0 syntax as an error instead of
+  accepting it.
 * **A typed getter for every TOML type**, returning `String`, `Long`, `Double`, `Boolean`,
   `TomlArray` or `TomlTable`, and the four date and time types as `java.time`'s `OffsetDateTime`,
   `LocalDateTime`, `LocalDate` and `LocalTime`. Each getter returns `null` if the key is missing,

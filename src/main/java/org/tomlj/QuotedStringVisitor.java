@@ -13,13 +13,10 @@
 package org.tomlj;
 
 import static org.tomlj.ParseTrees.singleTokenText;
-import static org.tomlj.TomlVersion.V0_5_0;
 import static org.tomlj.TomlVersion.V1_0_0;
 
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
-
-import org.antlr.v4.runtime.ParserRuleContext;
 
 final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
 
@@ -32,43 +29,22 @@ final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
 
   @Override
   public StringBuilder visitLiteralBody(TomlParser.LiteralBodyContext ctx) {
-    return appendText(ctx.getText(), ctx);
+    return builder.append(ctx.getText());
   }
 
   @Override
   public StringBuilder visitMlLiteralBody(TomlParser.MlLiteralBodyContext ctx) {
-    return appendText(ctx.getText(), ctx);
+    return builder.append(ctx.getText());
   }
 
   @Override
   public StringBuilder visitBasicUnescaped(TomlParser.BasicUnescapedContext ctx) {
-    return appendRun(singleTokenText(ctx), ctx);
+    return builder.append(singleTokenText(ctx));
   }
 
   @Override
   public StringBuilder visitMlBasicUnescaped(TomlParser.MlBasicUnescapedContext ctx) {
-    return appendRun(singleTokenText(ctx), ctx);
-  }
-
-  private StringBuilder appendText(String text, ParserRuleContext ctx) {
-    if (!(version.after(V0_5_0)) && text.indexOf('\t') != -1) {
-      throw tabError(new TomlPosition(ctx));
-    }
-    return builder.append(text);
-  }
-
-  // An unescaped context holds one token, a run of characters within a single line, so a tab is reported at its own
-  // column rather than where the run starts. Columns count code points, as the lexer does.
-  private StringBuilder appendRun(String text, ParserRuleContext ctx) {
-    int tab;
-    if (!(version.after(V0_5_0)) && (tab = text.indexOf('\t')) != -1) {
-      throw tabError(new TomlPosition(ctx, text.codePointCount(0, tab)));
-    }
-    return builder.append(text);
-  }
-
-  private static TomlParseError tabError(TomlPosition position) {
-    return new TomlParseError("Use \\t to represent a tab in a string (TOML versions before 1.0.0)", position);
+    return builder.append(singleTokenText(ctx));
   }
 
   @Override

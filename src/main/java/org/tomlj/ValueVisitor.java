@@ -179,7 +179,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
    */
   @Override
   public Object visitArray(TomlParser.ArrayContext ctx) {
-    MutableTomlArray array = MutableTomlArray.create(version, new TomlPosition(ctx));
+    MutableTomlArray array = new MutableTomlArray(false, new TomlPosition(ctx));
     List<ParseTree> nodes = Comments.flatten(ctx);
     for (int i = 0; i < nodes.size(); ++i) {
       ParseTree node = nodes.get(i);
@@ -218,7 +218,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     if (!version.after(V1_0_0)) {
       checkSingleLineInlineTable(ctx);
     }
-    MutableTomlTable table = MutableTomlTable.inline(version, new TomlPosition(ctx));
+    MutableTomlTable table = MutableTomlTable.inline(new TomlPosition(ctx));
     // The tables that dotted keys open within this one, which close with it: nothing written later may add to them.
     Map<MutableTomlTable, TomlPosition> openTables = null;
     List<ParseTree> nodes = Comments.flatten(ctx);

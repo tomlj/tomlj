@@ -12,8 +12,6 @@
  */
 package org.tomlj;
 
-import static org.tomlj.TomlVersion.V0_4_0;
-
 import org.tomlj.internal.AbstractTomlParser;
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
@@ -43,7 +41,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   LineVisitor(TomlVersion version, ErrorReporter errorReporter, int maxNestingDepth) {
     this.version = version;
     this.errorReporter = errorReporter;
-    this.rootTable = new MutableTomlTable(version, TomlPosition.positionAt(1, 1));
+    this.rootTable = new MutableTomlTable(TomlPosition.positionAt(1, 1));
     this.currentTable = rootTable;
     this.openTables = new HashMap<>();
     this.maxNestingDepth = maxNestingDepth;
@@ -113,10 +111,6 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       List<String> path = keyContext.accept(new KeyVisitor(version));
       if (path == null || path.isEmpty()) {
         return rootTable;
-      }
-      // TOML 0.4.0 doesn't support dotted keys
-      if (!version.after(V0_4_0) && path.size() > 1) {
-        throw new TomlParseError("Dotted keys are not supported", new TomlPosition(keyContext));
       }
       Object value = valContext.accept(new ValueVisitor(version));
       if (value != null && !hasSyntaxError(ctx)) {
