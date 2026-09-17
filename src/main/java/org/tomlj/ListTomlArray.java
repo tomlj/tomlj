@@ -12,9 +12,13 @@
  */
 package org.tomlj;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -112,6 +116,19 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
   }
 
   /**
+   * Build an entry added through the editing API: no position, and marked as added.
+   *
+   * @param value The value, already wrapped; see {@link Value#of}.
+   * @param comments The comments attached to the entry.
+   * @return The entry, not yet part of any array.
+   */
+  private static Entry.Indexed newEditedEntry(Value value, List<TomlComment> comments) {
+    Entry.Indexed entry = new Entry.Indexed(value, comments);
+    entry.valueModified = true;
+    return entry;
+  }
+
+  /**
    * Append an entry added through the editing API: no position, and marked as added.
    *
    * @param value The value, already wrapped; see {@link Value#of}.
@@ -119,9 +136,7 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
    * @return The entry appended.
    */
   private Entry.Indexed appendEdited(Value value, List<TomlComment> comments) {
-    Entry.Indexed entry = append(new Entry.Indexed(value, comments));
-    entry.valueModified = true;
-    return entry;
+    return append(newEditedEntry(value, comments));
   }
 
   @Override
@@ -133,6 +148,67 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
   public ListTomlArray add(Object value) {
     Object normalized = TomlValues.normalize(value);
     appendEdited(Value.of(normalized, null), Collections.emptyList());
+    return this;
+  }
+
+  @Override
+  public ListTomlArray insertBefore(int index, Object value) {
+    Objects.checkIndex(index, size());
+    Object normalized = TomlValues.normalize(value);
+    return insertEntry(entries.get(index), normalized, false);
+  }
+
+  @Override
+  public ListTomlArray insertAfter(int index, Object value) {
+    Objects.checkIndex(index, size());
+    Object normalized = TomlValues.normalize(value);
+    return insertEntry(entries.get(index), normalized, true);
+  }
+
+  @Override
+  public ListTomlArray insertBefore(TomlElement anchor, Object value) {
+    requireNonNull(anchor);
+    Object normalized = TomlValues.normalize(value);
+    return insertEntry(anchor, normalized, false);
+  }
+
+  @Override
+  public ListTomlArray insertAfter(TomlElement anchor, Object value) {
+    requireNonNull(anchor);
+    Object normalized = TomlValues.normalize(value);
+    return insertEntry(anchor, normalized, true);
+  }
+
+  // Shared by insertBefore(TomlElement, Object), insertAfter(TomlElement, Object), insertBefore(int, Object), and
+  // insertAfter(int, Object); anchor is already validated non-null, and value already converted. Walks elements() once,
+  // counting the Entry.Indexed elements seen before the position the new entry is inserted at: a comment anchor between
+  // two entries gives the same entryIndex for before and after alike, while an anchor that is itself an entry gives one
+  // more for after than for before, since the anchor entry then counts as before the insertion point. after selects
+  // which side of the anchor the new entry goes on.
+  @SuppressWarnings("ReferenceEquality") // a sequence search is about identity, never equals
+  private ListTomlArray insertEntry(TomlElement anchor, Object normalized, boolean after) {
+    List<TomlElement> sequence = elements();
+    int entryIndex = 0;
+    int sequenceIndex = -1;
+    for (int i = 0; i < sequence.size(); i++) {
+      TomlElement element = sequence.get(i);
+      if (element == anchor) {
+        sequenceIndex = after ? i + 1 : i;
+        if (after && element instanceof Entry.Indexed) {
+          entryIndex++;
+        }
+        break;
+      }
+      if (element instanceof Entry.Indexed) {
+        entryIndex++;
+      }
+    }
+    if (sequenceIndex < 0) {
+      throw new NoSuchElementException("anchor is not an element of this array");
+    }
+    Entry.Indexed entry = newEditedEntry(Value.of(normalized, null), Collections.emptyList());
+    insert(sequenceIndex, entry);
+    entries.add(entryIndex, entry);
     return this;
   }
 
@@ -166,6 +242,46 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
   @Override
   public ListTomlArray addComment(TomlComment comment) {
     addEditedComment(comment.requireUnattached().withoutPosition());
+    return this;
+  }
+
+  @Override
+  public ListTomlArray insertCommentBefore(int index, TomlComment comment) {
+    Objects.checkIndex(index, size());
+    requireNonNull(comment);
+    return insertComment(entries.get(index), comment, false);
+  }
+
+  @Override
+  public ListTomlArray insertCommentAfter(int index, TomlComment comment) {
+    Objects.checkIndex(index, size());
+    requireNonNull(comment);
+    return insertComment(entries.get(index), comment, true);
+  }
+
+  @Override
+  public ListTomlArray insertCommentBefore(TomlElement anchor, TomlComment comment) {
+    requireNonNull(anchor);
+    requireNonNull(comment);
+    return insertComment(anchor, comment, false);
+  }
+
+  @Override
+  public ListTomlArray insertCommentAfter(TomlElement anchor, TomlComment comment) {
+    requireNonNull(anchor);
+    requireNonNull(comment);
+    return insertComment(anchor, comment, true);
+  }
+
+  // Shared by insertCommentBefore(TomlElement, TomlComment), insertCommentAfter(TomlElement, TomlComment),
+  // insertCommentBefore(int, TomlComment), and insertCommentAfter(int, TomlComment); anchor and comment are already
+  // validated non-null. after selects which side of the anchor the comment goes on.
+  private ListTomlArray insertComment(TomlElement anchor, TomlComment comment, boolean after) {
+    int index = indexOfElement(anchor);
+    if (index < 0) {
+      throw new NoSuchElementException("anchor is not an element of this array");
+    }
+    insertEditedComment(after ? index + 1 : index, comment.requireUnattached().withoutPosition());
     return this;
   }
 

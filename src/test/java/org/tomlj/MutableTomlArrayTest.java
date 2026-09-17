@@ -14,6 +14,7 @@ package org.tomlj;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -27,6 +28,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -238,6 +240,13 @@ class MutableTomlArrayTest {
   void shouldRejectValuesTomlCannotRepresentThroughSet(Object value) {
     MutableTomlArray array = MutableTomlArray.of(1L);
     assertThrows(IllegalArgumentException.class, () -> array.set(0, value));
+  }
+
+  @ParameterizedTest
+  @MethodSource("badValues")
+  void shouldRejectValuesTomlCannotRepresentThroughInsertBefore(Object value) {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+    assertThrows(IllegalArgumentException.class, () -> array.insertBefore(0, value));
   }
 
   @Test
@@ -586,5 +595,498 @@ class MutableTomlArrayTest {
     TomlComment attached = array.comments(0).get(0);
 
     assertFalse(array.removeComment(attached));
+  }
+
+  @Test
+  void shouldInsertAtTheStartMiddleAndEndOfAnArray() {
+    MutableTomlArray array = MutableTomlArray.of(1L, 2L);
+
+    array.insertBefore(0, 0L);
+    array.insertAfter(1, 9L);
+    array.insertAfter(array.size() - 1, 3L);
+
+    assertEquals(List.of(0L, 1L, 9L, 2L, 3L), array.toList());
+  }
+
+  @Test
+  void shouldInsertBeforeAnEntryThatAnUnattachedCommentPrecedes() {
+    // A comment run needs a blank line after it, before the next entry, to be unattached rather than that entry's
+    // ABOVE run; see Comments' class documentation.
+    LinkedTomlTable table = parse("a = [\n  1,\n  # c\n\n  2,\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    TomlComment comment = (TomlComment) array.elements().get(1);
+    Entry.Indexed entryForTwo = array.entry(1);
+    TomlPosition positionOfTwo = array.inputPositionOf(1);
+
+    array.insertBefore(1, 9L);
+
+    assertEquals(List.of(1L, 9L, 2L), array.toList());
+    assertEquals(9L, array.get(1));
+    List<TomlElement> elements = array.elements();
+    assertEquals(4, elements.size());
+    assertEquals(1L, ((TomlEntry) elements.get(0)).value().get());
+    assertSame(comment, elements.get(1));
+    assertEquals(9L, ((TomlEntry) elements.get(2)).value().get());
+    assertSame(entryForTwo, elements.get(3));
+    assertSame(entryForTwo, array.entry(2));
+    assertNull(array.inputPositionOf(1));
+    assertEquals(positionOfTwo, array.inputPositionOf(2));
+  }
+
+  @Test
+  void shouldMarkOnlyTheNewEntryModifiedWhenInsertingIntoAParsedArray() {
+    LinkedTomlTable table = parse("a = [1, 2]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+
+    array.insertBefore(1, 9L);
+
+    assertTrue(array.isModified(1));
+    assertFalse(array.isModified(0));
+    assertFalse(array.isModified(2));
+    assertTrue(array.isModified());
+  }
+
+  @Test
+  void shouldStoreATableValueAsADeepCopyWhenInsertingIntoAnArray() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+    MutableTomlTable original = MutableTomlTable.create();
+    original.set("x", 1L);
+
+    array.insertBefore(0, original);
+
+    original.set("x", 2L);
+    assertEquals(1L, array.getTable(0).get("x"));
+  }
+
+  @Test
+  void shouldRejectOutOfBoundsIndexWhenInsertingAtAnIndex() {
+    MutableTomlArray array = MutableTomlArray.of(1L, 2L);
+
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertBefore(-1, 9L));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertBefore(array.size(), 9L));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertBefore(array.size() + 1, 9L));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertAfter(-1, 9L));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertAfter(array.size(), 9L));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertAfter(array.size() + 1, 9L));
+
+    assertEquals(List.of(1L, 2L), array.toList());
+
+    MutableTomlArray empty = MutableTomlArray.create();
+    assertThrows(IndexOutOfBoundsException.class, () -> empty.insertBefore(0, 9L));
+    assertThrows(IndexOutOfBoundsException.class, () -> empty.insertAfter(0, 9L));
+  }
+
+  @Test
+  void shouldRejectNullAndUnconvertibleValuesWhenInsertingIntoAnArray() {
+    MutableTomlArray array = MutableTomlArray.of(1L, 2L);
+
+    assertThrows(NullPointerException.class, () -> array.insertBefore(1, null));
+    assertThrows(IllegalArgumentException.class, () -> array.insertBefore(1, new Object()));
+
+    assertEquals(List.of(1L, 2L), array.toList());
+  }
+
+  @Test
+  void shouldInsertCommentsAtTheStartMiddleAndEndOfAnArray() {
+    MutableTomlArray array = MutableTomlArray.of(1L, 2L);
+
+    array.insertCommentBefore(0, "first");
+    array.insertCommentBefore(1, List.of("middle"));
+    array.insertCommentAfter(array.size() - 1, TomlComment.ofLines(List.of("last"), TomlComment.Placement.UNATTACHED));
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(5, elements.size());
+    assertEquals("first", ((TomlComment) elements.get(0)).text());
+    assertEquals(1L, ((TomlEntry) elements.get(1)).value().get());
+    assertEquals("middle", ((TomlComment) elements.get(2)).text());
+    assertEquals(2L, ((TomlEntry) elements.get(3)).value().get());
+    assertEquals("last", ((TomlComment) elements.get(4)).text());
+  }
+
+  @Test
+  void shouldSplitAnInsertedCommentLineAtANewline() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+
+    array.insertCommentBefore(0, "one\ntwo", "three");
+    array.insertCommentAfter(0, List.of("four\nfive"));
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(List.of("one", "two", "three"), ((TomlComment) elements.get(0)).lines());
+    assertEquals(List.of("four", "five"), ((TomlComment) elements.get(2)).lines());
+  }
+
+  @Test
+  void shouldInsertAParsedUnattachedCommentBeforeAnEntryWithoutItsPosition() {
+    LinkedTomlTable table = parse("a = [\n1,\n\n# note\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    TomlComment parsed = (TomlComment) array.elements().get(1);
+    assertNotNull(parsed.position());
+
+    array.insertCommentBefore(0, parsed);
+
+    TomlComment inserted = (TomlComment) array.elements().get(0);
+    assertEquals(3, array.elements().size());
+    assertEquals(TomlComment.Placement.UNATTACHED, inserted.placement());
+    assertNull(inserted.position());
+    assertEquals(parsed.lines(), inserted.lines());
+    assertNotSame(parsed, inserted);
+    assertTrue(array.isModified());
+  }
+
+  @Test
+  void shouldFindACommentInsertedBeforeAnEntryWithRemoveComment() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+
+    array.insertCommentBefore(0, "note");
+
+    TomlComment inserted = (TomlComment) array.elements().get(0);
+    assertTrue(array.removeComment(inserted));
+  }
+
+  @Test
+  void shouldRejectOutOfBoundsIndexEmptyLinesAndNullCommentWhenInsertingACommentAtAnIndex() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertCommentBefore(-1, "x"));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertCommentBefore(array.size(), "x"));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertCommentBefore(array.size() + 1, "x"));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertCommentAfter(-1, "x"));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertCommentAfter(array.size(), "x"));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.insertCommentAfter(array.size() + 1, "x"));
+    assertThrows(IllegalArgumentException.class, () -> array.insertCommentBefore(0, List.of()));
+    assertThrows(NullPointerException.class, () -> array.insertCommentBefore(0, (TomlComment) null));
+
+    MutableTomlArray empty = MutableTomlArray.create();
+    assertThrows(IndexOutOfBoundsException.class, () -> empty.insertCommentBefore(0, "x"));
+    assertThrows(IndexOutOfBoundsException.class, () -> empty.insertCommentAfter(0, "x"));
+  }
+
+  @Test
+  void shouldInsertBeforeALeadingUnattachedComment() {
+    LinkedTomlTable table = parse("a = [\n# lead\n\n1,\n2,\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    TomlElement lead = array.elements().get(0);
+
+    array.insertBefore(lead, 0L);
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(4, elements.size());
+    assertEquals(0L, ((TomlEntry) elements.get(0)).value().get());
+    assertEquals("lead", ((TomlComment) elements.get(1)).text());
+    assertEquals(1L, ((TomlEntry) elements.get(2)).value().get());
+    assertEquals(2L, ((TomlEntry) elements.get(3)).value().get());
+    assertEquals(3, array.size());
+    assertEquals(List.of(0L, 1L, 2L), array.toList());
+    assertEquals(0L, array.get(0));
+    assertEquals(1L, array.get(1));
+    assertEquals(2L, array.get(2));
+  }
+
+  @Test
+  void shouldInsertAfterTheLastEntryWhenATrailingCommentFollowsIt() {
+    LinkedTomlTable table = parse("a = [\n1,\n2,\n\n# trail\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    Entry.Indexed lastEntry = array.entry(1);
+
+    array.insertAfter(lastEntry, 9L);
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(4, elements.size());
+    assertEquals(1L, ((TomlEntry) elements.get(0)).value().get());
+    assertEquals(2L, ((TomlEntry) elements.get(1)).value().get());
+    assertEquals(9L, ((TomlEntry) elements.get(2)).value().get());
+    assertEquals("trail", ((TomlComment) elements.get(3)).text());
+    assertEquals(3, array.size());
+    assertEquals(List.of(1L, 2L, 9L), array.toList());
+    assertEquals(1L, array.get(0));
+    assertEquals(2L, array.get(1));
+    assertEquals(9L, array.get(2));
+  }
+
+  @Test
+  void shouldInsertBetweenTwoConsecutiveUnattachedComments() {
+    LinkedTomlTable table = parse("a = [\n1,\n\n# one\n\n# two\n\n2,\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    TomlElement two = array.elements().get(2);
+
+    array.insertBefore(two, 9L);
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(5, elements.size());
+    assertEquals(1L, ((TomlEntry) elements.get(0)).value().get());
+    assertEquals("one", ((TomlComment) elements.get(1)).text());
+    assertEquals(9L, ((TomlEntry) elements.get(2)).value().get());
+    assertEquals("two", ((TomlComment) elements.get(3)).text());
+    assertEquals(2L, ((TomlEntry) elements.get(4)).value().get());
+    assertEquals(List.of(1L, 9L, 2L), array.toList());
+    assertEquals(1L, array.get(0));
+    assertEquals(9L, array.get(1));
+    assertEquals(2L, array.get(2));
+  }
+
+  @Test
+  void shouldInsertACommentBeforeAndAfterALeadingUnattachedComment() {
+    LinkedTomlTable table = parse("a = [\n# lead\n\n1,\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    TomlElement lead = array.elements().get(0);
+
+    array.insertCommentBefore(lead, "before lead");
+    array.insertCommentAfter(lead, "after lead");
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(4, elements.size());
+    assertEquals("before lead", ((TomlComment) elements.get(0)).text());
+    assertEquals("lead", ((TomlComment) elements.get(1)).text());
+    assertEquals("after lead", ((TomlComment) elements.get(2)).text());
+    assertEquals(1L, ((TomlEntry) elements.get(3)).value().get());
+  }
+
+  @Test
+  void shouldInsertACommentBeforeAndAfterTheLastEntryWhenATrailingCommentFollowsIt() {
+    LinkedTomlTable table = parse("a = [\n1,\n\n# trail\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    Entry.Indexed lastEntry = array.entry(0);
+
+    array.insertCommentAfter(lastEntry, "right after");
+    array.insertCommentBefore(lastEntry, "right before");
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(4, elements.size());
+    assertEquals("right before", ((TomlComment) elements.get(0)).text());
+    assertEquals(1L, ((TomlEntry) elements.get(1)).value().get());
+    assertEquals("right after", ((TomlComment) elements.get(2)).text());
+    assertEquals("trail", ((TomlComment) elements.get(3)).text());
+  }
+
+  @Test
+  void shouldInsertACommentBetweenTwoConsecutiveUnattachedCommentsBeforeAndAfterEach() {
+    LinkedTomlTable table = parse("a = [\n1,\n\n# one\n\n# two\n\n2,\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    TomlElement one = array.elements().get(1);
+    TomlElement two = array.elements().get(2);
+
+    array.insertCommentAfter(one, "after one");
+    array.insertCommentBefore(two, "before two");
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(6, elements.size());
+    assertEquals(1L, ((TomlEntry) elements.get(0)).value().get());
+    assertEquals("one", ((TomlComment) elements.get(1)).text());
+    assertEquals("after one", ((TomlComment) elements.get(2)).text());
+    assertEquals("before two", ((TomlComment) elements.get(3)).text());
+    assertEquals("two", ((TomlComment) elements.get(4)).text());
+    assertEquals(2L, ((TomlEntry) elements.get(5)).value().get());
+  }
+
+  @Test
+  void shouldInsertBeforeAndAfterAnEntryThroughItsElement() {
+    MutableTomlArray array = MutableTomlArray.of(1L, 2L);
+
+    array.insertBefore(array.entry(1), 9L);
+    array.insertAfter(array.elements().get(0), 8L);
+
+    assertEquals(List.of(1L, 8L, 9L, 2L), array.toList());
+  }
+
+  @Test
+  void shouldRejectAForeignAnchorFromANestedArrayOrACopy() {
+    LinkedTomlTable table = parse("a = [ [1], 2 ]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    ListTomlArray nested = (ListTomlArray) array.get(0);
+    TomlElement nestedAnchor = nested.elements().get(0);
+
+    NoSuchElementException e1 = assertThrows(NoSuchElementException.class, () -> array.insertBefore(nestedAnchor, 9L));
+    assertEquals("anchor is not an element of this array", e1.getMessage());
+
+    MutableTomlArray copy = MutableTomlArray.copyOf(array);
+    TomlElement copyAnchor = copy.elements().get(0);
+    assertThrows(NoSuchElementException.class, () -> array.insertBefore(copyAnchor, 9L));
+  }
+
+  @Test
+  void shouldRejectANullAnchorOrNullValueThroughTheElementForm() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+    TomlElement anchor = array.elements().get(0);
+
+    assertThrows(NullPointerException.class, () -> array.insertBefore(null, 1L));
+    assertThrows(NullPointerException.class, () -> array.insertBefore(anchor, null));
+  }
+
+  @Test
+  void shouldRejectInsertingAnAttachedComment() {
+    ListTomlArray array = (ListTomlArray) parse("a = [\n# above\n1\n]\n").get("a");
+    TomlComment attached = array.comments(0).get(0);
+    TomlElement anchor = array.entry(0);
+
+    assertThrows(IllegalArgumentException.class, () -> array.insertCommentBefore(0, attached));
+    assertThrows(IllegalArgumentException.class, () -> array.insertCommentAfter(0, attached));
+    assertThrows(IllegalArgumentException.class, () -> array.insertCommentBefore(anchor, attached));
+    assertThrows(IllegalArgumentException.class, () -> array.insertCommentAfter(anchor, attached));
+
+    assertEquals(1, array.elements().size());
+    assertFalse(array.isModified());
+  }
+
+  @Test
+  void shouldRejectANullAnchorOrNullCommentThroughTheElementForm() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+    TomlElement anchor = array.elements().get(0);
+
+    assertThrows(NullPointerException.class, () -> array.insertCommentBefore(null, "x"));
+    assertThrows(NullPointerException.class, () -> array.insertCommentBefore(anchor, (TomlComment) null));
+  }
+
+  @Test
+  void shouldMarkOnlyTheInsertedEntryModifiedThroughTheElementFormAndNotShiftedEntries() {
+    LinkedTomlTable table = parse("a = [1, 2]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    Entry.Indexed anchor = array.entry(0);
+
+    array.insertBefore(anchor, 9L);
+
+    assertTrue(array.isModified(0));
+    assertFalse(array.isModified(1));
+    assertFalse(array.isModified(2));
+    assertTrue(array.isModified());
+  }
+
+  @Test
+  void shouldMarkTheArrayModifiedWhenInsertingACommentThroughTheElementForm() {
+    LinkedTomlTable table = parse("a = [1]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    assertFalse(array.isModified());
+
+    array.insertCommentBefore(array.entry(0), "note");
+
+    assertTrue(array.isModified());
+    assertFalse(array.isModified(0));
+  }
+
+  @Test
+  void shouldInsertCommentTextFormsThroughTheElementAnchorAndValidateLines() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+    TomlElement anchor = array.elements().get(0);
+
+    array.insertCommentBefore(anchor, "above");
+    array.insertCommentAfter(anchor, List.of("after"));
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(3, elements.size());
+    assertEquals("above", ((TomlComment) elements.get(0)).text());
+    assertEquals(1L, ((TomlEntry) elements.get(1)).value().get());
+    assertEquals("after", ((TomlComment) elements.get(2)).text());
+
+    assertThrows(IllegalArgumentException.class, () -> array.insertCommentBefore(anchor, List.of()));
+    String badLine = "bad" + (char) 1 + "line";
+    assertThrows(IllegalArgumentException.class, () -> array.insertCommentBefore(anchor, badLine));
+  }
+
+  @Test
+  void shouldInsertBeforeAndAfterEntriesAroundAnUnattachedComment() {
+    LinkedTomlTable table = parse("a = [\n1,\n\n# note\n\n2,\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+
+    // insertBefore(1, ...) first, so that index 0 still names the entry for 1 when insertAfter(0, ...) runs: an
+    // insertAfter(0, ...) done first would place the new entry at index 1, ahead of insertBefore(1, ...)'s target.
+    array.insertBefore(1, 8L);
+    array.insertAfter(0, 9L);
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(5, elements.size());
+    assertEquals(1L, ((TomlEntry) elements.get(0)).value().get());
+    assertEquals(9L, ((TomlEntry) elements.get(1)).value().get());
+    assertEquals("note", ((TomlComment) elements.get(2)).text());
+    assertEquals(8L, ((TomlEntry) elements.get(3)).value().get());
+    assertEquals(2L, ((TomlEntry) elements.get(4)).value().get());
+    assertEquals(List.of(1L, 9L, 8L, 2L), array.toList());
+    assertEquals(1L, array.get(0));
+    assertEquals(9L, array.get(1));
+    assertEquals(8L, array.get(2));
+    assertEquals(2L, array.get(3));
+  }
+
+  @Test
+  void shouldInsertAfterTheLastEntryBeforeATrailingCommentUnlikeAdd() {
+    LinkedTomlTable table = parse("a = [\n1,\n\n# trail\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+
+    array.insertAfter(array.size() - 1, 9L);
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(3, elements.size());
+    assertEquals(1L, ((TomlEntry) elements.get(0)).value().get());
+    assertEquals(9L, ((TomlEntry) elements.get(1)).value().get());
+    assertEquals("trail", ((TomlComment) elements.get(2)).text());
+
+    LinkedTomlTable freshTable = parse("a = [\n1,\n\n# trail\n]\n");
+    ListTomlArray fresh = (ListTomlArray) freshTable.get("a");
+
+    fresh.add(9L);
+
+    List<TomlElement> freshElements = fresh.elements();
+    assertEquals(3, freshElements.size());
+    assertEquals(1L, ((TomlEntry) freshElements.get(0)).value().get());
+    assertEquals("trail", ((TomlComment) freshElements.get(1)).text());
+    assertEquals(9L, ((TomlEntry) freshElements.get(2)).value().get());
+  }
+
+  @Test
+  void shouldInsertCommentsBeforeAndAfterEntriesAroundAnUnattachedComment() {
+    LinkedTomlTable table = parse("a = [\n1,\n\n# note\n\n2,\n]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+
+    array.insertCommentAfter(0, "x");
+    array.insertCommentBefore(1, "y");
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(5, elements.size());
+    assertEquals(1L, ((TomlEntry) elements.get(0)).value().get());
+    assertEquals("x", ((TomlComment) elements.get(1)).text());
+    assertEquals("note", ((TomlComment) elements.get(2)).text());
+    assertEquals("y", ((TomlComment) elements.get(3)).text());
+    assertEquals(2L, ((TomlEntry) elements.get(4)).value().get());
+  }
+
+  @Test
+  void shouldMarkOnlyTheInsertedEntryModifiedThroughInsertAfterAndNotShiftedEntries() {
+    LinkedTomlTable table = parse("a = [1, 2]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+
+    array.insertAfter(0, 9L);
+
+    assertFalse(array.isModified(0));
+    assertTrue(array.isModified(1));
+    assertFalse(array.isModified(2));
+    assertTrue(array.isModified());
+  }
+
+  @Test
+  void shouldMarkTheArrayModifiedWhenInsertingACommentThroughInsertCommentAfter() {
+    LinkedTomlTable table = parse("a = [1]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+    assertFalse(array.isModified());
+
+    array.insertCommentAfter(0, "note");
+
+    assertTrue(array.isModified());
+    assertFalse(array.isModified(0));
+  }
+
+  @Test
+  void shouldInsertCommentTextFormsAtAnIndexForBothDirectionsAndValidateLines() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+
+    array.insertCommentBefore(0, "above");
+    array.insertCommentAfter(0, List.of("after"));
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(3, elements.size());
+    assertEquals("above", ((TomlComment) elements.get(0)).text());
+    assertEquals(1L, ((TomlEntry) elements.get(1)).value().get());
+    assertEquals("after", ((TomlComment) elements.get(2)).text());
+
+    assertThrows(IllegalArgumentException.class, () -> array.insertCommentBefore(0, List.of()));
+    String badLine = "bad" + (char) 1 + "line";
+    assertThrows(IllegalArgumentException.class, () -> array.insertCommentBefore(0, badLine));
   }
 }

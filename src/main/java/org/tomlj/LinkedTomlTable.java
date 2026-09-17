@@ -12,6 +12,7 @@
  */
 package org.tomlj;
 
+import static java.util.Objects.requireNonNull;
 import static org.tomlj.Parser.parseDottedKey;
 import static org.tomlj.TomlType.typeFor;
 
@@ -22,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -230,6 +232,20 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
   }
 
   /**
+   * Build a key/value pair added through the editing API: no position, and marked as added.
+   *
+   * @param key The key.
+   * @param value The value, already wrapped; see {@link Value#of}.
+   * @param comments The comments attached to the entry.
+   * @return The entry, not yet part of any table.
+   */
+  private static Entry.KeyValue newEditedEntry(String key, Value value, List<TomlComment> comments) {
+    Entry.KeyValue entry = new Entry.KeyValue(key, value, null, comments);
+    entry.valueModified = true;
+    return entry;
+  }
+
+  /**
    * Append a key/value pair added through the editing API: no position, and marked as added.
    *
    * @param key The key.
@@ -238,8 +254,9 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
    * @return The entry created.
    */
   private Entry.KeyValue putEdited(String key, Value value, List<TomlComment> comments) {
-    Entry.KeyValue entry = put(key, value, null, comments);
-    entry.valueModified = true;
+    Entry.KeyValue entry = newEditedEntry(key, value, comments);
+    add(entry);
+    properties.put(key, entry);
     return entry;
   }
 
@@ -467,6 +484,138 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
       table.putEdited(key, Value.of(normalized, null), Collections.emptyList());
     }
     return this;
+  }
+
+  @Override
+  public LinkedTomlTable insertBefore(List<String> anchorPath, String key, Object value) {
+    return insert(anchorPath, key, value, false);
+  }
+
+  @Override
+  public LinkedTomlTable insertAfter(List<String> anchorPath, String key, Object value) {
+    return insert(anchorPath, key, value, true);
+  }
+
+  // Shared by insertBefore(List, String, Object) and insertAfter(List, String, Object); after selects which side of
+  // the anchor the new entry goes on.
+  private LinkedTomlTable insert(List<String> anchorPath, String key, Object value, boolean after) {
+    if (anchorPath.isEmpty()) {
+      throw new IllegalArgumentException("path is empty");
+    }
+    requireNoNullElement(anchorPath);
+    requireNonNull(key);
+    TomlValues.checkKey(key);
+    Object normalized = TomlValues.normalize(value);
+
+    LinkedTomlTable table = parentTable(anchorPath);
+    String anchorKey = anchorPath.get(anchorPath.size() - 1);
+    Entry.KeyValue anchor = (table != null) ? table.properties.get(anchorKey) : null;
+    if (anchor == null) {
+      throw new NoSuchElementException(Toml.joinKeyPath(anchorPath) + " is not set");
+    }
+    table.insertEntry(anchor, key, normalized, after);
+    return this;
+  }
+
+  @Override
+  public LinkedTomlTable insertBefore(TomlElement anchor, String key, Object value) {
+    requireNonNull(anchor);
+    requireNonNull(key);
+    TomlValues.checkKey(key);
+    Object normalized = TomlValues.normalize(value);
+    return insertEntry(anchor, key, normalized, false);
+  }
+
+  @Override
+  public LinkedTomlTable insertAfter(TomlElement anchor, String key, Object value) {
+    requireNonNull(anchor);
+    requireNonNull(key);
+    TomlValues.checkKey(key);
+    Object normalized = TomlValues.normalize(value);
+    return insertEntry(anchor, key, normalized, true);
+  }
+
+  // Shared by insertBefore(TomlElement, String, Object) and insertAfter(TomlElement, String, Object), and by
+  // insert(List, String, Object, boolean) once it has walked to the anchor's own table; anchor and key are already
+  // validated non-null, and value already converted. after selects which side of the anchor the new entry goes on.
+  private LinkedTomlTable insertEntry(TomlElement anchor, String key, Object normalized, boolean after) {
+    int index = indexOfElement(anchor);
+    if (index < 0) {
+      throw new NoSuchElementException("anchor is not an element of this table");
+    }
+    if (properties.containsKey(key)) {
+      throw new TomlKeyAlreadySetException(Toml.joinKeyPath(Collections.singletonList(key)) + " is already set");
+    }
+    Entry.KeyValue entry = newEditedEntry(key, Value.of(normalized, null), Collections.emptyList());
+    insert(after ? index + 1 : index, entry);
+    reindex();
+    return this;
+  }
+
+  @Override
+  public LinkedTomlTable insertCommentBefore(List<String> anchorPath, TomlComment comment) {
+    return insertComment(anchorPath, comment, false);
+  }
+
+  @Override
+  public LinkedTomlTable insertCommentAfter(List<String> anchorPath, TomlComment comment) {
+    return insertComment(anchorPath, comment, true);
+  }
+
+  // Shared by insertCommentBefore(List, TomlComment) and insertCommentAfter(List, TomlComment); after selects which
+  // side of the anchor the comment goes on.
+  private LinkedTomlTable insertComment(List<String> anchorPath, TomlComment comment, boolean after) {
+    if (anchorPath.isEmpty()) {
+      throw new IllegalArgumentException("path is empty");
+    }
+    requireNoNullElement(anchorPath);
+
+    LinkedTomlTable table = parentTable(anchorPath);
+    String anchorKey = anchorPath.get(anchorPath.size() - 1);
+    Entry.KeyValue anchor = (table != null) ? table.properties.get(anchorKey) : null;
+    if (anchor == null) {
+      throw new NoSuchElementException(Toml.joinKeyPath(anchorPath) + " is not set");
+    }
+    table.insertComment(anchor, comment, after);
+    return this;
+  }
+
+  @Override
+  public LinkedTomlTable insertCommentBefore(TomlElement anchor, TomlComment comment) {
+    requireNonNull(anchor);
+    requireNonNull(comment);
+    return insertComment(anchor, comment, false);
+  }
+
+  @Override
+  public LinkedTomlTable insertCommentAfter(TomlElement anchor, TomlComment comment) {
+    requireNonNull(anchor);
+    requireNonNull(comment);
+    return insertComment(anchor, comment, true);
+  }
+
+  // Shared by insertCommentBefore(TomlElement, TomlComment) and insertCommentAfter(TomlElement, TomlComment), and by
+  // insertComment(List, TomlComment, boolean) once it has walked to the anchor's own table; anchor and comment are
+  // already validated non-null. after selects which side of the anchor the comment goes on.
+  private LinkedTomlTable insertComment(TomlElement anchor, TomlComment comment, boolean after) {
+    int index = indexOfElement(anchor);
+    if (index < 0) {
+      throw new NoSuchElementException("anchor is not an element of this table");
+    }
+    insertEditedComment(after ? index + 1 : index, comment.requireUnattached().withoutPosition());
+    return this;
+  }
+
+  // Rebuild properties from elements(), in sequence order. A LinkedHashMap otherwise iterates in insertion order, so
+  // an entry inserted ahead of others already indexed would be listed last; run after such an insertion.
+  private void reindex() {
+    properties.clear();
+    for (TomlElement element : elements()) {
+      if (element instanceof Entry.KeyValue) {
+        Entry.KeyValue entry = (Entry.KeyValue) element;
+        properties.put(entry.key, entry);
+      }
+    }
   }
 
   // Throws before anything else changes if any element of path is null. A loop, not path.contains(null): List.of()

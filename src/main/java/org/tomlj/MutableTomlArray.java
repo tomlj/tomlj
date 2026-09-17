@@ -16,6 +16,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.framework.qual.DefaultQualifier;
@@ -37,7 +38,9 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * <p>
  * An entry's attached comments are edited through its {@link MutableTomlEntry} obtained from {@link #entry}, or through
  * the shortcuts here. An unattached comment is added after the last element with {@link #addComment} and removed with
- * {@link #removeComment}.
+ * {@link #removeComment}. An entry or a comment can be inserted before or after the entry at an index, or before or
+ * after any element of this array's sequence, as {@link #elements()} returns it, with {@link #insertBefore},
+ * {@link #insertAfter}, {@link #insertCommentBefore}, or {@link #insertCommentAfter}.
  *
  * <p>
  * An array read from {@code [[x]]} headers accepts any value; nothing requires its entries to stay tables.
@@ -88,6 +91,85 @@ public interface MutableTomlArray extends TomlArray {
    *         TOML.
    */
   MutableTomlArray add(Object value);
+
+  /**
+   * Insert a value into this array immediately before the entry at an index.
+   *
+   * <p>
+   * The new entry goes immediately before the entry at {@code index} in this array's {@link #elements()}, so an
+   * unattached comment beside that entry stays on its own side. The new entry has no position and no comments, and
+   * {@code value} is converted as {@link #add(Object)} converts one. A table or array is stored as a deep copy, made as
+   * {@link #copyOf(TomlArray)} makes one, so it has no positions.
+   *
+   * @param index The array index of the entry to insert before.
+   * @param value The value to insert.
+   * @return This array.
+   * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
+   * @throws NullPointerException If {@code value} is {@code null}.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
+   */
+  MutableTomlArray insertBefore(int index, Object value);
+
+  /**
+   * Insert a value into this array immediately after the entry at an index.
+   *
+   * <p>
+   * The new entry goes immediately after the entry at {@code index} in this array's {@link #elements()}, so an
+   * unattached comment beside that entry stays on its own side. {@code insertAfter(size() - 1, value)} differs from
+   * {@link #add(Object)}: it places the new entry immediately after the last entry, before any unattached comments that
+   * follow it, while {@code add} appends after the last element. The new entry has no position and no comments, and
+   * {@code value} is converted as {@link #add(Object)} converts one. A table or array is stored as a deep copy, made as
+   * {@link #copyOf(TomlArray)} makes one, so it has no positions.
+   *
+   * @param index The array index of the entry to insert after.
+   * @param value The value to insert.
+   * @return This array.
+   * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
+   * @throws NullPointerException If {@code value} is {@code null}.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
+   */
+  MutableTomlArray insertAfter(int index, Object value);
+
+  /**
+   * Insert a value into this array immediately before an element of its sequence.
+   *
+   * <p>
+   * The anchor is an element of this array's own {@link #elements()}, matched by identity: an element of a sub-array, a
+   * copy, or another document is rejected, even if it is equal. It may be an entry or an unattached comment; "before an
+   * entry" means before the entry itself, so a comment attached above it stays attached to it. The new entry has no
+   * position and no comments, and {@code value} is converted as {@link #add(Object)} converts one. A table or array is
+   * stored as a deep copy, made as {@link #copyOf(TomlArray)} makes one, so it has no positions.
+   *
+   * @param anchor The element to insert before.
+   * @param value The value to insert.
+   * @return This array.
+   * @throws NullPointerException If {@code anchor} or {@code value} is {@code null}.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
+   * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
+   */
+  MutableTomlArray insertBefore(TomlElement anchor, Object value);
+
+  /**
+   * Insert a value into this array immediately after an element of its sequence.
+   *
+   * <p>
+   * The new entry is placed immediately after {@code anchor}, matched as {@link #insertBefore(TomlElement, Object)}
+   * matches one. The new entry has no position and no comments, and {@code value} is converted as {@link #add(Object)}
+   * converts one. A table or array is stored as a deep copy, made as {@link #copyOf(TomlArray)} makes one, so it has no
+   * positions.
+   *
+   * @param anchor The element to insert after.
+   * @param value The value to insert.
+   * @return This array.
+   * @throws NullPointerException If {@code anchor} or {@code value} is {@code null}.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
+   * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
+   */
+  MutableTomlArray insertAfter(TomlElement anchor, Object value);
 
   /**
    * Replace the value at an index.
@@ -312,6 +394,200 @@ public interface MutableTomlArray extends TomlArray {
    * @throws IllegalArgumentException If {@code comment} is attached.
    */
   MutableTomlArray addComment(TomlComment comment);
+
+  /**
+   * Insert an unattached comment into this array immediately before the entry at an index, as
+   * {@link #insertCommentBefore(int, List)} does.
+   *
+   * @param index The array index of the entry to insert before.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it; a line holding a newline is
+   *        split there.
+   * @return This array.
+   * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
+   * @throws NullPointerException If a line is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   */
+  default MutableTomlArray insertCommentBefore(int index, String... lines) {
+    return insertCommentBefore(index, Arrays.asList(lines));
+  }
+
+  /**
+   * Insert an unattached comment into this array immediately before the entry at an index, as
+   * {@link #insertCommentBefore(int, TomlComment)} places one.
+   *
+   * @param index The array index of the entry to insert before.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it; a line holding a newline is
+   *        split there.
+   * @return This array.
+   * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
+   * @throws NullPointerException If {@code lines}, or a line, is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   */
+  default MutableTomlArray insertCommentBefore(int index, List<String> lines) {
+    return insertCommentBefore(index, TomlComment.ofLines(lines, TomlComment.Placement.UNATTACHED));
+  }
+
+  /**
+   * Insert a comment into this array immediately before the entry at an index.
+   *
+   * <p>
+   * The comment is inserted as {@link #addComment(TomlComment)} adds one, its position ignored, immediately before the
+   * entry at {@code index}, as {@link #insertBefore(int, Object)} places a value.
+   *
+   * @param index The array index of the entry to insert before.
+   * @param comment The comment to insert, with no placement.
+   * @return This array.
+   * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
+   * @throws NullPointerException If {@code comment} is {@code null}.
+   * @throws IllegalArgumentException If {@code comment} is attached.
+   */
+  MutableTomlArray insertCommentBefore(int index, TomlComment comment);
+
+  /**
+   * Insert an unattached comment into this array immediately after the entry at an index, as
+   * {@link #insertCommentAfter(int, List)} does.
+   *
+   * @param index The array index of the entry to insert after.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it; a line holding a newline is
+   *        split there.
+   * @return This array.
+   * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
+   * @throws NullPointerException If a line is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   */
+  default MutableTomlArray insertCommentAfter(int index, String... lines) {
+    return insertCommentAfter(index, Arrays.asList(lines));
+  }
+
+  /**
+   * Insert an unattached comment into this array immediately after the entry at an index, as
+   * {@link #insertCommentAfter(int, TomlComment)} places one.
+   *
+   * @param index The array index of the entry to insert after.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it; a line holding a newline is
+   *        split there.
+   * @return This array.
+   * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
+   * @throws NullPointerException If {@code lines}, or a line, is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   */
+  default MutableTomlArray insertCommentAfter(int index, List<String> lines) {
+    return insertCommentAfter(index, TomlComment.ofLines(lines, TomlComment.Placement.UNATTACHED));
+  }
+
+  /**
+   * Insert a comment into this array immediately after the entry at an index.
+   *
+   * <p>
+   * The comment is inserted as {@link #addComment(TomlComment)} adds one, its position ignored, immediately after the
+   * entry at {@code index}, as {@link #insertAfter(int, Object)} places a value.
+   *
+   * @param index The array index of the entry to insert after.
+   * @param comment The comment to insert, with no placement.
+   * @return This array.
+   * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
+   * @throws NullPointerException If {@code comment} is {@code null}.
+   * @throws IllegalArgumentException If {@code comment} is attached.
+   */
+  MutableTomlArray insertCommentAfter(int index, TomlComment comment);
+
+  /**
+   * Insert an unattached comment into this array immediately before an element of its sequence, as
+   * {@link #insertCommentBefore(TomlElement, List)} does.
+   *
+   * @param anchor The element to insert before.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it; a line holding a newline is
+   *        split there.
+   * @return This array.
+   * @throws NullPointerException If {@code anchor}, {@code lines}, or a line is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
+   */
+  default MutableTomlArray insertCommentBefore(TomlElement anchor, String... lines) {
+    return insertCommentBefore(anchor, Arrays.asList(lines));
+  }
+
+  /**
+   * Insert an unattached comment into this array immediately before an element of its sequence, as
+   * {@link #insertCommentBefore(TomlElement, TomlComment)} places one.
+   *
+   * @param anchor The element to insert before.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it; a line holding a newline is
+   *        split there.
+   * @return This array.
+   * @throws NullPointerException If {@code anchor}, {@code lines}, or a line is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
+   */
+  default MutableTomlArray insertCommentBefore(TomlElement anchor, List<String> lines) {
+    return insertCommentBefore(anchor, TomlComment.ofLines(lines, TomlComment.Placement.UNATTACHED));
+  }
+
+  /**
+   * Insert a comment into this array immediately before an element of its sequence.
+   *
+   * <p>
+   * The comment is inserted as {@link #addComment(TomlComment)} adds one, its position ignored. The anchor is an
+   * element of this array's own {@link #elements()}, matched by identity: an element of a sub-array, a copy, or another
+   * document is rejected, even if it is equal. It may be an entry or an unattached comment; "before an entry" means
+   * before the entry itself, so its own attached comments stay attached to it.
+   *
+   * @param anchor The element to insert before.
+   * @param comment The comment to insert, with no placement.
+   * @return This array.
+   * @throws NullPointerException If {@code anchor} or {@code comment} is {@code null}.
+   * @throws IllegalArgumentException If {@code comment} is attached.
+   * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
+   */
+  MutableTomlArray insertCommentBefore(TomlElement anchor, TomlComment comment);
+
+  /**
+   * Insert an unattached comment into this array immediately after an element of its sequence, as
+   * {@link #insertCommentAfter(TomlElement, List)} does.
+   *
+   * @param anchor The element to insert after.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it; a line holding a newline is
+   *        split there.
+   * @return This array.
+   * @throws NullPointerException If {@code anchor}, {@code lines}, or a line is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
+   */
+  default MutableTomlArray insertCommentAfter(TomlElement anchor, String... lines) {
+    return insertCommentAfter(anchor, Arrays.asList(lines));
+  }
+
+  /**
+   * Insert an unattached comment into this array immediately after an element of its sequence, as
+   * {@link #insertCommentAfter(TomlElement, TomlComment)} places one.
+   *
+   * @param anchor The element to insert after.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it; a line holding a newline is
+   *        split there.
+   * @return This array.
+   * @throws NullPointerException If {@code anchor}, {@code lines}, or a line is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
+   */
+  default MutableTomlArray insertCommentAfter(TomlElement anchor, List<String> lines) {
+    return insertCommentAfter(anchor, TomlComment.ofLines(lines, TomlComment.Placement.UNATTACHED));
+  }
+
+  /**
+   * Insert a comment into this array immediately after an element of its sequence.
+   *
+   * <p>
+   * The comment is inserted as {@link #addComment(TomlComment)} adds one, its position ignored, immediately after
+   * {@code anchor}, matched as {@link #insertCommentBefore(TomlElement, TomlComment)} matches one.
+   *
+   * @param anchor The element to insert after.
+   * @param comment The comment to insert, with no placement.
+   * @return This array.
+   * @throws NullPointerException If {@code anchor} or {@code comment} is {@code null}.
+   * @throws IllegalArgumentException If {@code comment} is attached.
+   * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
+   */
+  MutableTomlArray insertCommentAfter(TomlElement anchor, TomlComment comment);
 
   /**
    * Remove an unattached comment, by identity.
