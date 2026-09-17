@@ -72,7 +72,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
         if (separated != null) {
           // A header is written in the document rather than in the section it opens, so the runs before it belong to
           // the root table rather than to that section.
-          CommentContainer container =
+          MutableTomlTable container =
               (((TomlParser.ExpressionContext) child).table() != null) ? rootTable : currentTable;
           separated.forEach(container::addComment);
           separated = null;
@@ -123,7 +123,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
           throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
         }
         currentTable
-            .set(path, value, new TomlPosition(ctx), comments)
+            .set(path, Element.Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
             .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
       }
       return rootTable;

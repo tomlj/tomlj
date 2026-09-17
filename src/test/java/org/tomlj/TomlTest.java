@@ -487,6 +487,30 @@ class TomlTest {
     // @formatter:on
   }
 
+  @Test
+  @SuppressWarnings("deprecation")
+  void shouldReportAnEmptyArrayAsContainingNoTypeBeforeV0_5_0() {
+    TomlParseResult result = Toml.parse("foo = []", TomlVersion.V0_4_0);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    TomlArray array = result.getArray("foo");
+    assertNotNull(array);
+    assertTrue(array.isEmpty());
+    assertFalse(array.containsStrings());
+    assertFalse(array.containsLongs());
+    assertFalse(array.containsTables());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void shouldRejectContainsTypeOnAnEmptyArrayAfterV0_5_0() {
+    TomlParseResult result = Toml.parse("foo = []", TomlVersion.V1_0_0);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    TomlArray array = result.getArray("foo");
+    assertNotNull(array);
+    assertTrue(array.isEmpty());
+    assertThrows(UnsupportedOperationException.class, array::containsStrings);
+  }
+
   @ParameterizedTest
   @MethodSource("arrayElementPositionSupplier")
   void shouldReturnArrayElementPositions(String input, int line0, int column0, int line1, int column1) {

@@ -200,7 +200,7 @@ class MutableTomlTableTest {
     table.set("foo.baz", "two", positionAt(3, 2));
     table.set("foo.buz", EMPTY_ARRAY, positionAt(3, 2));
     table.set("foo.foo", EMPTY_TABLE, positionAt(3, 2));
-    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false, positionAt(1, 1));
     array.append("hello\nthere", positionAt(5, 2));
     array.append("goodbye", positionAt(5, 2));
     table.set("foo.blah", array, positionAt(5, 2));

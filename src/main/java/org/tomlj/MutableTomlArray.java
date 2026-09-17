@@ -15,44 +15,58 @@ package org.tomlj;
 import static org.tomlj.TomlVersion.V0_5_0;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-class MutableTomlArray implements TomlArray, CommentContainer {
+class MutableTomlArray extends ElementContainer<Element.Value> implements TomlArray {
 
-  static MutableTomlArray create(TomlVersion version) {
-    return create(version, false);
+  /**
+   * Create an array for an array written in a document.
+   *
+   * @param version The TOML version.
+   * @param position The position of the array's opening {@code [}, or of its first {@code [[x]]} header if it is an
+   *        array of tables.
+   * @return A new array.
+   */
+  static MutableTomlArray create(TomlVersion version, TomlPosition position) {
+    return create(version, position, false);
   }
 
-  static MutableTomlArray create(TomlVersion version, boolean tableArray) {
-    return version.after(V0_5_0) ? new MutableTomlArray(tableArray) : new MutableHomogeneousTomlArray(tableArray);
+  /**
+   * Create an array for an array written in a document.
+   *
+   * @param version The TOML version.
+   * @param position The position of the array's opening {@code [}, or of its first {@code [[x]]} header if it is an
+   *        array of tables.
+   * @param tableArray {@code true} if this array holds the tables of a {@code [[x]]} header.
+   * @return A new array.
+   */
+  static MutableTomlArray create(TomlVersion version, TomlPosition position, boolean tableArray) {
+    return version.after(V0_5_0) ? new MutableTomlArray(tableArray, position)
+        : new MutableHomogeneousTomlArray(tableArray, position);
   }
 
-  private static class Element {
-    final Object value;
-    final TomlPosition position;
-    // The comments documenting this element: the run above it, then the comment trailing it.
-    final List<TomlComment> comments;
-
-    private Element(Object value, TomlPosition position, List<TomlComment> comments) {
-      this.value = value;
-      this.position = position;
-      this.comments = comments;
-    }
-  }
-
-  private final List<Element> elements = new ArrayList<>();
-  // The comments written in this array that document none of its elements, in document order.
-  private final List<TomlComment> comments = new ArrayList<>();
+  // The values of this array, in document order; the index into this list is the array index. This is a separate
+  // index over the same value elements that elements() holds, kept for lookup by position.
+  private final List<Element.Value> values = new ArrayList<>();
   private final boolean isTableArray;
 
-  MutableTomlArray(boolean isTableArray) {
+  // Final, unlike a table's: an array only ever comes from a literal written in the document, at a position known
+  // as soon as it is created, whereas a table can also be created implicitly by a dotted key and defined later.
+  private final TomlPosition position;
+
+  MutableTomlArray(boolean isTableArray, TomlPosition position) {
     this.isTableArray = isTableArray;
+    this.position = position;
   }
 
   boolean isTableArray() {
     return isTableArray;
+  }
+
+  @Override
+  TomlPosition position() {
+    return position;
   }
 
   @Override
@@ -107,58 +121,62 @@ class MutableTomlArray implements TomlArray, CommentContainer {
 
   @Override
   public int size() {
-    return elements.size();
+    return values.size();
   }
 
   @Override
   public boolean isEmpty() {
-    return elements.isEmpty();
+    return values.isEmpty();
   }
 
   @Override
   public Object get(int index) {
-    return elements.get(index).value;
+    return values.get(index).get();
   }
 
   @Override
   public TomlPosition inputPositionOf(int index) {
-    return elements.get(index).position;
+    return values.get(index).position();
   }
 
+  /**
+   * Append a value to this array's sequence, and index it by position.
+   *
+   * @param value The value.
+   * @param position The input position.
+   * @return This array.
+   */
   MutableTomlArray append(Object value, TomlPosition position) {
-    return append(value, position, Collections.emptyList());
-  }
-
-  MutableTomlArray append(Object value, TomlPosition position, List<TomlComment> comments) {
     if (value instanceof Integer) {
       value = ((Integer) value).longValue();
     }
+    return append(Element.Value.of(value, position));
+  }
 
-    if (!TomlType.typeFor(value).isPresent()) {
-      throw new IllegalArgumentException("Unsupported type " + value.getClass().getSimpleName());
+  /**
+   * Append a value to this array's sequence, and index it by position.
+   *
+   * @param value The value, already wrapped as an element with its comments attached; see
+   *        {@link Element.Value#of(Object, TomlPosition, List)}.
+   * @return This array.
+   */
+  MutableTomlArray append(Element.Value value) {
+    Object rawValue = value.get();
+    if (!TomlType.typeFor(rawValue).isPresent()) {
+      throw new IllegalArgumentException("Unsupported type " + rawValue.getClass().getSimpleName());
     }
-
-    elements.add(new Element(value, position, comments));
+    add(value);
+    values.add(value);
     return this;
   }
 
   @Override
-  public void addComment(TomlComment comment) {
-    comments.add(comment);
-  }
-
-  @Override
-  public List<TomlComment> comments() {
-    return Collections.unmodifiableList(comments);
-  }
-
-  @Override
   public List<TomlComment> comments(int index) {
-    return elements.get(index).comments;
+    return values.get(index).attachedComments();
   }
 
   @Override
   public List<Object> toList() {
-    return elements.stream().map(e -> e.value).collect(Collectors.toList());
+    return values.stream().map(Element.Value::get).collect(Collectors.toList());
   }
 }

@@ -12,7 +12,6 @@
  */
 package org.tomlj;
 
-import static org.tomlj.EmptyTomlArray.EMPTY_ARRAY;
 import static org.tomlj.ParseTrees.singleTokenText;
 import static org.tomlj.TomlVersion.V1_0_0;
 
@@ -180,12 +179,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
    */
   @Override
   public Object visitArray(TomlParser.ArrayContext ctx) {
-    // An array with nothing in it but comments still has to hold them, so it cannot be the shared empty array.
-    List<TomlParser.LineBreakContext> lineBreaks = ctx.lineBreak();
-    if (ctx.arrayValues() == null && (lineBreaks.isEmpty() || !Comments.holdsComments(lineBreaks.get(0)))) {
-      return EMPTY_ARRAY;
-    }
-    MutableTomlArray array = MutableTomlArray.create(version);
+    MutableTomlArray array = MutableTomlArray.create(version, new TomlPosition(ctx));
     List<ParseTree> nodes = Comments.flatten(ctx);
     for (int i = 0; i < nodes.size(); ++i) {
       ParseTree node = nodes.get(i);
@@ -206,7 +200,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     }
     TomlPosition position = new TomlPosition(ctx);
     try {
-      array.append(value, position, comments);
+      array.append(Element.Value.of(value, position, comments));
     } catch (TomlInvalidTypeException e) {
       throw new TomlParseError(e.getMessage(), position);
     }
@@ -264,7 +258,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     Object value = valContext.accept(this);
     if (value != null) {
       table
-          .set(path, value, new TomlPosition(ctx), comments)
+          .set(path, Element.Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
           .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
     }
   }

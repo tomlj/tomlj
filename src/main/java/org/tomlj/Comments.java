@@ -120,7 +120,7 @@ final class Comments {
    * @param index The index of the line break.
    * @param container The array or inline table.
    */
-  static void unattached(List<ParseTree> nodes, int index, CommentContainer container) {
+  static void unattached(List<ParseTree> nodes, int index, ElementContainer<?> container) {
     TomlParser.LineBreakContext lineBreak = (TomlParser.LineBreakContext) nodes.get(index);
     TerminalNode comment = lineEndComment(lineBreak);
     if (comment != null && !endsElementLine(nodes, index)) {
