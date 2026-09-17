@@ -28,7 +28,7 @@ import java.util.stream.Stream;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
-final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements TomlTable {
+final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements MutableTomlTable {
 
   private final Map<String, Entry.KeyValue> properties = new LinkedHashMap<>();
 
@@ -97,7 +97,8 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
 
   @Override
   public Set<String> keySet() {
-    return properties.keySet();
+    // Unmodifiable: removing a key through this set would desync it from the sequence elements() also holds.
+    return Collections.unmodifiableSet(properties.keySet());
   }
 
   @Override
@@ -217,14 +218,28 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
    *
    * @param key The key.
    * @param value The value.
-   * @param position The input position.
+   * @param position The input position, or {@code null} for an entry added through the editing API.
    * @param comments The comments attached to the entry.
    * @return The entry created.
    */
-  private Entry.KeyValue put(String key, Value value, TomlPosition position, List<TomlComment> comments) {
+  private Entry.KeyValue put(String key, Value value, @Nullable TomlPosition position, List<TomlComment> comments) {
     Entry.KeyValue entry = new Entry.KeyValue(key, value, position, comments);
     add(entry);
     properties.put(key, entry);
+    return entry;
+  }
+
+  /**
+   * Append a key/value pair added through the editing API: no position, and marked as added.
+   *
+   * @param key The key.
+   * @param value The value, already wrapped; see {@link Value#of}.
+   * @param comments The comments attached to the entry.
+   * @return The entry created.
+   */
+  private Entry.KeyValue putEdited(String key, Value value, List<TomlComment> comments) {
+    Entry.KeyValue entry = put(key, value, null, comments);
+    entry.valueModified = true;
     return entry;
   }
 
@@ -432,5 +447,175 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
       throw new TomlParseError(message, position);
     }
     return new EnsureTableResult(table, elements);
+  }
+
+  @Override
+  public LinkedTomlTable set(List<String> path, Object value) {
+    if (path.isEmpty()) {
+      throw new IllegalArgumentException("path is empty");
+    }
+    requireNoNullElement(path);
+    Object normalized = TomlValues.normalize(value);
+    int depth = path.size();
+    LinkedTomlTable table = ensureEditedTable(path.subList(0, depth - 1));
+    String key = path.get(depth - 1);
+    Entry.KeyValue existing = table.properties.get(key);
+    if (existing != null) {
+      existing.replace(Value.of(normalized, null));
+    } else {
+      table.putEdited(key, Value.of(normalized, null), Collections.emptyList());
+    }
+    return this;
+  }
+
+  // Throws before anything else changes if any element of path is null. A loop, not path.contains(null): List.of()
+  // rejects null in contains() too, with no argument identifying which path element was null.
+  private static void requireNoNullElement(List<String> path) {
+    for (String element : path) {
+      if (element == null) {
+        throw new NullPointerException("path element");
+      }
+    }
+  }
+
+  /**
+   * Walk to the table at a path for the editing API, creating any table along it that does not already exist.
+   *
+   * <p>
+   * Unlike {@link #ensureTable}, which enforces the parse-time rules around inline and already-defined tables, any
+   * table may be walked through or extended here: those rules describe what a document's syntax can express, not what
+   * the editing API is allowed to build.
+   *
+   * @param path The path to walk, or create, as a table.
+   * @return The table at the end of the path, or this table if {@code path} is empty.
+   * @throws TomlInvalidTypeException If an element of the path exists and is not a table.
+   */
+  private LinkedTomlTable ensureEditedTable(List<String> path) {
+    LinkedTomlTable table = this;
+    int depth = path.size();
+    int i = 0;
+    for (; i < depth; i++) {
+      Entry.KeyValue entry = table.properties.get(path.get(i));
+      if (entry == null) {
+        break;
+      }
+      if (!(entry.value instanceof LinkedTomlTable)) {
+        String badPath = Toml.joinKeyPath(path.subList(0, i + 1));
+        throw new TomlInvalidTypeException(
+            "Value of '" + badPath + "' is a " + TomlType.typeNameFor(entry.value.get()));
+      }
+      table = (LinkedTomlTable) entry.value;
+    }
+    for (; i < depth; i++) {
+      LinkedTomlTable newTable = new LinkedTomlTable();
+      table.putEdited(path.get(i), newTable, Collections.emptyList());
+      table = newTable;
+    }
+    return table;
+  }
+
+  @Override
+  public LinkedTomlTable getOrCreateTable(List<String> path) {
+    requireNoNullElement(path);
+    return ensureEditedTable(path);
+  }
+
+  @Override
+  public ListTomlArray getOrCreateArray(List<String> path) {
+    if (path.isEmpty()) {
+      throw new IllegalArgumentException("path is empty");
+    }
+    requireNoNullElement(path);
+    int depth = path.size();
+    LinkedTomlTable table = ensureEditedTable(path.subList(0, depth - 1));
+    String key = path.get(depth - 1);
+    Entry.KeyValue entry = table.properties.get(key);
+    if (entry == null) {
+      ListTomlArray array = new ListTomlArray(false, null);
+      table.putEdited(key, array, Collections.emptyList());
+      return array;
+    }
+    if (!(entry.value instanceof ListTomlArray)) {
+      throw new TomlInvalidTypeException(
+          "Value of '" + Toml.joinKeyPath(path) + "' is a " + TomlType.typeNameFor(entry.value.get()));
+    }
+    return (ListTomlArray) entry.value;
+  }
+
+  @Override
+  @Nullable
+  public Object remove(List<String> path) {
+    if (path.isEmpty()) {
+      throw new IllegalArgumentException("path is empty");
+    }
+    requireNoNullElement(path);
+    LinkedTomlTable table = parentTable(path);
+    Entry.KeyValue removed = (table != null) ? table.properties.remove(path.get(path.size() - 1)) : null;
+    if (removed == null) {
+      return null;
+    }
+    table.removeElement(removed);
+    return removed.value.get();
+  }
+
+  @Override
+  public void clear() {
+    properties.clear();
+    removeAllEntries();
+  }
+
+  @Override
+  public boolean isModified(List<String> path) {
+    if (path.isEmpty()) {
+      return isModified();
+    }
+    Entry.KeyValue entry = entry(path);
+    return entry != null && entry.modified();
+  }
+
+  /**
+   * Create a deep copy of this table for the editing API; see {@link #copyFrom(TomlTable, boolean)}. Keeps
+   * {@link #inline}, since it describes how the table is written, not where its entries came from.
+   *
+   * @return A copy of this table.
+   */
+  LinkedTomlTable copy() {
+    return copyFrom(this, inline);
+  }
+
+  /**
+   * Build a table from another implementation of {@link TomlTable}; see {@link #copyFrom(TomlTable, boolean)}. The
+   * public interface does not expose whether a foreign table is inline, so the copy is not.
+   *
+   * @param table The table to copy.
+   * @return A new table with the same entries.
+   */
+  static LinkedTomlTable copyFrom(TomlTable table) {
+    return copyFrom(table, false);
+  }
+
+  /**
+   * Build a table with the same entries as another, walked through its public interface: the same entries in the same
+   * order, each with no position and marked as added, keeping each entry's attached comments and the unattached
+   * comments in their places. A nested table or array is copied recursively, through {@link TomlValues#normalize};
+   * every other value is shared.
+   *
+   * @param table The table to copy.
+   * @param inline Whether the copy is an inline table.
+   * @return A new table with the same entries.
+   */
+  private static LinkedTomlTable copyFrom(TomlTable table, boolean inline) {
+    LinkedTomlTable copy = new LinkedTomlTable(null, inline);
+    for (TomlElement element : table.elements()) {
+      if (element instanceof TomlComment) {
+        copy.addComment((TomlComment) element);
+      } else {
+        TomlKeyValue original = (TomlKeyValue) element;
+        // A fresh wrapper even for a scalar: an entry's position is dropped, and an array entry's is its value's.
+        Value value = Value.of(TomlValues.normalize(original.value().get()), null);
+        copy.putEdited(original.key(), value, original.comments());
+      }
+    }
+    return copy;
   }
 }

@@ -14,6 +14,7 @@ package org.tomlj;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -27,11 +28,18 @@ import java.util.List;
  * Each subclass also keeps its own index over its entries, a map by key for a table and a list by index for an array;
  * this class keeps only the order they were written in.
  *
+ * <p>
+ * The editing API tracks {@link #sequenceModified} here: whether an entry or an unattached comment was removed from
+ * this container's sequence. An entry added or replaced records that on itself, in {@link Entry#valueModified}, since
+ * it still exists afterwards to carry the flag.
+ *
  * @param <E> The kind of entry this container holds: a key/value pair for a table, an indexed value for an array.
  */
 abstract class ElementContainer<E extends Entry> extends Value {
 
   private final List<TomlElement> elements = new ArrayList<>();
+
+  private boolean sequenceModified;
 
   /**
    * The elements written in this table or array, in document order.
@@ -58,6 +66,64 @@ abstract class ElementContainer<E extends Entry> extends Value {
    */
   void addComment(TomlComment comment) {
     elements.add(comment);
+  }
+
+  /**
+   * Remove an element from this container's sequence, by identity, and record the removal. Used for an entry, once the
+   * caller has removed it from its own index, and for an unattached comment.
+   *
+   * @param element The element to remove, already known to be among {@link #elements()}.
+   */
+  @SuppressWarnings("ReferenceEquality") // a sequence search is about identity, never equals
+  void removeElement(TomlElement element) {
+    for (int i = 0; i < elements.size(); i++) {
+      if (elements.get(i) == element) {
+        elements.remove(i);
+        sequenceModified = true;
+        return;
+      }
+    }
+    throw new AssertionError("element is not among this container's elements()");
+  }
+
+  /**
+   * Remove every entry from this container's sequence, leaving the unattached comments where they are. Used by
+   * {@code clear()}; the caller clears its own index separately.
+   *
+   * @return {@code true} if an entry was removed.
+   */
+  boolean removeAllEntries() {
+    boolean removedAny = false;
+    Iterator<TomlElement> iterator = elements.iterator();
+    while (iterator.hasNext()) {
+      TomlElement element = iterator.next();
+      if (element instanceof Entry) {
+        iterator.remove();
+        removedAny = true;
+      }
+    }
+    if (removedAny) {
+      sequenceModified = true;
+    }
+    return removedAny;
+  }
+
+  /**
+   * Whether this table or array was changed through the editing API, either directly or by a change nested within one
+   * of its entries.
+   *
+   * @return {@code true} if this table or array was changed through the editing API.
+   */
+  public boolean isModified() {
+    if (sequenceModified) {
+      return true;
+    }
+    for (TomlElement element : elements) {
+      if (element instanceof Entry && ((Entry) element).modified()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

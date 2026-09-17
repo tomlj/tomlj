@@ -14,6 +14,8 @@ package org.tomlj;
 
 import java.util.List;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 /**
  * An entry of a parsed table or array: what its sequence holds besides unattached comments.
  *
@@ -28,14 +30,25 @@ import java.util.List;
  * above it and the comment after it, are its {@code comments()}. The value hierarchy ({@link Value},
  * {@link Value.Scalar}, {@link ElementContainer}) is the data an entry holds; a value never carries comments of its
  * own.
+ *
+ * <p>
+ * The editing API records where a change happened, and never resets it: {@link #valueModified} when this entry was
+ * added, or its value replaced, through the API. {@link #modified()} folds that, and any modification nested in the
+ * value itself, into whether this entry was touched at all.
  */
 abstract class Entry implements TomlEntry {
 
-  final Value value;
+  // Not final: the editing API's set() and its array equivalent replace the value of an existing entry in place,
+  // keeping its position, its place in the container's sequence and its attached comments; see #replace.
+  Value value;
 
   // Not final: a table header such as [a] can define a table that an earlier dotted key created implicitly, and the
   // pair then takes over the header's attached comments, in place; see KeyValue#define.
   private List<TomlComment> attachedComments;
+
+  // Whether this entry was added, or had its value replaced, through the editing API, rather than read from a parsed
+  // document.
+  boolean valueModified;
 
   Entry(Value value, List<TomlComment> attachedComments) {
     this.value = value;
@@ -53,6 +66,26 @@ abstract class Entry implements TomlEntry {
   }
 
   /**
+   * Replace this entry's value, keeping its position, its place in the container's sequence and its attached comments.
+   *
+   * @param newValue The replacement value.
+   */
+  void replace(Value newValue) {
+    value = newValue;
+    valueModified = true;
+  }
+
+  /**
+   * Whether this entry was changed through the editing API, either directly or by a change nested within its value.
+   *
+   * @return {@code true} if this entry was added, had its value replaced, or holds a table or array that was itself
+   *         changed, through the editing API.
+   */
+  boolean modified() {
+    return valueModified || (value instanceof ElementContainer && ((ElementContainer<?>) value).isModified());
+  }
+
+  /**
    * A key/value pair written in a table.
    */
   static final class KeyValue extends Entry implements TomlKeyValue {
@@ -62,10 +95,11 @@ abstract class Entry implements TomlEntry {
 
     // Not final: a table header such as [a] can define a table that an earlier dotted key created implicitly, and
     // this pair then takes over the header's position and attached comments, in place, so it keeps its spot in the
-    // table's sequence rather than being replaced by a new entry.
-    private TomlPosition position;
+    // table's sequence rather than being replaced by a new entry. Nullable: an entry added through the editing API has
+    // no input position, and a table created implicitly by a dotted key has none until a later header defines it.
+    private @Nullable TomlPosition position;
 
-    KeyValue(String key, Value value, TomlPosition position, List<TomlComment> attachedComments) {
+    KeyValue(String key, Value value, @Nullable TomlPosition position, List<TomlComment> attachedComments) {
       super(value, attachedComments);
       this.key = key;
       this.position = position;
@@ -77,6 +111,7 @@ abstract class Entry implements TomlEntry {
     }
 
     @Override
+    @Nullable
     public TomlPosition position() {
       return position;
     }
@@ -106,9 +141,10 @@ abstract class Entry implements TomlEntry {
      * The position of this entry: where its value is written, since an array entry is written where its value is,
      * including the {@code [[x]]} header of a table in an array of tables.
      *
-     * @return The position.
+     * @return The position, or {@code null} if this entry's value has none; see {@link Value#position()}.
      */
     @Override
+    @Nullable
     public TomlPosition position() {
       return value.position();
     }
