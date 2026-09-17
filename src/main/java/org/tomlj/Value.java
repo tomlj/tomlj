@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 /**
  * Anything a key or an array slot holds: a scalar, a table or an array.
  *
@@ -34,10 +36,10 @@ abstract class Value implements TomlValue {
    *
    * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link LinkedTomlTable} /
    *        {@link ListTomlArray}, which is already a {@link Value}.
-   * @param position The position of the value in the document.
+   * @param position The position of the value in the document, or {@code null} if the value did not come from one.
    * @return {@code value} itself if it is already a {@link Value}, otherwise a new {@link Scalar} wrapping it.
    */
-  static Value of(Object value, TomlPosition position) {
+  static Value of(Object value, @Nullable TomlPosition position) {
     return (value instanceof Value) ? (Value) value : new Scalar(value, position);
   }
 
@@ -47,9 +49,11 @@ abstract class Value implements TomlValue {
   static final class Scalar extends Value {
 
     private final Object value;
-    private final TomlPosition position;
 
-    Scalar(Object value, TomlPosition position) {
+    // Nullable: a scalar set through the editing API has no input position.
+    private final @Nullable TomlPosition position;
+
+    Scalar(Object value, @Nullable TomlPosition position) {
       this.value = value;
       this.position = position;
     }
@@ -60,6 +64,7 @@ abstract class Value implements TomlValue {
     }
 
     @Override
+    @Nullable
     public TomlPosition position() {
       return position;
     }

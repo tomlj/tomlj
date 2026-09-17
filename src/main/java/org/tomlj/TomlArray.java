@@ -337,9 +337,10 @@ public interface TomlArray {
    * This is a shortcut for {@link #entry(int)}, returning its position.
    *
    * @param index The array index.
-   * @return The input position.
+   * @return The input position, or {@code null} if the entry was not read from a document.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
    */
+  @Nullable
   default TomlPosition inputPositionOf(int index) {
     return entry(index).position();
   }

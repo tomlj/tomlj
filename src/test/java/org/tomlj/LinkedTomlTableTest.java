@@ -329,4 +329,26 @@ class LinkedTomlTableTest {
     TomlParseResult table = Toml.parse("x.y = 1\n");
     assertEquals(positionAt(1, 1), table.inputPositionOf(List.of("x")));
   }
+
+  @Test
+  void shouldReturnAnUnmodifiableKeySet() {
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.set("a", 1L);
+    assertThrows(UnsupportedOperationException.class, () -> table.keySet().remove("a"));
+    assertEquals(1L, table.get("a"));
+  }
+
+  @Test
+  void shouldKeepUnattachedCommentsInPlaceOnADeepCopy() {
+    LinkedTomlTable table = parse("# first\n\na = 1\n\n# second\n");
+
+    LinkedTomlTable copy = table.copy();
+
+    List<TomlElement> elements = copy.elements();
+    assertEquals(3, elements.size());
+    assertEquals("first", ((TomlComment) elements.get(0)).text());
+    assertEquals("a", ((TomlKeyValue) elements.get(1)).key());
+    assertEquals("second", ((TomlComment) elements.get(2)).text());
+    assertEquals(1L, copy.get("a"));
+  }
 }
