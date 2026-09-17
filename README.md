@@ -50,8 +50,9 @@ if (port > 65535) {
   a default.
 * **Comments are kept.** Every comment in a document is parsed into the model, attached to an entry
   or unattached in the table or array it was written in. See [Comments](#comments).
-* **Few dependencies.** The ANTLR runtime is the only library needed to run it, and the `all`
-  artifact bundles that in, so there is nothing else to add. Works on Java 9 and later.
+* **No dependencies.** The jar carries its own copy of the ANTLR runtime, relocated under TomlJ's
+  own package, so there is nothing else to add and no clash with ANTLR elsewhere in your project.
+  Works on Java 9 and later.
 
 ## Usage
 
@@ -130,7 +131,9 @@ TomlParseResult result = Toml.parse(source, TomlVersion.V1_0_0);
 
 ## Getting TomlJ
 
-TomlJ is published to Maven Central.
+TomlJ is published to Maven Central. `org.tomlj:tomlj` is a single jar with no dependencies: it
+carries its own copy of the ANTLR runtime, under TomlJ's own package, so it cannot clash with any
+other ANTLR in your project.
 
 To include using Maven:
 ```xml
@@ -143,7 +146,9 @@ To include using Maven:
 
 To include using Gradle: `implementation 'org.tomlj:tomlj:1.3.0'`
 
-For a single jar with ANTLR included, use the `all` classifier: `org.tomlj:tomlj:1.3.0:all`
+If your project already uses ANTLR and you would rather share one copy of the runtime, use
+`org.tomlj:tomlj-antlr` instead. It is the same library, depending on `org.antlr:antlr4-runtime`
+rather than bundling it.
 
 ## Links
 

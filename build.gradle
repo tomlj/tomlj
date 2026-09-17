@@ -267,7 +267,12 @@ dependencies {
 
 ext.moduleName = "org.tomlj"
 
+// Two jars are published. org.tomlj:tomlj is the shaded jar: the ANTLR runtime is copied into it under
+// org.tomlj.internal.antlr, so it has no dependencies and cannot clash with another ANTLR on the classpath.
+// org.tomlj:tomlj-antlr is the plain jar, which depends on org.antlr:antlr4-runtime, for projects that
+// already use ANTLR and want to share one copy of the runtime.
 jar {
+  archiveBaseName = 'tomlj-antlr'
   destinationDirectory = rootProject.layout.buildDirectory.dir('libs')
   inputs.property("moduleName", moduleName)
   manifest {
@@ -278,6 +283,7 @@ jar {
 }
 
 shadowJar {
+  archiveClassifier = ''
   configurations = [
     project.configurations.compileClasspath
   ]
@@ -298,6 +304,38 @@ shadowJar {
   }
 }
 
+// Run a test against the shaded jar itself, since the relocation and minimization steps leave the
+// unit tests untouched. The test compiles against the main classes (shadowJar depends on every compile
+// task, so compiling against the jar would be a cycle) and runs with the shaded jar and JUnit only: no
+// main classes and no ANTLR runtime. JUnit is declared directly rather than through testImplementation,
+// which would bring the ANTLR runtime along.
+sourceSets {
+  shadedTest {
+    compileClasspath += sourceSets.main.output
+    runtimeClasspath += files(tasks.shadowJar)
+  }
+}
+
+dependencies {
+  shadedTestCompileOnly 'org.checkerframework:checker-qual'
+  shadedTestImplementation 'org.junit.jupiter:junit-jupiter-api'
+  shadedTestRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+  shadedTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.register('shadedTest', Test) {
+  description = 'Runs the tests in src/shadedTest against the shaded jar.'
+  group = 'verification'
+  useJUnitPlatform()
+  testClassesDirs = sourceSets.shadedTest.output.classesDirs
+  classpath = sourceSets.shadedTest.runtimeClasspath
+}
+
+compileShadedTestJava.options.encoding = 'UTF-8'
+compileShadedTestJava.options.release = 17
+
+check.dependsOn shadedTest
+
 task deploy() { }
 
 dependencyManagement {
@@ -306,12 +344,58 @@ dependencyManagement {
   }
 }
 
+// The metadata shared by both publications.
+def tomljPom = {
+  url = 'https://github.com/tomlj/tomlj'
+  packaging = 'jar'
+  licenses {
+    license {
+      name = "The Apache License, Version 2.0"
+      url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+    }
+  }
+  scm {
+    connection = 'scm:https://github.com/tomlj/tomlj.git'
+    developerConnection = 'scm:git@github.com:tomlj/tomlj.git'
+    url = 'https://github.com/tomlj/tomlj'
+  }
+  developers {
+    developer {
+      name = 'Chris Leishman'
+      email = 'chris@leishman.org'
+    }
+    developer {
+      name = 'Tobias Schmidt'
+      email = 'tobias.schmidt24080878@gmail.com'
+    }
+  }
+}
+
+// The shadow plugin adds the shaded jar to the java component as an extra variant; without this, the
+// tomlj-antlr publication would carry both jars.
+components.java.withVariantsFromConfiguration(configurations.shadowRuntimeElements) {
+  skip()
+}
+
 publishing {
   publications {
-    tomljLibrary(MavenPublication) {
+    tomlj(MavenPublication) {
+      from components.shadow
+      artifact sourcesJar
+      artifact javadocJar
+      groupId = 'org.tomlj'
+      artifactId = 'tomlj'
+      version = project.version
+      pom tomljPom
+      pom {
+        name = 'tomlj'
+        description = project.description + ' Bundles the ANTLR runtime it needs.'
+      }
+    }
+    tomljAntlr(MavenPublication) {
       from components.java
       groupId = 'org.tomlj'
-      artifactId = base.archivesName.get()
+      artifactId = 'tomlj-antlr'
       version = project.version
       versionMapping {
         usage('java-api') {
@@ -321,32 +405,10 @@ publishing {
           fromResolutionResult()
         }
       }
+      pom tomljPom
       pom {
-        name = base.archivesName.get()
-        description = project.description
-        url = 'https://github.com/tomlj/tomlj'
-        packaging = 'jar'
-        licenses {
-          license {
-            name = "The Apache License, Version 2.0"
-            url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
-          }
-        }
-        scm {
-          connection = 'scm:https://github.com/tomlj/tomlj.git'
-          developerConnection = 'scm:git@github.com:tomlj/tomlj.git'
-          url = 'https://github.com/tomlj/tomlj'
-        }
-        developers {
-          developer {
-            name = 'Chris Leishman'
-            email = 'chris@leishman.org'
-          }
-          developer {
-            name = 'Tobias Schmidt'
-            email = 'tobias.schmidt24080878@gmail.com'
-          }
-        }
+        name = 'tomlj-antlr'
+        description = project.description + ' Depends on the ANTLR runtime instead of bundling it.'
       }
     }
   }
@@ -369,13 +431,9 @@ tasks.withType(GenerateModuleMetadata) {
 
 signing {
   useGpgCmd()
-  sign publishing.publications.tomljLibrary
+  sign publishing.publications
 }
 
 tasks.withType(Sign) {
   onlyIf { System.getenv('ENABLE_SIGNING') == 'true' }
-}
-
-tasks.named('generatePomFileForTomljLibraryPublication') {
-  destination = layout.buildDirectory.file('generated-pom.xml').get().asFile
 }
