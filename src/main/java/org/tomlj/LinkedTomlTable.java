@@ -28,7 +28,7 @@ import java.util.stream.Stream;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
-final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements TomlTable {
+final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements TomlTable {
 
   private final Map<String, Entry.KeyValue> properties = new LinkedHashMap<>();
 
@@ -40,15 +40,15 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
 
   private final boolean inline;
 
-  MutableTomlTable(@Nullable TomlPosition position) {
+  LinkedTomlTable(@Nullable TomlPosition position) {
     this(position, false);
   }
 
-  MutableTomlTable() {
+  LinkedTomlTable() {
     this(null, false);
   }
 
-  private MutableTomlTable(@Nullable TomlPosition position, boolean inline) {
+  private LinkedTomlTable(@Nullable TomlPosition position, boolean inline) {
     this.position = position;
     this.inline = inline;
   }
@@ -62,8 +62,8 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
    * @param position The position of the inline table.
    * @return A new, defined table.
    */
-  static MutableTomlTable inline(TomlPosition position) {
-    return new MutableTomlTable(position, true);
+  static LinkedTomlTable inline(TomlPosition position) {
+    return new LinkedTomlTable(position, true);
   }
 
   boolean isDefined() {
@@ -178,15 +178,15 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
     if (path.isEmpty()) {
       return null;
     }
-    MutableTomlTable table = this;
+    LinkedTomlTable table = this;
     int depth = path.size();
     for (int i = 0; i < (depth - 1); ++i) {
       Entry.KeyValue entry = table.properties.get(path.get(i));
       if (entry == null) {
         return null;
       }
-      if (entry.value instanceof MutableTomlTable) {
-        table = (MutableTomlTable) entry.value;
+      if (entry.value instanceof LinkedTomlTable) {
+        table = (LinkedTomlTable) entry.value;
         continue;
       }
       return null;
@@ -220,27 +220,27 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
     return entry;
   }
 
-  MutableTomlTable createTable(List<String> path, TomlPosition position) {
-    return createTable(path, position, Collections.emptyList());
+  LinkedTomlTable createParsedTable(List<String> path, TomlPosition position) {
+    return createParsedTable(path, position, Collections.emptyList());
   }
 
-  MutableTomlTable createTable(List<String> path, TomlPosition position, List<TomlComment> comments) {
+  LinkedTomlTable createParsedTable(List<String> path, TomlPosition position, List<TomlComment> comments) {
     if (path.isEmpty()) {
       return this;
     }
 
     int depth = path.size();
-    final MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true).table;
+    final LinkedTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true).table;
 
     String key = path.get(depth - 1);
     Entry.KeyValue entry = table.properties.get(key);
     if (entry == null) {
-      final MutableTomlTable newTable = new MutableTomlTable(position);
+      final LinkedTomlTable newTable = new LinkedTomlTable(position);
       table.put(key, newTable, position, comments);
       return newTable;
     }
-    if (entry.value instanceof MutableTomlTable) {
-      final MutableTomlTable subTable = (MutableTomlTable) entry.value;
+    if (entry.value instanceof LinkedTomlTable) {
+      final LinkedTomlTable subTable = (LinkedTomlTable) entry.value;
       if (!subTable.isDefined()) {
         subTable.define(position);
         // The entry was created implicitly by an earlier dotted key; it now takes over the header's position and
@@ -253,56 +253,56 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
     throw new TomlParseError(message, position);
   }
 
-  MutableTomlTable createTableArray(List<String> path, TomlPosition position) {
-    return createTableArray(path, position, Collections.emptyList());
+  LinkedTomlTable createParsedTableArray(List<String> path, TomlPosition position) {
+    return createParsedTableArray(path, position, Collections.emptyList());
   }
 
-  MutableTomlTable createTableArray(List<String> path, TomlPosition position, List<TomlComment> comments) {
+  LinkedTomlTable createParsedTableArray(List<String> path, TomlPosition position, List<TomlComment> comments) {
     if (path.isEmpty()) {
       throw new IllegalArgumentException("empty path");
     }
 
     int depth = path.size();
-    final MutableTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true).table;
+    final LinkedTomlTable table = ensureTable(path.subList(0, depth - 1), position, true, true).table;
 
     String key = path.get(depth - 1);
     Entry.KeyValue entry = table.properties.get(key);
     if (entry == null) {
-      entry = table.put(key, new MutableTomlArray(true, position), position, Collections.emptyList());
+      entry = table.put(key, new ListTomlArray(true, position), position, Collections.emptyList());
     }
     if (!(entry.value instanceof TomlArray)) {
       String message = Toml.joinKeyPath(path) + " is not an array (previously defined at " + entry.position() + ")";
       throw new TomlParseError(message, position);
     }
-    if (!(entry.value instanceof MutableTomlArray) || !((MutableTomlArray) entry.value).isTableArray()) {
+    if (!(entry.value instanceof ListTomlArray) || !((ListTomlArray) entry.value).isTableArray()) {
       String message = Toml.joinKeyPath(path) + " previously defined as a literal array at " + entry.position();
       throw new TomlParseError(message, position);
     }
-    MutableTomlArray array = (MutableTomlArray) entry.value;
+    ListTomlArray array = (ListTomlArray) entry.value;
     // The new table's own position is the header's, since [[x]] gives each element table it opens a position of its
     // own rather than sharing the array's.
-    MutableTomlTable newTable = new MutableTomlTable(position);
+    LinkedTomlTable newTable = new LinkedTomlTable(position);
     // Each header of an array of tables is an expression of its own, so its comments belong to the element it opens
     // rather than to the array as a whole.
-    array.append(Entry.Value.of(newTable, position, comments));
+    array.appendParsed(Entry.Value.of(newTable, position, comments));
     return newTable;
   }
 
-  List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> set(
+  List<AbstractMap.SimpleEntry<LinkedTomlTable, TomlPosition>> setParsed(
       String keyPath,
       Object value,
       TomlPosition position) {
-    return set(parseDottedKey(keyPath), value, position);
+    return setParsed(parseDottedKey(keyPath), value, position);
   }
 
-  List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> set(
+  List<AbstractMap.SimpleEntry<LinkedTomlTable, TomlPosition>> setParsed(
       List<String> path,
       Object value,
       TomlPosition position) {
-    return set(path, value, position, Collections.emptyList());
+    return setParsed(path, value, position, Collections.emptyList());
   }
 
-  List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> set(
+  List<AbstractMap.SimpleEntry<LinkedTomlTable, TomlPosition>> setParsed(
       List<String> path,
       Object value,
       TomlPosition position,
@@ -311,7 +311,7 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
       value = ((Integer) value).longValue();
     }
     assert (typeFor(value).isPresent()) : "Unexpected value of type " + value.getClass();
-    return set(path, Entry.Value.of(value, position), position, comments);
+    return setParsed(path, Entry.Value.of(value, position), position, comments);
   }
 
   /**
@@ -324,7 +324,7 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
    * @return The intermediate tables created along the path, each paired with the position it should be defined at if a
    *         later header claims it.
    */
-  List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> set(
+  List<AbstractMap.SimpleEntry<LinkedTomlTable, TomlPosition>> setParsed(
       List<String> path,
       Entry.Value value,
       TomlPosition position,
@@ -333,7 +333,7 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
     assert (depth > 0);
 
     final EnsureTableResult result = ensureTable(path.subList(0, depth - 1), position, false, false);
-    final MutableTomlTable table = result.table;
+    final LinkedTomlTable table = result.table;
 
     String key = path.get(depth - 1);
     Entry.KeyValue previous = table.properties.get(key);
@@ -347,12 +347,12 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
   }
 
   private static class EnsureTableResult {
-    final MutableTomlTable table;
-    final List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> intermediates;
+    final LinkedTomlTable table;
+    final List<AbstractMap.SimpleEntry<LinkedTomlTable, TomlPosition>> intermediates;
 
     private EnsureTableResult(
-        MutableTomlTable table,
-        List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> intermediates) {
+        LinkedTomlTable table,
+        List<AbstractMap.SimpleEntry<LinkedTomlTable, TomlPosition>> intermediates) {
       this.table = table;
       this.intermediates = intermediates;
     }
@@ -373,22 +373,22 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
       TomlPosition position,
       boolean followTableArrays,
       boolean followDefinedTables) {
-    MutableTomlTable table = this;
+    LinkedTomlTable table = this;
     int depth = path.size();
 
     if (depth == 0) {
       return new EnsureTableResult(table, Collections.emptyList());
     }
 
-    ArrayList<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> elements = new ArrayList<>();
+    ArrayList<AbstractMap.SimpleEntry<LinkedTomlTable, TomlPosition>> elements = new ArrayList<>();
     for (int i = 0; i < depth; ++i) {
       String key = path.get(i);
       Entry.KeyValue entry = table.properties.get(key);
       if (entry == null) {
-        entry = table.put(key, new MutableTomlTable(), position, Collections.emptyList());
+        entry = table.put(key, new LinkedTomlTable(), position, Collections.emptyList());
       }
-      if (entry.value instanceof MutableTomlTable) {
-        table = (MutableTomlTable) entry.value;
+      if (entry.value instanceof LinkedTomlTable) {
+        table = (LinkedTomlTable) entry.value;
         if (table.inline) {
           String message = Toml.joinKeyPath(path.subList(0, i + 1))
               + " is an inline table (defined at "
@@ -410,11 +410,11 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
             + ")";
         throw new TomlParseError(message, position);
       }
-      if (followTableArrays && entry.value instanceof MutableTomlArray) {
-        MutableTomlArray array = (MutableTomlArray) entry.value;
+      if (followTableArrays && entry.value instanceof ListTomlArray) {
+        ListTomlArray array = (ListTomlArray) entry.value;
         if (array.isTableArray()) {
           assert !array.isEmpty();
-          table = (MutableTomlTable) array.get(array.size() - 1);
+          table = (LinkedTomlTable) array.get(array.size() - 1);
           elements.add(new AbstractMap.SimpleEntry<>(table, entry.position()));
           continue;
         }

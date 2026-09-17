@@ -39,11 +39,11 @@ class TomlCommentTest {
   // Helpers
   // ---------------------------------------------------------------------------------------------------------------
 
-  private static MutableTomlTable parse(String document) {
+  private static LinkedTomlTable parse(String document) {
     return parse(document, TomlParseOptions.defaults());
   }
 
-  private static MutableTomlTable parse(String document, TomlParseOptions options) {
+  private static LinkedTomlTable parse(String document, TomlParseOptions options) {
     return Parser.parseTable(CharStreams.fromString(document), options, new AccumulatingErrorListener());
   }
 
@@ -53,7 +53,7 @@ class TomlCommentTest {
     return errorListener.errors();
   }
 
-  private static List<TomlComment> attached(MutableTomlTable table, String... path) {
+  private static List<TomlComment> attached(LinkedTomlTable table, String... path) {
     return table.comments(List.of(path));
   }
 
@@ -75,16 +75,16 @@ class TomlCommentTest {
     return comments;
   }
 
-  private static MutableTomlTable subTable(MutableTomlTable table, String... path) {
-    return (MutableTomlTable) table.get(List.of(path));
+  private static LinkedTomlTable subTable(LinkedTomlTable table, String... path) {
+    return (LinkedTomlTable) table.get(List.of(path));
   }
 
-  private static MutableTomlArray subArray(MutableTomlTable table, String... path) {
-    return (MutableTomlArray) table.get(List.of(path));
+  private static ListTomlArray subArray(LinkedTomlTable table, String... path) {
+    return (ListTomlArray) table.get(List.of(path));
   }
 
-  private static MutableTomlArray subArray(MutableTomlArray array, int index) {
-    return (MutableTomlArray) array.get(index);
+  private static ListTomlArray subArray(ListTomlArray array, int index) {
+    return (ListTomlArray) array.get(index);
   }
 
   private static void assertComment(TomlComment comment, TomlComment.Placement placement, String text) {
@@ -112,7 +112,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachCommentAbove() {
-    MutableTomlTable table = parse("# above\nx = 1\n");
+    LinkedTomlTable table = parse("# above\nx = 1\n");
     List<TomlComment> comments = attached(table, "x");
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
@@ -121,7 +121,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachCommentAfter() {
-    MutableTomlTable table = parse("x = 1 # after\n");
+    LinkedTomlTable table = parse("x = 1 # after\n");
     List<TomlComment> comments = attached(table, "x");
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.AFTER, "after");
@@ -129,7 +129,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachBothAboveAndAfter() {
-    MutableTomlTable table = parse("# above\nx = 1 # after\n");
+    LinkedTomlTable table = parse("# above\nx = 1 # after\n");
     List<TomlComment> comments = attached(table, "x");
     assertEquals(2, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
@@ -138,7 +138,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveARunSeparatedByABlankLineUnattached() {
-    MutableTomlTable table = parse("# unattached\n\nx = 1\n");
+    LinkedTomlTable table = parse("# unattached\n\nx = 1\n");
     assertTrue(attached(table, "x").isEmpty());
     List<TomlComment> comments = unattached(table);
     assertEquals(1, comments.size());
@@ -147,7 +147,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveTheFarOfTwoRunsUnattachedAndAttachTheNearOneAbove() {
-    MutableTomlTable table = parse("# far\n\n# near\nx = 1\n");
+    LinkedTomlTable table = parse("# far\n\n# near\nx = 1\n");
     List<TomlComment> rootComments = unattached(table);
     assertEquals(1, rootComments.size());
     assertUnattached(rootComments.get(0), "far");
@@ -159,7 +159,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachCommentsAboveAndOnATableHeaderLine() {
-    MutableTomlTable table = parse("# above\n[a] # after\nx = 1\n");
+    LinkedTomlTable table = parse("# above\n[a] # after\nx = 1\n");
     List<TomlComment> comments = attached(table, "a");
     assertEquals(2, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
@@ -168,11 +168,11 @@ class TomlCommentTest {
 
   @Test
   void shouldReadArrayTableElementHeaderCommentsFromTheArrayNotTheTable() {
-    MutableTomlTable table = parse("# above\n[[x]] # after\ny = 1\n");
+    LinkedTomlTable table = parse("# above\n[[x]] # after\ny = 1\n");
     // [[x]] has no line of its own to attach to as a path: the header's comments belong to the element it opens.
     assertTrue(attached(table, "x").isEmpty());
 
-    MutableTomlArray array = subArray(table, "x");
+    ListTomlArray array = subArray(table, "x");
     List<TomlComment> comments = array.comments(0);
     assertEquals(2, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
@@ -187,7 +187,7 @@ class TomlCommentTest {
   @Test
   void shouldOwnASectionEndCommentSeparatedByBlankLinesAsTheRootTable() {
     // [a] / x = 1 / blank / # note / blank / [b] -> root table.
-    MutableTomlTable table = parse("[a]\nx = 1\n\n# note\n\n[b]\n");
+    LinkedTomlTable table = parse("[a]\nx = 1\n\n# note\n\n[b]\n");
     List<TomlComment> rootComments = unattached(table);
     assertEquals(1, rootComments.size());
     assertUnattached(rootComments.get(0), "note");
@@ -197,7 +197,7 @@ class TomlCommentTest {
   @Test
   void shouldOwnASectionEndCommentGluedToTheLineAboveAsThatSection() {
     // [a] / x = 1 / # note / blank / [b] -> table a.
-    MutableTomlTable table = parse("[a]\nx = 1\n# note\n\n[b]\n");
+    LinkedTomlTable table = parse("[a]\nx = 1\n# note\n\n[b]\n");
     assertTrue(unattached(table).isEmpty());
     List<TomlComment> aComments = unattached(subTable(table, "a"));
     assertEquals(1, aComments.size());
@@ -207,7 +207,7 @@ class TomlCommentTest {
   @Test
   void shouldOwnACommentAfterAHeaderSeparatedByABlankLineFromTheNextEntryAsTheCurrentSection() {
     // [a] / # note / blank / x = 1 -> table a.
-    MutableTomlTable table = parse("[a]\n# note\n\nx = 1\n");
+    LinkedTomlTable table = parse("[a]\n# note\n\nx = 1\n");
     assertTrue(unattached(table).isEmpty());
     List<TomlComment> aComments = unattached(subTable(table, "a"));
     assertEquals(1, aComments.size());
@@ -218,7 +218,7 @@ class TomlCommentTest {
   @Test
   void shouldOwnATrailingCommentAtEndOfDocumentAsTheRootTableWhenSeparatedByABlankLine() {
     // [a] / x = 1 / blank / # end -> root table.
-    MutableTomlTable table = parse("[a]\nx = 1\n\n# end\n");
+    LinkedTomlTable table = parse("[a]\nx = 1\n\n# end\n");
     List<TomlComment> rootComments = unattached(table);
     assertEquals(1, rootComments.size());
     assertUnattached(rootComments.get(0), "end");
@@ -227,7 +227,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveARunAtTheVeryStartOfTheDocumentUnattachedInTheRootWhenFollowedByABlankLine() {
-    MutableTomlTable table = parse("# start\n\nx = 1\n");
+    LinkedTomlTable table = parse("# start\n\nx = 1\n");
     List<TomlComment> rootComments = unattached(table);
     assertEquals(1, rootComments.size());
     assertUnattached(rootComments.get(0), "start");
@@ -236,7 +236,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachARunAtTheStartOfTheDocumentAboveTheFirstKeyWhenGlued() {
-    MutableTomlTable table = parse("# note\nx = 1\n");
+    LinkedTomlTable table = parse("# note\nx = 1\n");
     List<TomlComment> comments = attached(table, "x");
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "note");
@@ -249,7 +249,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachCommentAboveAnArrayValue() {
-    MutableTomlArray array = subArray(parse("a = [\n# above\n1\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [\n# above\n1\n]\n"), "a");
     List<TomlComment> comments = array.comments(0);
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
@@ -259,7 +259,7 @@ class TomlCommentTest {
   @Test
   void shouldAttachCommentAfterAnArrayValueWhenTheCommaFollowsOnTheSameLine() {
     // "1, # trails one" - the comma precedes the comment, but the comment still trails the value.
-    MutableTomlArray array = subArray(parse("a = [1, # trails one\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [1, # trails one\n]\n"), "a");
     List<TomlComment> comments = array.comments(0);
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.AFTER, "trails one");
@@ -268,7 +268,7 @@ class TomlCommentTest {
   @Test
   void shouldAttachCommentAfterAnArrayValueWhenTheCommaFollowsOnTheNextLine() {
     // "1 # c" / ", 2" - the comment precedes the comma, on the value's own line.
-    MutableTomlArray array = subArray(parse("a = [1 # c\n, 2]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [1 # c\n, 2]\n"), "a");
     List<TomlComment> first = array.comments(0);
     assertEquals(1, first.size());
     assertComment(first.get(0), TomlComment.Placement.AFTER, "c");
@@ -279,7 +279,7 @@ class TomlCommentTest {
   @Test
   void shouldAttachARunAboveACommaLedLineToTheArrayValueOnThatLine() {
     // "1 # t" / "# ab" / ", 2" - the comma starting the line does not separate 2 from the run above it.
-    MutableTomlArray array = subArray(parse("a = [1 # t\n# ab\n, 2]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [1 # t\n# ab\n, 2]\n"), "a");
     List<TomlComment> first = array.comments(0);
     assertEquals(1, first.size());
     assertComment(first.get(0), TomlComment.Placement.AFTER, "t");
@@ -292,7 +292,7 @@ class TomlCommentTest {
   @Test
   void shouldLeaveACommentOnTheCommasOwnLineUnattached() {
     // "1" / ", # c" - the comment is written on the comma's line, not the value's.
-    MutableTomlArray array = subArray(parse("a = [1\n, # c\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [1\n, # c\n]\n"), "a");
     assertTrue(array.comments(0).isEmpty());
     List<TomlComment> comments = unattached(array);
     assertEquals(1, comments.size());
@@ -301,7 +301,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveACommentOnTheOpeningBracketsLineUnattached() {
-    MutableTomlArray array = subArray(parse("a = [ # c\n1\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [ # c\n1\n]\n"), "a");
     List<TomlComment> comments = unattached(array);
     assertEquals(1, comments.size());
     assertUnattached(comments.get(0), "c");
@@ -311,7 +311,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveARunBeforeTheClosingBracketUnattached() {
-    MutableTomlArray array = subArray(parse("a = [\n1\n# trailing run\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [\n1\n# trailing run\n]\n"), "a");
     assertTrue(array.comments(0).isEmpty());
     List<TomlComment> comments = unattached(array);
     assertEquals(1, comments.size());
@@ -320,7 +320,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveARunFollowedByABlankLineThenAValueUnattached() {
-    MutableTomlArray array = subArray(parse("a = [\n# note\n\n2\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [\n# note\n\n2\n]\n"), "a");
     assertTrue(array.comments(0).isEmpty());
     List<TomlComment> comments = unattached(array);
     assertEquals(1, comments.size());
@@ -330,7 +330,7 @@ class TomlCommentTest {
 
   @Test
   void shouldRecordAnArrayHoldingOnlyAComment() {
-    MutableTomlArray array = subArray(parse("a = [\n# only\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [\n# only\n]\n"), "a");
     assertEquals(0, array.size());
     List<TomlComment> comments = unattached(array);
     assertEquals(1, comments.size());
@@ -339,8 +339,8 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachACommentAfterTheClosingBracketToTheKeyValuePairNotTheArray() {
-    MutableTomlTable table = parse("a = [\n1\n] # c\n");
-    MutableTomlArray array = subArray(table, "a");
+    LinkedTomlTable table = parse("a = [\n1\n] # c\n");
+    ListTomlArray array = subArray(table, "a");
     assertTrue(unattached(array).isEmpty());
     List<TomlComment> comments = attached(table, "a");
     assertEquals(1, comments.size());
@@ -349,9 +349,9 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachACommentInsideANestedArrayToTheInnerArray() {
-    MutableTomlArray outer = subArray(parse("a = [\n[\n# note\n1\n]\n]\n"), "a");
+    ListTomlArray outer = subArray(parse("a = [\n[\n# note\n1\n]\n]\n"), "a");
     assertTrue(unattached(outer).isEmpty());
-    MutableTomlArray inner = subArray(outer, 0);
+    ListTomlArray inner = subArray(outer, 0);
     List<TomlComment> comments = inner.comments(0);
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "note");
@@ -364,7 +364,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachCommentAboveAnInlineTableEntry() {
-    MutableTomlTable inline = subTable(parse("a = {\n# above\nx = 1\n}\n"), "a");
+    LinkedTomlTable inline = subTable(parse("a = {\n# above\nx = 1\n}\n"), "a");
     List<TomlComment> comments = attached(inline, "x");
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
@@ -373,7 +373,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachCommentAboveAnInlineTableEntryAtVersionHead() {
-    MutableTomlTable inline =
+    LinkedTomlTable inline =
         subTable(parse("a = {\n# above\nx = 1\n}\n", TomlParseOptions.defaults().withVersion(TomlVersion.HEAD)), "a");
     List<TomlComment> comments = attached(inline, "x");
     assertEquals(1, comments.size());
@@ -382,7 +382,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachCommentAfterAnInlineTableEntryWhenTheCommaFollowsOnTheSameLine() {
-    MutableTomlTable inline = subTable(parse("a = {x = 1, # trails one\n}\n"), "a");
+    LinkedTomlTable inline = subTable(parse("a = {x = 1, # trails one\n}\n"), "a");
     List<TomlComment> comments = attached(inline, "x");
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.AFTER, "trails one");
@@ -390,7 +390,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachCommentAfterAnInlineTableEntryWhenTheCommaFollowsOnTheNextLine() {
-    MutableTomlTable inline = subTable(parse("a = {x = 1 # c\n, y = 2}\n"), "a");
+    LinkedTomlTable inline = subTable(parse("a = {x = 1 # c\n, y = 2}\n"), "a");
     List<TomlComment> xComments = attached(inline, "x");
     assertEquals(1, xComments.size());
     assertComment(xComments.get(0), TomlComment.Placement.AFTER, "c");
@@ -400,7 +400,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveACommentOnTheCommasOwnLineUnattachedInAnInlineTable() {
-    MutableTomlTable inline = subTable(parse("a = {x = 1\n, # c\n}\n"), "a");
+    LinkedTomlTable inline = subTable(parse("a = {x = 1\n, # c\n}\n"), "a");
     assertTrue(attached(inline, "x").isEmpty());
     List<TomlComment> comments = unattached(inline);
     assertEquals(1, comments.size());
@@ -409,7 +409,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveACommentOnTheOpeningBracesLineUnattached() {
-    MutableTomlTable inline = subTable(parse("a = { # c\nx = 1\n}\n"), "a");
+    LinkedTomlTable inline = subTable(parse("a = { # c\nx = 1\n}\n"), "a");
     List<TomlComment> comments = unattached(inline);
     assertEquals(1, comments.size());
     assertUnattached(comments.get(0), "c");
@@ -418,7 +418,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveARunBeforeTheClosingBraceUnattached() {
-    MutableTomlTable inline = subTable(parse("a = {\nx = 1\n# trailing run\n}\n"), "a");
+    LinkedTomlTable inline = subTable(parse("a = {\nx = 1\n# trailing run\n}\n"), "a");
     assertTrue(attached(inline, "x").isEmpty());
     List<TomlComment> comments = unattached(inline);
     assertEquals(1, comments.size());
@@ -427,7 +427,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveARunFollowedByABlankLineThenAnEntryUnattachedInAnInlineTable() {
-    MutableTomlTable inline = subTable(parse("a = {\n# note\n\ny = 2\n}\n"), "a");
+    LinkedTomlTable inline = subTable(parse("a = {\n# note\n\ny = 2\n}\n"), "a");
     List<TomlComment> comments = unattached(inline);
     assertEquals(1, comments.size());
     assertUnattached(comments.get(0), "note");
@@ -437,7 +437,7 @@ class TomlCommentTest {
 
   @Test
   void shouldRecordAnInlineTableHoldingOnlyAComment() {
-    MutableTomlTable inline = subTable(parse("a = {\n# only\n}\n"), "a");
+    LinkedTomlTable inline = subTable(parse("a = {\n# only\n}\n"), "a");
     assertEquals(0, inline.size());
     List<TomlComment> comments = unattached(inline);
     assertEquals(1, comments.size());
@@ -446,8 +446,8 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachACommentAfterTheClosingBraceToTheKeyValuePairNotTheInlineTable() {
-    MutableTomlTable table = parse("a = {\nx = 1\n} # c\n");
-    MutableTomlTable inline = subTable(table, "a");
+    LinkedTomlTable table = parse("a = {\nx = 1\n} # c\n");
+    LinkedTomlTable inline = subTable(table, "a");
     assertTrue(unattached(inline).isEmpty());
     List<TomlComment> comments = attached(table, "a");
     assertEquals(1, comments.size());
@@ -456,9 +456,9 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachACommentInsideANestedInlineTableToTheInnerTable() {
-    MutableTomlTable outer = subTable(parse("a = {\nb = {\n# note\nx = 1\n}\n}\n"), "a");
+    LinkedTomlTable outer = subTable(parse("a = {\nb = {\n# note\nx = 1\n}\n}\n"), "a");
     assertTrue(unattached(outer).isEmpty());
-    MutableTomlTable inner = subTable(outer, "b");
+    LinkedTomlTable inner = subTable(outer, "b");
     List<TomlComment> comments = attached(inner, "x");
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "note");
@@ -481,7 +481,7 @@ class TomlCommentTest {
   @ParameterizedTest
   @MethodSource("textFormCases")
   void shouldStripAtMostOneLeadingSpaceFromCommentText(String written, String expected) {
-    MutableTomlTable table = parse("x = 1 " + written + "\n");
+    LinkedTomlTable table = parse("x = 1 " + written + "\n");
     List<TomlComment> comments = attached(table, "x");
     assertEquals(1, comments.size());
     TomlComment comment = comments.get(0);
@@ -491,7 +491,7 @@ class TomlCommentTest {
 
   @Test
   void shouldKeepATabInsideACommentAfterStrippingOneLeadingSpace() {
-    MutableTomlTable table = parse("x = 1 # a\tb\n");
+    LinkedTomlTable table = parse("x = 1 # a\tb\n");
     TomlComment comment = attached(table, "x").get(0);
     assertEquals(List.of("a\tb"), comment.lines());
     assertEquals("a\tb", comment.text());
@@ -499,7 +499,7 @@ class TomlCommentTest {
 
   @Test
   void shouldJoinTheLinesOfAMultiLineRunWithNewlines() {
-    MutableTomlTable table = parse("# line one\n# line two\nx = 1\n");
+    LinkedTomlTable table = parse("# line one\n# line two\nx = 1\n");
     TomlComment comment = attached(table, "x").get(0);
     assertEquals(List.of("line one", "line two"), comment.lines());
     assertEquals("line one\nline two", comment.text());
@@ -507,14 +507,14 @@ class TomlCommentTest {
 
   @Test
   void shouldReportThePositionOfTheFirstLineOfARun() {
-    MutableTomlTable table = parse("  # note\n# more\nx = 1\n");
+    LinkedTomlTable table = parse("  # note\n# more\nx = 1\n");
     TomlComment comment = attached(table, "x").get(0);
     assertPosition(comment, 1, 3);
   }
 
   @Test
   void shouldReportThePositionOfAnAfterComment() {
-    MutableTomlTable table = parse("x = 1 # note\n");
+    LinkedTomlTable table = parse("x = 1 # note\n");
     TomlComment comment = attached(table, "x").get(0);
     assertPosition(comment, 1, 7);
   }
@@ -525,12 +525,12 @@ class TomlCommentTest {
 
   @Test
   void shouldReturnEmptyListsWhenTheDocumentHasNoComments() {
-    MutableTomlTable table = parse("x = 1\na = [1, 2]\n");
+    LinkedTomlTable table = parse("x = 1\na = [1, 2]\n");
     assertTrue(unattached(table).isEmpty());
     assertTrue(attached(table, "x").isEmpty());
     assertTrue(attached(table, "unknown").isEmpty());
 
-    MutableTomlArray array = subArray(table, "a");
+    ListTomlArray array = subArray(table, "a");
     assertTrue(unattached(array).isEmpty());
     assertTrue(array.comments(0).isEmpty());
     assertTrue(array.comments(1).isEmpty());
@@ -542,7 +542,7 @@ class TomlCommentTest {
 
   @Test
   void shouldAttachAnAfterCommentAtEndOfInputWithNoTrailingNewline() {
-    MutableTomlTable table = parse("a = 1 # c");
+    LinkedTomlTable table = parse("a = 1 # c");
     List<TomlComment> comments = attached(table, "a");
     assertEquals(1, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.AFTER, "c");
@@ -550,7 +550,7 @@ class TomlCommentTest {
 
   @Test
   void shouldLeaveAGluedRunAtEndOfInputWithNoTrailingNewlineUnattachedInTheRoot() {
-    MutableTomlTable table = parse("a = 1\n# end");
+    LinkedTomlTable table = parse("a = 1\n# end");
     List<TomlComment> comments = unattached(table);
     assertEquals(1, comments.size());
     assertUnattached(comments.get(0), "end");
@@ -568,7 +568,7 @@ class TomlCommentTest {
   void shouldRecordNoCommentForAnErroneousExpression() {
     assertFalse(errorsOf("a = @ # c\n").isEmpty(), "expected the malformed value to be reported as an error");
 
-    MutableTomlTable table = parse("a = @ # c\n");
+    LinkedTomlTable table = parse("a = @ # c\n");
     assertFalse(table.keySet().contains("a"), "the erroneous pair should not have been recorded");
     assertTrue(unattached(table).isEmpty(), "the trailing comment should not have been recorded as unattached");
   }
@@ -579,7 +579,7 @@ class TomlCommentTest {
 
   @Test
   void shouldSequenceRootTableElementsInDocumentOrder() {
-    MutableTomlTable table = parse(
+    LinkedTomlTable table = parse(
         "a = 1\n"
             + "# separated from b by the blank line\n"
             + "\n"
@@ -610,7 +610,7 @@ class TomlCommentTest {
 
   @Test
   void shouldSequenceASectionTablesElementsSeparatelyFromTheRoot() {
-    MutableTomlTable table = parse("# above t\n[t]\nx = 1\n# unattached\n");
+    LinkedTomlTable table = parse("# above t\n[t]\nx = 1\n# unattached\n");
 
     List<TomlElement> rootElements = table.elements();
     assertEquals(1, rootElements.size());
@@ -635,7 +635,7 @@ class TomlCommentTest {
 
   @Test
   void shouldInterleaveArrayValuesAndUnattachedCommentsInDocumentOrder() {
-    MutableTomlArray array = subArray(parse("a = [1,\n# note\n\n2\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [1,\n# note\n\n2\n]\n"), "a");
     List<TomlElement> elements = array.elements();
     assertEquals(3, elements.size());
 
@@ -655,16 +655,16 @@ class TomlCommentTest {
 
   @Test
   void shouldGiveEachNestedArrayValueItsOwnSequenceAndPosition() {
-    MutableTomlArray outer = subArray(parse("a = [[1, 2], [3]]\n"), "a");
+    ListTomlArray outer = subArray(parse("a = [[1, 2], [3]]\n"), "a");
     assertEquals(2, outer.size());
 
-    MutableTomlArray first = subArray(outer, 0);
+    ListTomlArray first = subArray(outer, 0);
     assertEquals(2, first.size());
     assertEquals(1L, first.get(0));
     assertEquals(2L, first.get(1));
     assertPosition(first.position(), 1, 6);
 
-    MutableTomlArray second = subArray(outer, 1);
+    ListTomlArray second = subArray(outer, 1);
     assertEquals(1, second.size());
     assertEquals(3L, second.get(0));
     assertPosition(second.position(), 1, 14);
@@ -672,7 +672,7 @@ class TomlCommentTest {
 
   @Test
   void shouldReportKeyValueAndScalarPositionsSeparately() {
-    MutableTomlTable table = parse("key = \"v\"\n");
+    LinkedTomlTable table = parse("key = \"v\"\n");
     TomlKeyValue keyValue = (TomlKeyValue) table.elements().get(0);
     assertPosition(keyValue.position(), 1, 1);
     assertPosition(keyValue.value().position(), 1, 7);
@@ -680,7 +680,7 @@ class TomlCommentTest {
 
   @Test
   void shouldReadAValueThroughItsTypedAccessors() {
-    MutableTomlTable table = parse("key = \"v\" # after\n");
+    LinkedTomlTable table = parse("key = \"v\" # after\n");
     TomlValue value = ((TomlKeyValue) table.elements().get(0)).value();
     assertTrue(value.isString());
     assertFalse(value.isLong());
@@ -691,28 +691,28 @@ class TomlCommentTest {
 
   @Test
   void shouldReportATableHeaderPositionAsTheTablesOwnPosition() {
-    MutableTomlTable table = subTable(parse("[t]\n"), "t");
+    LinkedTomlTable table = subTable(parse("[t]\n"), "t");
     assertPosition(table.position(), 1, 1);
   }
 
   @Test
   void shouldReportEachArrayTableElementsOwnHeaderPosition() {
-    MutableTomlTable table = parse("[[x]]\na = 1\n[[x]]\nb = 2\n");
-    MutableTomlArray array = subArray(table, "x");
+    LinkedTomlTable table = parse("[[x]]\na = 1\n[[x]]\nb = 2\n");
+    ListTomlArray array = subArray(table, "x");
     assertPosition(array.position(), 1, 1);
-    assertPosition(((MutableTomlTable) array.get(0)).position(), 1, 1);
-    assertPosition(((MutableTomlTable) array.get(1)).position(), 3, 1);
+    assertPosition(((LinkedTomlTable) array.get(0)).position(), 1, 1);
+    assertPosition(((LinkedTomlTable) array.get(1)).position(), 3, 1);
   }
 
   @Test
   void shouldReportAnInlineTablesPositionAsItsOpeningBrace() {
-    MutableTomlTable inline = subTable(parse("k = { a = 1 }\n"), "k");
+    LinkedTomlTable inline = subTable(parse("k = { a = 1 }\n"), "k");
     assertPosition(inline.position(), 1, 5);
   }
 
   @Test
   void shouldPlaceTheRootTableAtTheStartOfTheDocument() {
-    MutableTomlTable table = parse("\n# leading comment\n[t]\n");
+    LinkedTomlTable table = parse("\n# leading comment\n[t]\n");
     assertPosition(table.position(), 1, 1);
     assertEquals(TomlPosition.positionAt(1, 1), table.inputPositionOf(List.of()));
     assertEquals(TomlPosition.positionAt(3, 1), subTable(table, "t").inputPositionOf(List.of()));
@@ -724,15 +724,15 @@ class TomlCommentTest {
     // defines "a" directly, taking over the spot its implicit creation already holds in the root table's sequence.
     assertNull(subTable(parse("[a.b]\nx = 1\n"), "a").position());
 
-    MutableTomlTable table = parse("[a.b]\nx = 1\n[a]\nc = 2\n");
-    MutableTomlTable a = subTable(table, "a");
+    LinkedTomlTable table = parse("[a.b]\nx = 1\n[a]\nc = 2\n");
+    LinkedTomlTable a = subTable(table, "a");
     assertEquals(TomlPosition.positionAt(3, 1), a.position());
     assertEquals(TomlPosition.positionAt(3, 1), table.inputPositionOf(List.of("a")));
   }
 
   @Test
   void shouldAttachCommentsToAnArrayMembersValueRatherThanTheArray() {
-    MutableTomlArray array = subArray(parse("a = [ # after bracket\n  # above one\n  1, # after one\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [ # after bracket\n  # above one\n  1, # after one\n]\n"), "a");
     List<TomlComment> comments = array.comments(0);
     assertEquals(2, comments.size());
     assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above one");
@@ -745,7 +745,7 @@ class TomlCommentTest {
 
   @Test
   void shouldSequenceInlineTableElementsInDocumentOrder() {
-    MutableTomlTable inline = subTable(parse("t = { a = 1, # after a\n# unattached\n\nb = 2 }\n"), "t");
+    LinkedTomlTable inline = subTable(parse("t = { a = 1, # after a\n# unattached\n\nb = 2 }\n"), "t");
     List<TomlElement> elements = inline.elements();
     assertEquals(3, elements.size());
 
@@ -767,7 +767,7 @@ class TomlCommentTest {
 
   @Test
   void shouldGiveAnEntryTheSameCommentsAsTheTableLookup() {
-    MutableTomlTable table = parse("# above a\na = 1 # after a\n");
+    LinkedTomlTable table = parse("# above a\na = 1 # after a\n");
     TomlKeyValue a = (TomlKeyValue) table.elements().get(0);
     assertEquals(table.comments("a"), a.comments());
     assertEquals(table.inputPositionOf("a"), a.position());
@@ -775,7 +775,7 @@ class TomlCommentTest {
 
   @Test
   void shouldGiveAnArrayEntryTheSameCommentsAndPositionAsTheIndexLookup() {
-    MutableTomlArray array = subArray(parse("a = [\n# above\n1, # after\n]\n"), "a");
+    ListTomlArray array = subArray(parse("a = [\n# above\n1, # after\n]\n"), "a");
     TomlValue entry = (TomlValue) array.elements().get(0);
     assertEquals(1L, entry.get());
     assertEquals(array.comments(0), entry.comments());
@@ -784,7 +784,7 @@ class TomlCommentTest {
 
   @Test
   void shouldSequenceAnArrayOfTablesAsEntriesOfTheArray() {
-    MutableTomlTable table = parse("[[x]]\na = 1\n# between\n\n[[x]]\nb = 2\n");
+    LinkedTomlTable table = parse("[[x]]\na = 1\n# between\n\n[[x]]\nb = 2\n");
 
     List<TomlElement> rootElements = table.elements();
     assertEquals(1, rootElements.size());
@@ -815,12 +815,12 @@ class TomlCommentTest {
 
   @Test
   void shouldReportNoPositionForATableCreatedByADottedKeyUntilAHeaderDefinesIt() {
-    MutableTomlTable table = parse("a.b = 1\n");
+    LinkedTomlTable table = parse("a.b = 1\n");
     TomlKeyValue a = (TomlKeyValue) table.elements().get(0);
     assertNull(a.value().position());
     assertPosition(table.inputPositionOf("a"), 1, 1);
 
-    MutableTomlTable defined = parse("[a.b]\n[a]\n");
+    LinkedTomlTable defined = parse("[a.b]\n[a]\n");
     assertPosition(((TomlValue) defined.getTable("a")).position(), 2, 1);
   }
 

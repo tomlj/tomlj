@@ -91,7 +91,7 @@ abstract class Entry implements TomlElement {
   abstract static class Value extends Entry implements TomlValue {
 
     // The comments attached to this value in an array; empty for a value under a key in a table, whose comments
-    // belong to the KeyValue (see MutableTomlTable#put). Not final: a nested table or array is built by the visitor
+    // belong to the KeyValue (see LinkedTomlTable#put). Not final: a nested table or array is built by the visitor
     // before the comments around it in the enclosing array are known, so they are attached afterwards; see #attach.
     private List<TomlComment> attachedComments = Collections.emptyList();
 
@@ -121,8 +121,8 @@ abstract class Entry implements TomlElement {
     /**
      * Wrap a value read from the document as the entry a table or array can place in its sequence.
      *
-     * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link MutableTomlTable} /
-     *        {@link MutableTomlArray}, which is already a {@link Value}.
+     * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link LinkedTomlTable} /
+     *        {@link ListTomlArray}, which is already a {@link Value}.
      * @param position The position of the value in the document.
      * @return {@code value} itself if it is already a {@link Value}, otherwise a new {@link Scalar} wrapping it.
      */
@@ -133,8 +133,8 @@ abstract class Entry implements TomlElement {
     /**
      * Wrap a value read from an array as the entry the array can place in its sequence, with its comments attached.
      *
-     * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link MutableTomlTable} /
-     *        {@link MutableTomlArray}, which is already a {@link Value}.
+     * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link LinkedTomlTable} /
+     *        {@link ListTomlArray}, which is already a {@link Value}.
      * @param position The position of the value in the document.
      * @param attachedComments The comments attached to the value in the array.
      * @return {@code value} itself if it is already a {@link Value}, otherwise a new {@link Scalar} wrapping it, with

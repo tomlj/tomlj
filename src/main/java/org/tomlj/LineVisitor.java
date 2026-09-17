@@ -23,17 +23,17 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 
-final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
+final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
 
   private final TomlVersion version;
   private final ErrorReporter errorReporter;
-  private final MutableTomlTable rootTable;
-  private MutableTomlTable currentTable;
+  private final LinkedTomlTable rootTable;
+  private LinkedTomlTable currentTable;
   // The comments documenting the expression being visited, which the document rule reads from the tree around it.
   private List<TomlComment> attached = Collections.emptyList();
   // The number of tables and arrays enclosing the entries of currentTable, not counting the root table. Starts at 0.
   private int currentDepth;
-  private final Map<MutableTomlTable, TomlPosition> openTables;
+  private final Map<LinkedTomlTable, TomlPosition> openTables;
   // The maximum number of tables and arrays, not counting the root table, that may enclose any value, table or array
   // in the document.
   private final int maxNestingDepth;
@@ -41,7 +41,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   LineVisitor(TomlVersion version, ErrorReporter errorReporter, int maxNestingDepth) {
     this.version = version;
     this.errorReporter = errorReporter;
-    this.rootTable = new MutableTomlTable(TomlPosition.positionAt(1, 1));
+    this.rootTable = new LinkedTomlTable(TomlPosition.positionAt(1, 1));
     this.currentTable = rootTable;
     this.openTables = new HashMap<>();
     this.maxNestingDepth = maxNestingDepth;
@@ -59,7 +59,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
    * expression is reached.
    */
   @Override
-  public MutableTomlTable visitToml(TomlParser.TomlContext ctx) {
+  public LinkedTomlTable visitToml(TomlParser.TomlContext ctx) {
     List<TomlComment> separated = null;
     int childCount = ctx.getChildCount();
     for (int i = 0; i < childCount; ++i) {
@@ -71,7 +71,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
         if (separated != null) {
           // A header is written in the document rather than in the section it opens, so the runs before it belong to
           // the root table rather than to that section.
-          MutableTomlTable container =
+          LinkedTomlTable container =
               (((TomlParser.ExpressionContext) child).table() != null) ? rootTable : currentTable;
           separated.forEach(container::addComment);
           separated = null;
@@ -99,7 +99,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   }
 
   @Override
-  public MutableTomlTable visitKeyval(TomlParser.KeyvalContext ctx) {
+  public LinkedTomlTable visitKeyval(TomlParser.KeyvalContext ctx) {
     // A key/value pair is written inside whatever section is open, and so is any comment written around it.
     List<TomlComment> comments = attached;
     TomlParser.KeyContext keyContext = ctx.key();
@@ -118,7 +118,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
           throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
         }
         currentTable
-            .set(path, Entry.Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
+            .setParsed(path, Entry.Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
             .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
       }
       return rootTable;
@@ -129,7 +129,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   }
 
   @Override
-  public MutableTomlTable visitStandardTable(TomlParser.StandardTableContext ctx) {
+  public LinkedTomlTable visitStandardTable(TomlParser.StandardTableContext ctx) {
     List<TomlComment> comments = attached;
     defineOpenTables();
     if (hasRecoveredKey(ctx, TomlParser.TableKeyEnd)) {
@@ -150,7 +150,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       if (depth > maxNestingDepth) {
         throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
       }
-      currentTable = rootTable.createTable(path, new TomlPosition(ctx), comments);
+      currentTable = rootTable.createParsedTable(path, new TomlPosition(ctx), comments);
       currentDepth = depth + 1;
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
@@ -159,7 +159,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   }
 
   @Override
-  public MutableTomlTable visitArrayTable(TomlParser.ArrayTableContext ctx) {
+  public LinkedTomlTable visitArrayTable(TomlParser.ArrayTableContext ctx) {
     List<TomlComment> comments = attached;
     defineOpenTables();
     if (hasRecoveredKey(ctx, TomlParser.ArrayTableKeyEnd)) {
@@ -181,7 +181,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       if ((long) depth + 1 > maxNestingDepth) {
         throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
       }
-      currentTable = rootTable.createTableArray(path, new TomlPosition(ctx), comments);
+      currentTable = rootTable.createParsedTableArray(path, new TomlPosition(ctx), comments);
       currentDepth = depth + 2;
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
@@ -194,29 +194,29 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
    *
    * <p>
    * Walks {@link #rootTable} along the header's leading keys ({@code path} without its last element), mirroring
-   * {@code MutableTomlTable.ensureTable}'s {@code followTableArrays} behaviour: each leading key adds one level, and a
+   * {@code LinkedTomlTable.ensureTable}'s {@code followTableArrays} behaviour: each leading key adds one level, and a
    * leading key that names a (non-empty) array of tables adds a second level, because the header walks into the last
    * table of that array rather than the array itself. A key that is absent, or that names anything else, stops the
-   * walk, but every remaining leading key still adds its one level, since {@code createTable} /
-   * {@code createTableArray} will report the real error for it.
+   * walk, but every remaining leading key still adds its one level, since {@code createParsedTable} /
+   * {@code createParsedTableArray} will report the real error for it.
    */
   private int headerDepth(List<String> path) {
     int depth = 0;
-    MutableTomlTable table = rootTable;
+    LinkedTomlTable table = rootTable;
     for (int i = 0; i < path.size() - 1; i++) {
       depth++;
       if (table == null) {
         continue;
       }
       Object value = table.get(Collections.singletonList(path.get(i)));
-      if (value instanceof MutableTomlArray
-          && ((MutableTomlArray) value).isTableArray()
-          && !((MutableTomlArray) value).isEmpty()) {
-        MutableTomlArray array = (MutableTomlArray) value;
+      if (value instanceof ListTomlArray
+          && ((ListTomlArray) value).isTableArray()
+          && !((ListTomlArray) value).isEmpty()) {
+        ListTomlArray array = (ListTomlArray) value;
         depth++;
-        table = (MutableTomlTable) array.get(array.size() - 1);
-      } else if (value instanceof MutableTomlTable) {
-        table = (MutableTomlTable) value;
+        table = (LinkedTomlTable) array.get(array.size() - 1);
+      } else if (value instanceof LinkedTomlTable) {
+        table = (LinkedTomlTable) value;
       } else {
         table = null;
       }
@@ -225,12 +225,12 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   }
 
   @Override
-  protected MutableTomlTable aggregateResult(MutableTomlTable aggregate, MutableTomlTable nextResult) {
+  protected LinkedTomlTable aggregateResult(LinkedTomlTable aggregate, LinkedTomlTable nextResult) {
     return aggregate == null ? null : nextResult;
   }
 
   @Override
-  protected MutableTomlTable defaultResult() {
+  protected LinkedTomlTable defaultResult() {
     return rootTable;
   }
 
@@ -306,7 +306,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
   }
 
   private void defineOpenTables() {
-    openTables.forEach(MutableTomlTable::define);
+    openTables.forEach(LinkedTomlTable::define);
     openTables.clear();
   }
 }
