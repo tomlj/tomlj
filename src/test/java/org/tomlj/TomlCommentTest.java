@@ -75,7 +75,7 @@ class TomlCommentTest {
     return (MutableTomlArray) array.get(index);
   }
 
-  private static void assertComment(TomlComment comment, CommentPlacement placement, String text) {
+  private static void assertComment(TomlComment comment, TomlComment.Placement placement, String text) {
     assertEquals(placement, comment.placement());
     assertEquals(text, comment.text());
   }
@@ -100,7 +100,7 @@ class TomlCommentTest {
     MutableTomlTable table = parse("# above\nx = 1\n");
     List<TomlComment> comments = attached(table, "x");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "above");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
     assertTrue(unattached(table).isEmpty());
   }
 
@@ -109,7 +109,7 @@ class TomlCommentTest {
     MutableTomlTable table = parse("x = 1 # after\n");
     List<TomlComment> comments = attached(table, "x");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.AFTER, "after");
+    assertComment(comments.get(0), TomlComment.Placement.AFTER, "after");
   }
 
   @Test
@@ -117,8 +117,8 @@ class TomlCommentTest {
     MutableTomlTable table = parse("# above\nx = 1 # after\n");
     List<TomlComment> comments = attached(table, "x");
     assertEquals(2, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "above");
-    assertComment(comments.get(1), CommentPlacement.AFTER, "after");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
+    assertComment(comments.get(1), TomlComment.Placement.AFTER, "after");
   }
 
   @Test
@@ -139,7 +139,7 @@ class TomlCommentTest {
 
     List<TomlComment> xComments = attached(table, "x");
     assertEquals(1, xComments.size());
-    assertComment(xComments.get(0), CommentPlacement.ABOVE, "near");
+    assertComment(xComments.get(0), TomlComment.Placement.ABOVE, "near");
   }
 
   @Test
@@ -147,8 +147,8 @@ class TomlCommentTest {
     MutableTomlTable table = parse("# above\n[a] # after\nx = 1\n");
     List<TomlComment> comments = attached(table, "a");
     assertEquals(2, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "above");
-    assertComment(comments.get(1), CommentPlacement.AFTER, "after");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
+    assertComment(comments.get(1), TomlComment.Placement.AFTER, "after");
   }
 
   @Test
@@ -160,8 +160,8 @@ class TomlCommentTest {
     MutableTomlArray array = subArray(table, "x");
     List<TomlComment> comments = array.comments(0);
     assertEquals(2, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "above");
-    assertComment(comments.get(1), CommentPlacement.AFTER, "after");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
+    assertComment(comments.get(1), TomlComment.Placement.AFTER, "after");
     assertTrue(unattached(array).isEmpty());
   }
 
@@ -224,7 +224,7 @@ class TomlCommentTest {
     MutableTomlTable table = parse("# note\nx = 1\n");
     List<TomlComment> comments = attached(table, "x");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "note");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "note");
     assertTrue(unattached(table).isEmpty());
   }
 
@@ -237,7 +237,7 @@ class TomlCommentTest {
     MutableTomlArray array = subArray(parse("a = [\n# above\n1\n]\n"), "a");
     List<TomlComment> comments = array.comments(0);
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "above");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
     assertTrue(unattached(array).isEmpty());
   }
 
@@ -247,7 +247,7 @@ class TomlCommentTest {
     MutableTomlArray array = subArray(parse("a = [1, # trails one\n]\n"), "a");
     List<TomlComment> comments = array.comments(0);
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.AFTER, "trails one");
+    assertComment(comments.get(0), TomlComment.Placement.AFTER, "trails one");
   }
 
   @Test
@@ -256,7 +256,7 @@ class TomlCommentTest {
     MutableTomlArray array = subArray(parse("a = [1 # c\n, 2]\n"), "a");
     List<TomlComment> first = array.comments(0);
     assertEquals(1, first.size());
-    assertComment(first.get(0), CommentPlacement.AFTER, "c");
+    assertComment(first.get(0), TomlComment.Placement.AFTER, "c");
     assertEquals(2L, array.get(1));
     assertTrue(array.comments(1).isEmpty());
   }
@@ -267,10 +267,10 @@ class TomlCommentTest {
     MutableTomlArray array = subArray(parse("a = [1 # t\n# ab\n, 2]\n"), "a");
     List<TomlComment> first = array.comments(0);
     assertEquals(1, first.size());
-    assertComment(first.get(0), CommentPlacement.AFTER, "t");
+    assertComment(first.get(0), TomlComment.Placement.AFTER, "t");
     List<TomlComment> second = array.comments(1);
     assertEquals(1, second.size());
-    assertComment(second.get(0), CommentPlacement.ABOVE, "ab");
+    assertComment(second.get(0), TomlComment.Placement.ABOVE, "ab");
     assertTrue(unattached(array).isEmpty());
   }
 
@@ -329,7 +329,7 @@ class TomlCommentTest {
     assertTrue(unattached(array).isEmpty());
     List<TomlComment> comments = attached(table, "a");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.AFTER, "c");
+    assertComment(comments.get(0), TomlComment.Placement.AFTER, "c");
   }
 
   @Test
@@ -339,7 +339,7 @@ class TomlCommentTest {
     MutableTomlArray inner = subArray(outer, 0);
     List<TomlComment> comments = inner.comments(0);
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "note");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "note");
     assertTrue(unattached(inner).isEmpty());
   }
 
@@ -352,7 +352,7 @@ class TomlCommentTest {
     MutableTomlTable inline = subTable(parse("a = {\n# above\nx = 1\n}\n"), "a");
     List<TomlComment> comments = attached(inline, "x");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "above");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
     assertTrue(unattached(inline).isEmpty());
   }
 
@@ -362,7 +362,7 @@ class TomlCommentTest {
         subTable(parse("a = {\n# above\nx = 1\n}\n", TomlParseOptions.defaults().withVersion(TomlVersion.HEAD)), "a");
     List<TomlComment> comments = attached(inline, "x");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "above");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
   }
 
   @Test
@@ -370,7 +370,7 @@ class TomlCommentTest {
     MutableTomlTable inline = subTable(parse("a = {x = 1, # trails one\n}\n"), "a");
     List<TomlComment> comments = attached(inline, "x");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.AFTER, "trails one");
+    assertComment(comments.get(0), TomlComment.Placement.AFTER, "trails one");
   }
 
   @Test
@@ -378,7 +378,7 @@ class TomlCommentTest {
     MutableTomlTable inline = subTable(parse("a = {x = 1 # c\n, y = 2}\n"), "a");
     List<TomlComment> xComments = attached(inline, "x");
     assertEquals(1, xComments.size());
-    assertComment(xComments.get(0), CommentPlacement.AFTER, "c");
+    assertComment(xComments.get(0), TomlComment.Placement.AFTER, "c");
     assertEquals(2L, inline.get(List.of("y")));
     assertTrue(attached(inline, "y").isEmpty());
   }
@@ -436,7 +436,7 @@ class TomlCommentTest {
     assertTrue(unattached(inline).isEmpty());
     List<TomlComment> comments = attached(table, "a");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.AFTER, "c");
+    assertComment(comments.get(0), TomlComment.Placement.AFTER, "c");
   }
 
   @Test
@@ -446,7 +446,7 @@ class TomlCommentTest {
     MutableTomlTable inner = subTable(outer, "b");
     List<TomlComment> comments = attached(inner, "x");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "note");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "note");
     assertTrue(unattached(inner).isEmpty());
   }
 
@@ -530,7 +530,7 @@ class TomlCommentTest {
     MutableTomlTable table = parse("a = 1 # c");
     List<TomlComment> comments = attached(table, "a");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.AFTER, "c");
+    assertComment(comments.get(0), TomlComment.Placement.AFTER, "c");
   }
 
   @Test
@@ -567,8 +567,8 @@ class TomlCommentTest {
     TomlParseResult result = Toml.parse("# above\na.b = 1 # after\n");
     List<TomlComment> comments = result.comments("a.b");
     assertEquals(2, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "above");
-    assertComment(comments.get(1), CommentPlacement.AFTER, "after");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
+    assertComment(comments.get(1), TomlComment.Placement.AFTER, "after");
   }
 
   @Test
@@ -576,7 +576,7 @@ class TomlCommentTest {
     TomlParseResult result = Toml.parse("# c\n\"x y\" = 1\n");
     List<TomlComment> comments = result.comments("\"x y\"");
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "c");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "c");
   }
 
   @Test
@@ -594,7 +594,7 @@ class TomlCommentTest {
     TomlArray array = result.getArray("x");
     List<TomlComment> comments = array.comments(0);
     assertEquals(1, comments.size());
-    assertComment(comments.get(0), CommentPlacement.ABOVE, "h");
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "h");
   }
 
   @Test

@@ -69,7 +69,7 @@ final class Comments {
     // Within brackets the run above an element is the last thing written in the line break before it.
     ParseTree run = (previous instanceof TomlParser.LineBreakContext) ? lastChild(previous) : previous;
     return (run instanceof TomlParser.CommentRunContext)
-        ? of((TomlParser.CommentRunContext) run, CommentPlacement.ABOVE)
+        ? of((TomlParser.CommentRunContext) run, TomlComment.Placement.ABOVE)
         : null;
   }
 
@@ -82,7 +82,7 @@ final class Comments {
   @Nullable
   static TomlComment after(@Nullable ParseTree next) {
     TerminalNode comment = lineEndComment(next);
-    return (comment != null) ? of(comment, CommentPlacement.AFTER) : null;
+    return (comment != null) ? of(comment, TomlComment.Placement.AFTER) : null;
   }
 
   /**
@@ -186,7 +186,7 @@ final class Comments {
    * @param placement Where it sits relative to what it documents, or {@code null} if it documents nothing.
    * @return The comment.
    */
-  static TomlComment of(TomlParser.CommentRunContext run, @Nullable CommentPlacement placement) {
+  static TomlComment of(TomlParser.CommentRunContext run, TomlComment.@Nullable Placement placement) {
     List<TerminalNode> comments = run.Comment();
     List<Token> tokens = new ArrayList<>(comments.size());
     for (TerminalNode comment : comments) {
@@ -202,7 +202,7 @@ final class Comments {
    * @param placement Where it sits relative to what it documents, or {@code null} if it documents nothing.
    * @return The comment.
    */
-  static TomlComment of(TerminalNode comment, @Nullable CommentPlacement placement) {
+  static TomlComment of(TerminalNode comment, TomlComment.@Nullable Placement placement) {
     return TomlComment.of(Collections.singletonList(comment.getSymbol()), placement);
   }
 
