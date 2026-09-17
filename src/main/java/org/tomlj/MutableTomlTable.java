@@ -165,37 +165,21 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
 
   @Override
   @Nullable
-  public Object get(List<String> path) {
-    if (path.isEmpty()) {
-      return this;
-    }
-    Entry.KeyValue element = getElement(path);
-    return (element != null) ? element.value().get() : null;
-  }
-
-  @Override
-  @Nullable
   public TomlPosition inputPositionOf(List<String> path) {
     if (path.isEmpty()) {
       return position;
     }
-    Entry.KeyValue element = getElement(path);
+    Entry.KeyValue element = entry(path);
     return (element != null) ? element.position() : null;
   }
 
   @Override
-  public List<TomlComment> comments(List<String> path) {
+  public Entry.@Nullable KeyValue entry(List<String> path) {
     if (path.isEmpty()) {
-      return Collections.emptyList();
+      return null;
     }
-    Entry.KeyValue element = getElement(path);
-    return (element != null) ? element.comments() : Collections.emptyList();
-  }
-
-  private Entry.KeyValue getElement(List<String> path) {
     MutableTomlTable table = this;
     int depth = path.size();
-    assert depth > 0;
     for (int i = 0; i < (depth - 1); ++i) {
       Entry.KeyValue element = table.properties.get(path.get(i));
       if (element == null) {

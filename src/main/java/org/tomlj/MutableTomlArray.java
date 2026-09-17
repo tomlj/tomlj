@@ -59,13 +59,8 @@ class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArra
   }
 
   @Override
-  public Object get(int index) {
-    return values.get(index).get();
-  }
-
-  @Override
-  public TomlPosition inputPositionOf(int index) {
-    return values.get(index).position();
+  public Entry.Value entry(int index) {
+    return values.get(index);
   }
 
   /**
@@ -97,11 +92,6 @@ class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArra
     add(value);
     values.add(value);
     return this;
-  }
-
-  @Override
-  public List<TomlComment> comments(int index) {
-    return values.get(index).comments();
   }
 
   @Override

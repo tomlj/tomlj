@@ -32,17 +32,7 @@ final class EmptyTomlArray implements TomlArray {
   }
 
   @Override
-  public Object get(int index) {
-    throw new IndexOutOfBoundsException("Index: " + index + ", Size: 0");
-  }
-
-  @Override
-  public TomlPosition inputPositionOf(int index) {
-    throw new IndexOutOfBoundsException("Index: " + index + ", Size: 0");
-  }
-
-  @Override
-  public List<TomlComment> comments(int index) {
+  public TomlValue entry(int index) {
     throw new IndexOutOfBoundsException("Index: " + index + ", Size: 0");
   }
 

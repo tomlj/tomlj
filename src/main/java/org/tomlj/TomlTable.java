@@ -245,12 +245,21 @@ public interface TomlTable {
   /**
    * Get a value from the TOML document.
    *
+   * <p>
+   * This is a shortcut for {@link #entry(List)}, returning its value.
+   *
    * @param path The key path.
    * @return The value, or {@code null} if no value was set in the TOML document.
    * @throws TomlInvalidTypeException If any element of the path preceding the final key is not a table.
    */
   @Nullable
-  Object get(List<String> path);
+  default Object get(List<String> path) {
+    if (path.isEmpty()) {
+      return this;
+    }
+    TomlKeyValue entry = entry(path);
+    return (entry != null) ? entry.value().get() : null;
+  }
 
   /**
    * Check if a value in the TOML document is a string.
@@ -1233,6 +1242,9 @@ public interface TomlTable {
   /**
    * Get the position where a key is defined in the TOML document.
    *
+   * <p>
+   * For a non-empty path, this is the position of {@link #entry(List)}.
+   *
    * @param path The key path.
    * @return The input position, or {@code null} if the key was not set in the TOML document.
    * @throws TomlInvalidTypeException If any element of the path preceding the final key is not a table.
@@ -1279,10 +1291,54 @@ public interface TomlTable {
    * The comments on a {@code [[x]]} header are attached to the table it opens, so {@code comments("x")} is empty and
    * they are read with {@code getArray("x").comments(0)} and so on.
    *
+   * <p>
+   * This is a shortcut for {@link #entry(List)}, returning its comments.
+   *
    * @param path The key path.
    * @return The attached comments, in document order. Unmodifiable.
    */
-  List<TomlComment> comments(List<String> path);
+  default List<TomlComment> comments(List<String> path) {
+    if (path.isEmpty()) {
+      return Collections.emptyList();
+    }
+    TomlKeyValue entry = entry(path);
+    return (entry != null) ? entry.comments() : Collections.emptyList();
+  }
+
+  /**
+   * Get the entry for a key.
+   *
+   * <p>
+   * The key is parsed using TOML key syntax, so keys containing characters other than {@code A-Z}, {@code a-z},
+   * {@code 0-9}, {@code _} and {@code -} must be quoted (e.g. {@code "\"@key\""}). To look up a raw key name without
+   * quoting, such as one returned by {@link #keySet()}, use {@link #entry(List)} instead.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @return The entry, or {@code null} if the key was not set in the TOML document.
+   * @throws IllegalArgumentException If the key cannot be parsed.
+   * @throws TomlInvalidTypeException If any element of the path preceding the final key is not a table.
+   */
+  @Nullable
+  default TomlKeyValue entry(String dottedKey) {
+    requireNonNull(dottedKey);
+    return entry(Parser.parseDottedKey(dottedKey));
+  }
+
+  /**
+   * Get the entry for a key.
+   *
+   * <p>
+   * The entry is the {@link TomlKeyValue} that {@link #elements()} holds for the key, in the table the path leads to.
+   * {@link #get(List)}, {@link #inputPositionOf(List)} and {@link #comments(List)} are shortcuts that read the value,
+   * position and comments of this entry. An empty path names this table itself, which is not an entry, so it returns
+   * {@code null}.
+   *
+   * @param path The key path.
+   * @return The entry, or {@code null} if the key was not set in the TOML document.
+   * @throws TomlInvalidTypeException If any element of the path preceding the final key is not a table.
+   */
+  @Nullable
+  TomlKeyValue entry(List<String> path);
 
   /**
    * Get the elements written in this table, in document order.
