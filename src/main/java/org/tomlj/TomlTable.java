@@ -1270,6 +1270,7 @@ public interface TomlTable {
    * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
    * @return The attached comments, in document order. Unmodifiable.
    * @throws IllegalArgumentException If the key cannot be parsed.
+   * @throws TomlInvalidTypeException If any element of the path preceding the final key is not a table.
    */
   default List<TomlComment> comments(String dottedKey) {
     requireNonNull(dottedKey);
@@ -1296,6 +1297,7 @@ public interface TomlTable {
    *
    * @param path The key path.
    * @return The attached comments, in document order. Unmodifiable.
+   * @throws TomlInvalidTypeException If any element of the path preceding the final key is not a table.
    */
   default List<TomlComment> comments(List<String> path) {
     if (path.isEmpty()) {

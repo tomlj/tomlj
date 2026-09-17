@@ -178,20 +178,33 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
     if (path.isEmpty()) {
       return null;
     }
+    LinkedTomlTable table = parentTable(path);
+    return (table != null) ? table.properties.get(path.get(path.size() - 1)) : null;
+  }
+
+  /**
+   * Walk to the table that holds the last key of a path.
+   *
+   * @param path A non-empty key path.
+   * @return The table the last key is looked up in, or {@code null} if a table before it is missing.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key exists and is not a table.
+   */
+  @Nullable
+  private LinkedTomlTable parentTable(List<String> path) {
     LinkedTomlTable table = this;
-    int depth = path.size();
-    for (int i = 0; i < (depth - 1); ++i) {
+    for (int i = 0; i < (path.size() - 1); ++i) {
       Entry.KeyValue entry = table.properties.get(path.get(i));
       if (entry == null) {
         return null;
       }
-      if (entry.value instanceof LinkedTomlTable) {
-        table = (LinkedTomlTable) entry.value;
-        continue;
+      if (!(entry.value instanceof LinkedTomlTable)) {
+        String badPath = Toml.joinKeyPath(path.subList(0, i + 1));
+        throw new TomlInvalidTypeException(
+            "Value of '" + badPath + "' is a " + TomlType.typeNameFor(entry.value.get()));
       }
-      return null;
+      table = (LinkedTomlTable) entry.value;
     }
-    return table.properties.get(path.get(depth - 1));
+    return table;
   }
 
   @Override

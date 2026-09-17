@@ -252,8 +252,22 @@ class LinkedTomlTableTest {
     assertNull(table.entry("missing"));
     assertNull(table.entry(List.of("t", "missing")));
     assertNull(table.entry(List.of()));
-    assertNull(table.entry(List.of("a", "x")));
+    assertNull(table.entry(List.of("missing", "x")));
     assertNull(EMPTY_TABLE.entry(List.of("a")));
+  }
+
+  @Test
+  void shouldThrowWhenAKeyBeforeTheLastIsNotATable() {
+    LinkedTomlTable table = parse("a = 1\n[t]\nb = \"x\"\n");
+    TomlInvalidTypeException e = assertThrows(TomlInvalidTypeException.class, () -> table.entry(List.of("a", "x")));
+    assertEquals("Value of 'a' is a integer", e.getMessage());
+    e = assertThrows(TomlInvalidTypeException.class, () -> table.get("t.b.c.d"));
+    assertEquals("Value of 't.b' is a string", e.getMessage());
+    assertThrows(TomlInvalidTypeException.class, () -> table.comments("a.x"));
+    assertThrows(TomlInvalidTypeException.class, () -> table.inputPositionOf("a.x"));
+    assertThrows(TomlInvalidTypeException.class, () -> table.getString("a.x"));
+    assertFalse(table.contains("a.x"));
+    assertFalse(table.isString("a.x"));
   }
 
   @Test
