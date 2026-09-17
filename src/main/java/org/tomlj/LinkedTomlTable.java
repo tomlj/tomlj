@@ -564,7 +564,8 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
     if (removed == null) {
       return null;
     }
-    table.removeElement(removed);
+    boolean removedFromElements = table.removeElement(removed);
+    assert removedFromElements : "removed entry is not among elements()";
     return removed.value.get();
   }
 
@@ -580,7 +581,18 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
       return isModified();
     }
     Entry.KeyValue entry = entry(path);
-    return entry != null && entry.modified();
+    return entry != null && entry.isModified();
+  }
+
+  @Override
+  public LinkedTomlTable addComment(TomlComment comment) {
+    addEditedComment(comment.requireUnattached().withoutPosition());
+    return this;
+  }
+
+  @Override
+  public boolean removeComment(TomlComment comment) {
+    return removeElement(comment);
   }
 
   /**
@@ -606,9 +618,9 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
 
   /**
    * Build a table with the same entries as another, walked through its public interface: the same entries in the same
-   * order, each with no position and marked as added, keeping each entry's attached comments and the unattached
-   * comments in their places. A nested table or array is copied recursively, through {@link TomlValues#normalize};
-   * every other value is shared.
+   * order, each with no position and marked as added, with each entry's attached comments and the unattached comments
+   * in their places, copied without their positions. A nested table or array is copied recursively, through
+   * {@link TomlValues#normalize}; every other value is shared.
    *
    * @param table The table to copy.
    * @param inline Whether the copy is an inline table.
@@ -618,13 +630,13 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
     LinkedTomlTable copy = new LinkedTomlTable(null, inline);
     for (TomlElement element : table.elements()) {
       if (element instanceof TomlComment) {
-        copy.addComment((TomlComment) element);
+        copy.addParsedComment(((TomlComment) element).withoutPosition());
       } else {
         TomlKeyValue original = (TomlKeyValue) element;
         TomlValues.checkKey(original.key());
         // A fresh wrapper even for a scalar: an entry's position is dropped, and an array entry's is its value's.
         Value value = Value.of(TomlValues.normalize(original.value().get()), null);
-        copy.putEdited(original.key(), value, original.comments());
+        copy.putEdited(original.key(), value, TomlComment.copyWithoutPositions(original.comments()));
       }
     }
     return copy;

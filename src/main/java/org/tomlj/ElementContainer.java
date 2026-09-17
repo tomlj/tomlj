@@ -30,8 +30,8 @@ import java.util.List;
  *
  * <p>
  * The editing API tracks {@link #sequenceModified} here: whether an entry or an unattached comment was removed from
- * this container's sequence. An entry added or replaced records that on itself, in {@link Entry#valueModified}, since
- * it still exists afterwards to carry the flag.
+ * this container's sequence, or an unattached comment was added to it. An entry added or replaced records that on
+ * itself, in {@link Entry#valueModified}, since it still exists afterwards to carry the flag.
  *
  * @param <E> The kind of entry this container holds: a key/value pair for a table, an indexed value for an array.
  */
@@ -60,30 +60,41 @@ abstract class ElementContainer<E extends Entry> extends Value {
   }
 
   /**
-   * Add an unattached comment, after the elements already written.
+   * Add an unattached comment read from the document, after the elements already written.
    *
    * @param comment The comment.
    */
-  void addComment(TomlComment comment) {
+  void addParsedComment(TomlComment comment) {
     elements.add(comment);
   }
 
   /**
-   * Remove an element from this container's sequence, by identity, and record the removal. Used for an entry, once the
-   * caller has removed it from its own index, and for an unattached comment.
+   * Add an unattached comment through the editing API, after the elements already written, and record the addition.
    *
-   * @param element The element to remove, already known to be among {@link #elements()}.
+   * @param comment The comment.
+   */
+  void addEditedComment(TomlComment comment) {
+    elements.add(comment);
+    sequenceModified = true;
+  }
+
+  /**
+   * Remove an element from this container's sequence, by identity, and record the removal if it was found. Used for an
+   * entry, once the caller has removed it from its own index, and for an unattached comment.
+   *
+   * @param element The element to remove.
+   * @return {@code true} if the element was found, and removed.
    */
   @SuppressWarnings("ReferenceEquality") // a sequence search is about identity, never equals
-  void removeElement(TomlElement element) {
+  boolean removeElement(TomlElement element) {
     for (int i = 0; i < elements.size(); i++) {
       if (elements.get(i) == element) {
         elements.remove(i);
         sequenceModified = true;
-        return;
+        return true;
       }
     }
-    throw new AssertionError("element is not among this container's elements()");
+    return false;
   }
 
   /**
@@ -119,7 +130,7 @@ abstract class ElementContainer<E extends Entry> extends Value {
       return true;
     }
     for (TomlElement element : elements) {
-      if (element instanceof Entry && ((Entry) element).modified()) {
+      if (element instanceof Entry && ((Entry) element).isModified()) {
         return true;
       }
     }
