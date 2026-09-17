@@ -304,6 +304,38 @@ shadowJar {
   }
 }
 
+// Run a test against the shaded jar itself, since the relocation and minimization steps leave the
+// unit tests untouched. The test compiles against the main classes (shadowJar depends on every compile
+// task, so compiling against the jar would be a cycle) and runs with the shaded jar and JUnit only: no
+// main classes and no ANTLR runtime. JUnit is declared directly rather than through testImplementation,
+// which would bring the ANTLR runtime along.
+sourceSets {
+  shadedTest {
+    compileClasspath += sourceSets.main.output
+    runtimeClasspath += files(tasks.shadowJar)
+  }
+}
+
+dependencies {
+  shadedTestCompileOnly 'org.checkerframework:checker-qual'
+  shadedTestImplementation 'org.junit.jupiter:junit-jupiter-api'
+  shadedTestRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+  shadedTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.register('shadedTest', Test) {
+  description = 'Runs the tests in src/shadedTest against the shaded jar.'
+  group = 'verification'
+  useJUnitPlatform()
+  testClassesDirs = sourceSets.shadedTest.output.classesDirs
+  classpath = sourceSets.shadedTest.runtimeClasspath
+}
+
+compileShadedTestJava.options.encoding = 'UTF-8'
+compileShadedTestJava.options.release = 17
+
+check.dependsOn shadedTest
+
 task deploy() { }
 
 dependencyManagement {
