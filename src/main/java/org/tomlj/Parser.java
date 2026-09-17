@@ -30,7 +30,7 @@ final class Parser {
 
   static TomlParseResult parse(CharStream stream, TomlParseOptions options) {
     AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
-    MutableTomlTable table = parseTable(stream, options, errorListener);
+    LinkedTomlTable table = parseTable(stream, options, errorListener);
 
     return new TomlParseResult() {
       @Override
@@ -104,7 +104,7 @@ final class Parser {
    * @param errorListener Where syntax errors and parse errors are reported.
    * @return The table the document describes, which is incomplete if any error was reported.
    */
-  static MutableTomlTable parseTable(
+  static LinkedTomlTable parseTable(
       CharStream stream,
       TomlParseOptions options,
       AccumulatingErrorListener errorListener) {

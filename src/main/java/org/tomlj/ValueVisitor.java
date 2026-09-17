@@ -179,7 +179,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
    */
   @Override
   public Object visitArray(TomlParser.ArrayContext ctx) {
-    MutableTomlArray array = new MutableTomlArray(false, new TomlPosition(ctx));
+    ListTomlArray array = new ListTomlArray(false, new TomlPosition(ctx));
     List<ParseTree> nodes = Comments.flatten(ctx);
     for (int i = 0; i < nodes.size(); ++i) {
       ParseTree node = nodes.get(i);
@@ -192,7 +192,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     return array;
   }
 
-  private void append(MutableTomlArray array, TomlParser.ValContext ctx, List<ParseTree> nodes, int index) {
+  private void append(ListTomlArray array, TomlParser.ValContext ctx, List<ParseTree> nodes, int index) {
     List<TomlComment> comments = TomlComment.attached(Comments.above(nodes, index), Comments.after(nodes, index));
     Object value = ctx.accept(this);
     if (value == null) {
@@ -200,7 +200,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     }
     TomlPosition position = new TomlPosition(ctx);
     try {
-      array.append(Entry.Value.of(value, position, comments));
+      array.appendParsed(Entry.Value.of(value, position, comments));
     } catch (TomlInvalidTypeException e) {
       throw new TomlParseError(e.getMessage(), position);
     }
@@ -218,9 +218,9 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     if (!version.after(V1_0_0)) {
       checkSingleLineInlineTable(ctx);
     }
-    MutableTomlTable table = MutableTomlTable.inline(new TomlPosition(ctx));
+    LinkedTomlTable table = LinkedTomlTable.inline(new TomlPosition(ctx));
     // The tables that dotted keys open within this one, which close with it: nothing written later may add to them.
-    Map<MutableTomlTable, TomlPosition> openTables = null;
+    Map<LinkedTomlTable, TomlPosition> openTables = null;
     List<ParseTree> nodes = Comments.flatten(ctx);
     for (int i = 0; i < nodes.size(); ++i) {
       ParseTree node = nodes.get(i);
@@ -234,14 +234,14 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
       }
     }
     if (openTables != null) {
-      openTables.forEach(MutableTomlTable::define);
+      openTables.forEach(LinkedTomlTable::define);
     }
     return table;
   }
 
   private void set(
-      MutableTomlTable table,
-      Map<MutableTomlTable, TomlPosition> openTables,
+      LinkedTomlTable table,
+      Map<LinkedTomlTable, TomlPosition> openTables,
       TomlParser.KeyvalContext ctx,
       List<ParseTree> nodes,
       int index) {
@@ -258,7 +258,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     Object value = valContext.accept(this);
     if (value != null) {
       table
-          .set(path, Entry.Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
+          .setParsed(path, Entry.Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
           .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
     }
   }

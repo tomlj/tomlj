@@ -33,25 +33,25 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-class MutableTomlTableTest {
+class LinkedTomlTableTest {
 
-  private static MutableTomlTable parse(String document) {
+  private static LinkedTomlTable parse(String document) {
     return Parser
         .parseTable(CharStreams.fromString(document), TomlParseOptions.defaults(), new AccumulatingErrorListener());
   }
 
   @Test
   void emptyTableIsEmpty() {
-    TomlTable table = new MutableTomlTable();
+    TomlTable table = new LinkedTomlTable();
     assertTrue(table.isEmpty());
     assertEquals(0, table.size());
   }
 
   @Test
   void getMissingPropertyReturnsNull() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("bar", "one", positionAt(1, 1));
-    table.set("foo.baz", "two", positionAt(1, 1));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("bar", "one", positionAt(1, 1));
+    table.setParsed("foo.baz", "two", positionAt(1, 1));
     assertNull(table.get("baz"));
     assertNull(table.get("foo.bar"));
     assertNull(table.get("foo.bar.baz"));
@@ -59,38 +59,38 @@ class MutableTomlTableTest {
 
   @Test
   void getStringProperty() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("foo.bar", "one", positionAt(1, 1));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("foo.bar", "one", positionAt(1, 1));
     assertTrue(table.isString("foo.bar"));
     assertEquals("one", table.getString("foo.bar"));
   }
 
   @Test
   void shouldCreateParentTables() {
-    MutableTomlTable table = new MutableTomlTable();
-    List<AbstractMap.SimpleEntry<MutableTomlTable, TomlPosition>> intermediates =
-        table.set("foo.bar", "one", positionAt(1, 1));
+    LinkedTomlTable table = new LinkedTomlTable();
+    List<AbstractMap.SimpleEntry<LinkedTomlTable, TomlPosition>> intermediates =
+        table.setParsed("foo.bar", "one", positionAt(1, 1));
     assertTrue(table.isTable("foo"));
     assertNotNull(table.getTable("foo"));
-    MutableTomlTable firstIntermediate = intermediates.get(0).getKey();
+    LinkedTomlTable firstIntermediate = intermediates.get(0).getKey();
     assertEquals(table.get("foo"), firstIntermediate);
     assertFalse(firstIntermediate.isDefined());
   }
 
   @Test
   void cannotReplaceProperty() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("foo.bar", "one", positionAt(1, 3));
-    TomlParseError e = assertThrows(TomlParseError.class, () -> table.set("foo.bar", "two", positionAt(2, 5)));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("foo.bar", "one", positionAt(1, 3));
+    TomlParseError e = assertThrows(TomlParseError.class, () -> table.setParsed("foo.bar", "two", positionAt(2, 5)));
     assertEquals("foo.bar previously defined at line 1, column 3", e.getMessage());
   }
 
   @ParameterizedTest
   @MethodSource("quotesComplexKeyInErrorSupplier")
   void quotesComplexKeysInError(List<String> path, String expected) {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set(path, "one", positionAt(1, 3));
-    TomlParseError e = assertThrows(TomlParseError.class, () -> table.set(path, "two", positionAt(2, 5)));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed(path, "one", positionAt(1, 3));
+    TomlParseError e = assertThrows(TomlParseError.class, () -> table.setParsed(path, "two", positionAt(2, 5)));
     assertEquals(expected + " previously defined at line 1, column 3", e.getMessage());
   }
 
@@ -104,33 +104,34 @@ class MutableTomlTableTest {
 
   @Test
   void cannotTreatNonTableAsTable() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("foo.bar", "one", positionAt(5, 3));
-    TomlParseError e = assertThrows(TomlParseError.class, () -> table.set("foo.bar.baz", "two", positionAt(2, 5)));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("foo.bar", "one", positionAt(5, 3));
+    TomlParseError e =
+        assertThrows(TomlParseError.class, () -> table.setParsed("foo.bar.baz", "two", positionAt(2, 5)));
     assertEquals("foo.bar is not a table (previously defined at line 5, column 3)", e.getMessage());
   }
 
   @Test
   void ignoresWhitespaceAroundUnquotedKeys() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("foo.bar", 4, positionAt(5, 3));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("foo.bar", 4, positionAt(5, 3));
     assertEquals(Long.valueOf(4), table.getLong(" foo . bar"));
-    table.set(Arrays.asList(" Bar ", " B A Z "), 9, positionAt(5, 3));
+    table.setParsed(Arrays.asList(" Bar ", " B A Z "), 9, positionAt(5, 3));
     assertEquals(Long.valueOf(9), table.getLong("' Bar '.  \" B A Z \""));
   }
 
   @Test
   void throwsForInvalidKey() {
-    MutableTomlTable table = new MutableTomlTable();
+    LinkedTomlTable table = new LinkedTomlTable();
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> table.get("foo.=bar"));
     assertEquals("Invalid key: Unexpected '=', expected a key" + TomlTest.INVALID_KEY_HINT, e.getMessage());
   }
 
   @Test
   void shouldReturnInputPosition() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("bar", "one", positionAt(4, 3));
-    table.set("foo.baz", "two", positionAt(15, 2));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("bar", "one", positionAt(4, 3));
+    table.setParsed("foo.baz", "two", positionAt(15, 2));
     assertEquals(positionAt(4, 3), table.inputPositionOf("bar"));
     assertEquals(positionAt(15, 2), table.inputPositionOf("foo.baz"));
     assertNull(table.inputPositionOf("baz"));
@@ -140,18 +141,18 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnKeySet() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("bar", "one", positionAt(4, 3));
-    table.set("foo.baz", "two", positionAt(15, 2));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("bar", "one", positionAt(4, 3));
+    table.setParsed("foo.baz", "two", positionAt(15, 2));
     assertEquals(new HashSet<>(Arrays.asList("bar", "foo")), table.keySet());
   }
 
   @Test
   void shouldReturnDottedKeySet() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("bar", "one", positionAt(4, 3));
-    table.set("foo.baz", "two", positionAt(15, 2));
-    table.set("foo.buz.bar", "three", positionAt(15, 2));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("bar", "one", positionAt(4, 3));
+    table.setParsed("foo.baz", "two", positionAt(15, 2));
+    table.setParsed("foo.buz.bar", "three", positionAt(15, 2));
     assertEquals(
         new HashSet<>(Arrays.asList("bar", "foo", "foo.baz", "foo.buz", "foo.buz.bar")),
         table.dottedKeySet(true));
@@ -160,9 +161,9 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnEntrySet() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("bar", "one", positionAt(4, 3));
-    table.set("foo.baz", "two", positionAt(15, 2));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("bar", "one", positionAt(4, 3));
+    table.setParsed("foo.baz", "two", positionAt(15, 2));
     assertEquals(
         new HashSet<>(
             Arrays
@@ -174,10 +175,10 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnDottedEntrySet() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("bar", "one", positionAt(4, 3));
-    table.set("foo.baz", "two", positionAt(15, 2));
-    table.set("foo.buz.bar", "three", positionAt(15, 2));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("bar", "one", positionAt(4, 3));
+    table.setParsed("foo.baz", "two", positionAt(15, 2));
+    table.setParsed("foo.buz.bar", "three", positionAt(15, 2));
     assertEquals(
         new HashSet<>(
             Arrays
@@ -200,19 +201,19 @@ class MutableTomlTableTest {
 
   @Test
   void shouldSerializeToJSON() {
-    MutableTomlTable table = new MutableTomlTable();
-    table.set("bar", "one", positionAt(2, 1));
-    table.set("foo.baz", "two", positionAt(3, 2));
-    table.set("foo.buz", EMPTY_ARRAY, positionAt(3, 2));
-    table.set("foo.foo", EMPTY_TABLE, positionAt(3, 2));
-    MutableTomlArray array = new MutableTomlArray(false, positionAt(1, 1));
-    array.append("hello\nthere", positionAt(5, 2));
-    array.append("goodbye", positionAt(5, 2));
-    table.set("foo.blah", array, positionAt(5, 2));
-    table.set("buz", OffsetDateTime.parse("1937-07-18T03:25:43-04:00"), positionAt(5, 2));
-    table.set("glad", LocalDateTime.parse("1937-07-18T03:25:43"), positionAt(5, 2));
-    table.set("zoo", LocalDate.parse("1937-07-18"), positionAt(5, 2));
-    table.set("alpha", LocalTime.parse("03:25:43"), positionAt(5, 2));
+    LinkedTomlTable table = new LinkedTomlTable();
+    table.setParsed("bar", "one", positionAt(2, 1));
+    table.setParsed("foo.baz", "two", positionAt(3, 2));
+    table.setParsed("foo.buz", EMPTY_ARRAY, positionAt(3, 2));
+    table.setParsed("foo.foo", EMPTY_TABLE, positionAt(3, 2));
+    ListTomlArray array = new ListTomlArray(false, positionAt(1, 1));
+    array.appendParsed("hello\nthere", positionAt(5, 2));
+    array.appendParsed("goodbye", positionAt(5, 2));
+    table.setParsed("foo.blah", array, positionAt(5, 2));
+    table.setParsed("buz", OffsetDateTime.parse("1937-07-18T03:25:43-04:00"), positionAt(5, 2));
+    table.setParsed("glad", LocalDateTime.parse("1937-07-18T03:25:43"), positionAt(5, 2));
+    table.setParsed("zoo", LocalDate.parse("1937-07-18"), positionAt(5, 2));
+    table.setParsed("alpha", LocalTime.parse("03:25:43"), positionAt(5, 2));
     String expected = "{\n"
         + "  \"bar\" : \"one\",\n"
         + "  \"foo\" : {\n"
@@ -234,7 +235,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnTheEntryForAKey() {
-    MutableTomlTable table = parse("a = 1\n[t]\nb = \"x\" # after\n");
+    LinkedTomlTable table = parse("a = 1\n[t]\nb = \"x\" # after\n");
     assertSame(table.elements().get(0), table.entry("a"));
     TomlKeyValue entry = table.entry(List.of("t", "b"));
     assertSame(table.getTable("t").elements().get(0), entry);
@@ -247,7 +248,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnNullForAMissingEntry() {
-    MutableTomlTable table = parse("a = 1\n[t]\nb = \"x\"\n");
+    LinkedTomlTable table = parse("a = 1\n[t]\nb = \"x\"\n");
     assertNull(table.entry("missing"));
     assertNull(table.entry(List.of("t", "missing")));
     assertNull(table.entry(List.of()));
@@ -257,7 +258,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReadShortcutsThroughTheEntry() {
-    MutableTomlTable table = parse("a = 1\n[t]\nb = \"x\" # after\n");
+    LinkedTomlTable table = parse("a = 1\n[t]\nb = \"x\" # after\n");
     assertEquals(table.entry("t.b").value().get(), table.get("t.b"));
     assertEquals(table.entry("t.b").comments(), table.comments("t.b"));
     assertEquals(table.entry("t.b").position(), table.inputPositionOf("t.b"));
@@ -266,7 +267,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldReturnTheEntryAtAnArrayIndex() {
-    MutableTomlTable table = parse("a = [ 1, # one\n 2 ]\n");
+    LinkedTomlTable table = parse("a = [ 1, # one\n 2 ]\n");
     TomlArray array = table.getArray("a");
     assertSame(array.elements().get(0), array.entry(0));
     assertEquals(2L, array.entry(1).getLong());

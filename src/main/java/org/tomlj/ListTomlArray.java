@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArray {
+class ListTomlArray extends ElementContainer<Entry.Value> implements TomlArray {
 
   // The values of this array, in document order; the index into this list is the array index. This is a separate
   // index over the same value elements that elements() holds, kept for lookup by position.
@@ -34,7 +34,7 @@ class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArra
    * @param position The position of the array's opening {@code [}, or of its first {@code [[x]]} header if it is an
    *        array of tables.
    */
-  MutableTomlArray(boolean isTableArray, TomlPosition position) {
+  ListTomlArray(boolean isTableArray, TomlPosition position) {
     this.isTableArray = isTableArray;
     this.position = position;
   }
@@ -70,21 +70,21 @@ class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArra
    * @param position The input position.
    * @return This array.
    */
-  MutableTomlArray append(Object value, TomlPosition position) {
+  ListTomlArray appendParsed(Object value, TomlPosition position) {
     if (value instanceof Integer) {
       value = ((Integer) value).longValue();
     }
-    return append(Entry.Value.of(value, position));
+    return appendParsed(Entry.Value.of(value, position));
   }
 
   /**
    * Append a value to this array's sequence, and index it by position.
    *
-   * @param value The value, already wrapped as an element with its comments attached; see
+   * @param value The value, already wrapped as an entry with its comments attached; see
    *        {@link Entry.Value#of(Object, TomlPosition, List)}.
    * @return This array.
    */
-  MutableTomlArray append(Entry.Value value) {
+  ListTomlArray appendParsed(Entry.Value value) {
     Object rawValue = value.get();
     if (!TomlType.typeFor(rawValue).isPresent()) {
       throw new IllegalArgumentException("Unsupported type " + rawValue.getClass().getSimpleName());

@@ -62,7 +62,7 @@ class TomlCommentSuiteTest {
 
   private static void checkComments(Path file) throws IOException {
     String document = new String(Files.readAllBytes(file), UTF_8);
-    MutableTomlTable table = Parser
+    LinkedTomlTable table = Parser
         .parseTable(CharStreams.fromString(document), TomlParseOptions.defaults(), new AccumulatingErrorListener());
 
     Recorder recorder = new Recorder();
@@ -125,7 +125,7 @@ class TomlCommentSuiteTest {
     final Map<Integer, Integer> columns = new TreeMap<>();
     final List<String> failures = new ArrayList<>();
 
-    void walk(MutableTomlTable table, String path) {
+    void walk(LinkedTomlTable table, String path) {
       unattached(unattachedComments(table.elements()), path.isEmpty() ? "the root table" : path);
       for (String key : table.keySet()) {
         List<String> keyPath = Collections.singletonList(key);
@@ -136,7 +136,7 @@ class TomlCommentSuiteTest {
       }
     }
 
-    void walk(MutableTomlArray array, String path) {
+    void walk(ListTomlArray array, String path) {
       unattached(unattachedComments(array.elements()), path);
       for (int i = 0; i < array.size(); ++i) {
         String entry = path + "[" + i + "]";
@@ -156,9 +156,9 @@ class TomlCommentSuiteTest {
     }
 
     private void descend(Object value, String entry) {
-      if (value instanceof MutableTomlTable table) {
+      if (value instanceof LinkedTomlTable table) {
         walk(table, entry + ".");
-      } else if (value instanceof MutableTomlArray array) {
+      } else if (value instanceof ListTomlArray array) {
         walk(array, entry);
       }
     }

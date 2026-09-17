@@ -61,7 +61,7 @@ abstract class ElementContainer<E extends Entry> extends Entry.Value {
   }
 
   /**
-   * A container is its own value: {@link MutableTomlTable} and {@link MutableTomlArray} implement the public
+   * A container is its own value: {@link LinkedTomlTable} and {@link ListTomlArray} implement the public
    * {@link TomlTable} / {@link TomlArray} interfaces directly, so the object the public API exposes is the container
    * itself.
    *
