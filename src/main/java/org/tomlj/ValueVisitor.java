@@ -179,7 +179,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
    */
   @Override
   public Object visitArray(TomlParser.ArrayContext ctx) {
-    MutableTomlArray array = MutableTomlArray.create(version, new TomlPosition(ctx));
+    MutableTomlArray array = new MutableTomlArray(false, new TomlPosition(ctx));
     List<ParseTree> nodes = Comments.flatten(ctx);
     for (int i = 0; i < nodes.size(); ++i) {
       ParseTree node = nodes.get(i);

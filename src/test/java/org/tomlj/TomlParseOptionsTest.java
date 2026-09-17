@@ -48,9 +48,9 @@ class TomlParseOptionsTest {
   @Test
   void withVersionReturnsANewInstanceLeavingTheOriginalUnchanged() {
     TomlParseOptions original = TomlParseOptions.defaults();
-    TomlParseOptions updated = original.withVersion(TomlVersion.V0_4_0);
+    TomlParseOptions updated = original.withVersion(TomlVersion.V1_0_0);
 
-    assertEquals(TomlVersion.V0_4_0, updated.version());
+    assertEquals(TomlVersion.V1_0_0, updated.version());
     assertEquals(TomlParseOptions.DEFAULT_MAX_NESTING_DEPTH, updated.maxNestingDepth());
     assertEquals(TomlVersion.LATEST, original.version());
   }
@@ -159,8 +159,8 @@ class TomlParseOptionsTest {
 
   @Test
   void optionsWithVersionReportsSameErrorAsVersionOverload() {
-    TomlParseResult viaVersion = Toml.parse("a.b = 1", TomlVersion.V0_4_0);
-    TomlParseResult viaOptions = Toml.parse("a.b = 1", TomlParseOptions.defaults().withVersion(TomlVersion.V0_4_0));
+    TomlParseResult viaVersion = Toml.parse("a = {\n}", TomlVersion.V1_0_0);
+    TomlParseResult viaOptions = Toml.parse("a = {\n}", TomlParseOptions.defaults().withVersion(TomlVersion.V1_0_0));
 
     assertEquals(1, viaVersion.errors().size());
     assertEquals(1, viaOptions.errors().size());

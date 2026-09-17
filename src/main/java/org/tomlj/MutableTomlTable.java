@@ -287,7 +287,7 @@ final class MutableTomlTable extends ElementContainer<Entry.KeyValue> implements
     String key = path.get(depth - 1);
     Entry.KeyValue element = table.properties.get(key);
     if (element == null) {
-      element = table.put(key, MutableTomlArray.create(version, position, true), position, Collections.emptyList());
+      element = table.put(key, new MutableTomlArray(true, position), position, Collections.emptyList());
     }
     if (!(element.element instanceof TomlArray)) {
       String message = Toml.joinKeyPath(path) + " is not an array (previously defined at " + element.position() + ")";

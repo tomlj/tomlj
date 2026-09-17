@@ -19,22 +19,6 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  */
 public enum TomlVersion {
   /**
-   * The 0.4.0 version of TOML.
-   *
-   * <p>
-   * This specification can be found at <a href=
-   * "https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.4.0.md">https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.4.0.md</a>.
-   */
-  V0_4_0(null),
-  /**
-   * The 0.5.0 version of TOML.
-   *
-   * <p>
-   * This specification can be found at <a href=
-   * "https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md">https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md</a>.
-   */
-  V0_5_0(null),
-  /**
    * The 1.0.0 version of TOML.
    *
    * <p>
