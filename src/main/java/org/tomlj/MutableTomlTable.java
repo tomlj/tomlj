@@ -14,9 +14,11 @@ package org.tomlj;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -35,6 +37,11 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * <p>
  * A {@link TomlTable} or {@link TomlArray} stored as a value is stored as a deep copy, so later changes to the original
  * are not seen; the stored copy is edited through the getters that return it.
+ *
+ * <p>
+ * An entry's attached comments are edited through its {@link MutableTomlKeyValue} (or {@link MutableTomlEntry})
+ * obtained from {@link #entry}, or through the shortcuts here. An unattached comment is added after the last element
+ * with {@link #addComment} and removed with {@link #removeComment}.
  *
  * <p>
  * Not safe for use from multiple threads without external synchronization.
@@ -219,6 +226,336 @@ public interface MutableTomlTable extends TomlTable {
   boolean isModified(List<String> path);
 
   /**
+   * Set the run of comment lines written above an entry, as {@link MutableTomlEntry#setCommentAbove(String...)} does.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it.
+   * @return This table.
+   * @throws NullPointerException If {@code dottedKey}, or a line, is {@code null}.
+   * @throws IllegalArgumentException If the key cannot be parsed, {@code lines} is empty, or a line cannot be written
+   *         as a TOML comment.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setCommentAbove(String dottedKey, String... lines) {
+    requireNonNull(dottedKey);
+    return setCommentAbove(Parser.parseDottedKey(dottedKey), Arrays.asList(lines));
+  }
+
+  /**
+   * Set the run of comment lines written above an entry, as {@link MutableTomlEntry#setCommentAbove(List)} does.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it.
+   * @return This table.
+   * @throws NullPointerException If {@code dottedKey}, {@code lines}, or a line is {@code null}.
+   * @throws IllegalArgumentException If the key cannot be parsed, {@code lines} is empty, or a line cannot be written
+   *         as a TOML comment.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setCommentAbove(String dottedKey, List<String> lines) {
+    requireNonNull(dottedKey);
+    return setCommentAbove(Parser.parseDottedKey(dottedKey), lines);
+  }
+
+  /**
+   * Set the run of comment lines written above an entry, as {@link MutableTomlEntry#setCommentAbove(String...)} does.
+   *
+   * @param path The key path.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it.
+   * @return This table.
+   * @throws NullPointerException If a path element, or a line, is {@code null}.
+   * @throws IllegalArgumentException If {@code path} is empty, {@code lines} is empty, or a line cannot be written as a
+   *         TOML comment.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setCommentAbove(List<String> path, String... lines) {
+    return setCommentAbove(path, Arrays.asList(lines));
+  }
+
+  /**
+   * Set the run of comment lines written above an entry, as {@link MutableTomlEntry#setCommentAbove(List)} does.
+   *
+   * @param path The key path.
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it.
+   * @return This table.
+   * @throws NullPointerException If a path element, or a line, is {@code null}.
+   * @throws IllegalArgumentException If {@code path} is empty, {@code lines} is empty, or a line cannot be written as a
+   *         TOML comment.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setCommentAbove(List<String> path, List<String> lines) {
+    entryOrThrow(path).setCommentAbove(lines);
+    return this;
+  }
+
+  /**
+   * Set the comment written on an entry's line, as {@link MutableTomlEntry#setCommentAfter(String)} does.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @param text The comment text, as {@link TomlComment#lines()} would return its one line.
+   * @return This table.
+   * @throws NullPointerException If {@code dottedKey}, or {@code text}, is {@code null}.
+   * @throws IllegalArgumentException If the key cannot be parsed, or {@code text} cannot be written as a TOML comment.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setCommentAfter(String dottedKey, String text) {
+    requireNonNull(dottedKey);
+    return setCommentAfter(Parser.parseDottedKey(dottedKey), text);
+  }
+
+  /**
+   * Set the comment written on an entry's line, as {@link MutableTomlEntry#setCommentAfter(String)} does.
+   *
+   * @param path The key path.
+   * @param text The comment text, as {@link TomlComment#lines()} would return its one line.
+   * @return This table.
+   * @throws NullPointerException If a path element, or {@code text}, is {@code null}.
+   * @throws IllegalArgumentException If {@code path} is empty, or {@code text} cannot be written as a TOML comment.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setCommentAfter(List<String> path, String text) {
+    entryOrThrow(path).setCommentAfter(text);
+    return this;
+  }
+
+  /**
+   * Set an attached comment on an entry from its text, as
+   * {@link MutableTomlEntry#setComment(String, TomlComment.Placement)} does.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @param text The comment's text, as {@link TomlComment#text()} would return it.
+   * @param placement Where the comment sits relative to the entry.
+   * @return This table.
+   * @throws NullPointerException If {@code dottedKey}, {@code text}, or {@code placement} is {@code null}.
+   * @throws IllegalArgumentException If the key cannot be parsed, or a line of {@code text} cannot be written as a TOML
+   *         comment.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setComment(String dottedKey, String text, TomlComment.Placement placement) {
+    requireNonNull(dottedKey);
+    return setComment(Parser.parseDottedKey(dottedKey), text, placement);
+  }
+
+  /**
+   * Set an attached comment on an entry from its text, as
+   * {@link MutableTomlEntry#setComment(String, TomlComment.Placement)} does.
+   *
+   * @param path The key path.
+   * @param text The comment's text, as {@link TomlComment#text()} would return it.
+   * @param placement Where the comment sits relative to the entry.
+   * @return This table.
+   * @throws NullPointerException If a path element, {@code text}, or {@code placement} is {@code null}.
+   * @throws IllegalArgumentException If {@code path} is empty, or a line of {@code text} cannot be written as a TOML
+   *         comment.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setComment(List<String> path, String text, TomlComment.Placement placement) {
+    entryOrThrow(path).setComment(text, placement);
+    return this;
+  }
+
+  /**
+   * Set an attached comment on an entry, as {@link MutableTomlEntry#setComment(TomlComment)} does.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @param comment The comment, with {@link TomlComment#placement()} either {@link TomlComment.Placement#ABOVE} or
+   *        {@link TomlComment.Placement#AFTER}.
+   * @return This table.
+   * @throws NullPointerException If {@code dottedKey}, or {@code comment}, is {@code null}.
+   * @throws IllegalArgumentException If the key cannot be parsed, or {@code comment} is unattached.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setComment(String dottedKey, TomlComment comment) {
+    requireNonNull(dottedKey);
+    return setComment(Parser.parseDottedKey(dottedKey), comment);
+  }
+
+  /**
+   * Set an attached comment on an entry, as {@link MutableTomlEntry#setComment(TomlComment)} does.
+   *
+   * @param path The key path.
+   * @param comment The comment, with {@link TomlComment#placement()} either {@link TomlComment.Placement#ABOVE} or
+   *        {@link TomlComment.Placement#AFTER}.
+   * @return This table.
+   * @throws NullPointerException If a path element, or {@code comment}, is {@code null}.
+   * @throws IllegalArgumentException If {@code path} is empty, or {@code comment} is unattached.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable setComment(List<String> path, TomlComment comment) {
+    entryOrThrow(path).setComment(comment);
+    return this;
+  }
+
+  /**
+   * Remove the run of comment lines written above an entry, as {@link MutableTomlEntry#removeCommentAbove()} does.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @return This table.
+   * @throws NullPointerException If {@code dottedKey} is {@code null}.
+   * @throws IllegalArgumentException If the key cannot be parsed.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable removeCommentAbove(String dottedKey) {
+    requireNonNull(dottedKey);
+    return removeCommentAbove(Parser.parseDottedKey(dottedKey));
+  }
+
+  /**
+   * Remove the run of comment lines written above an entry, as {@link MutableTomlEntry#removeCommentAbove()} does.
+   *
+   * @param path The key path.
+   * @return This table.
+   * @throws NullPointerException If a path element is {@code null}.
+   * @throws IllegalArgumentException If {@code path} is empty.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable removeCommentAbove(List<String> path) {
+    entryOrThrow(path).removeCommentAbove();
+    return this;
+  }
+
+  /**
+   * Remove the comment written on an entry's line, as {@link MutableTomlEntry#removeCommentAfter()} does.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @return This table.
+   * @throws NullPointerException If {@code dottedKey} is {@code null}.
+   * @throws IllegalArgumentException If the key cannot be parsed.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable removeCommentAfter(String dottedKey) {
+    requireNonNull(dottedKey);
+    return removeCommentAfter(Parser.parseDottedKey(dottedKey));
+  }
+
+  /**
+   * Remove the comment written on an entry's line, as {@link MutableTomlEntry#removeCommentAfter()} does.
+   *
+   * @param path The key path.
+   * @return This table.
+   * @throws NullPointerException If a path element is {@code null}.
+   * @throws IllegalArgumentException If {@code path} is empty.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable removeCommentAfter(List<String> path) {
+    entryOrThrow(path).removeCommentAfter();
+    return this;
+  }
+
+  /**
+   * Remove the attached comment at a placement, as {@link MutableTomlEntry#removeComment(TomlComment.Placement)} does.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @param placement Which attached comment to remove.
+   * @return This table.
+   * @throws NullPointerException If {@code dottedKey}, or {@code placement}, is {@code null}.
+   * @throws IllegalArgumentException If the key cannot be parsed.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable removeComment(String dottedKey, TomlComment.Placement placement) {
+    requireNonNull(dottedKey);
+    return removeComment(Parser.parseDottedKey(dottedKey), placement);
+  }
+
+  /**
+   * Remove the attached comment at a placement, as {@link MutableTomlEntry#removeComment(TomlComment.Placement)} does.
+   *
+   * @param path The key path.
+   * @param placement Which attached comment to remove.
+   * @return This table.
+   * @throws NullPointerException If a path element, or {@code placement}, is {@code null}.
+   * @throws IllegalArgumentException If {@code path} is empty.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  default MutableTomlTable removeComment(List<String> path, TomlComment.Placement placement) {
+    entryOrThrow(path).removeComment(placement);
+    return this;
+  }
+
+  /**
+   * Add an unattached comment, after the elements already written, as {@link #addComment(List)} does.
+   *
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it.
+   * @return This table.
+   * @throws NullPointerException If a line is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   */
+  default MutableTomlTable addComment(String... lines) {
+    return addComment(Arrays.asList(lines));
+  }
+
+  /**
+   * Add an unattached comment, after the elements already written.
+   *
+   * @param lines The text of each line, as {@link TomlComment#lines()} would return it.
+   * @return This table.
+   * @throws NullPointerException If {@code lines}, or a line, is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, or a line cannot be written as a TOML comment.
+   */
+  default MutableTomlTable addComment(List<String> lines) {
+    return addComment(TomlComment.ofLines(lines, null));
+  }
+
+  /**
+   * Add a comment, after the elements already written.
+   *
+   * <p>
+   * The comment's position is ignored: the copy stored here has none. This is how an unattached comment is copied from
+   * one table or array to another, across documents too.
+   *
+   * @param comment The comment to add, with no placement.
+   * @return This table.
+   * @throws NullPointerException If {@code comment} is {@code null}.
+   * @throws IllegalArgumentException If {@code comment} is attached.
+   */
+  MutableTomlTable addComment(TomlComment comment);
+
+  /**
+   * Remove an unattached comment, by identity.
+   *
+   * @param comment The comment to remove.
+   * @return {@code true} if {@code comment} was among this table's {@link #elements()}, and was removed. An attached
+   *         comment is never among them, so removing one here always returns {@code false}.
+   */
+  boolean removeComment(TomlComment comment);
+
+  /**
+   * Get the entry for a key, or throw if the key is not set.
+   *
+   * @param path The key path.
+   * @return The entry.
+   * @throws IllegalArgumentException If {@code path} is empty.
+   * @throws NoSuchElementException If the key is not set.
+   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
+   */
+  private MutableTomlKeyValue entryOrThrow(List<String> path) {
+    if (path.isEmpty()) {
+      throw new IllegalArgumentException("path is empty");
+    }
+    MutableTomlKeyValue entry = entry(path);
+    if (entry == null) {
+      throw new NoSuchElementException(Toml.joinKeyPath(path) + " is not set");
+    }
+    return entry;
+  }
+
+  /**
    * Create a deep copy of a table.
    *
    * <p>
@@ -259,6 +596,17 @@ public interface MutableTomlTable extends TomlTable {
     }
     return table;
   }
+
+  @Override
+  @Nullable
+  default MutableTomlKeyValue entry(String dottedKey) {
+    requireNonNull(dottedKey);
+    return entry(Parser.parseDottedKey(dottedKey));
+  }
+
+  @Override
+  @Nullable
+  MutableTomlKeyValue entry(List<String> path);
 
   @Override
   @Nullable

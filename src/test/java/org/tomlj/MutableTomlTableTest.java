@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.antlr.v4.runtime.CharStreams;
@@ -386,7 +387,7 @@ class MutableTomlTableTest {
     MutableTomlTable copy = MutableTomlTable.copyOf(original);
 
     assertTrue(Toml.equals(original, copy));
-    assertEquals(original.comments("a"), copy.comments("a"));
+    assertEquals(original.comments("a").get(0).text(), copy.comments("a").get(0).text());
     assertNull(copy.inputPositionOf("a"));
     assertNull(copy.inputPositionOf("b"));
     assertNull(copy.inputPositionOf("b.c"));
@@ -398,6 +399,29 @@ class MutableTomlTableTest {
 
     copy.set("a", 99L);
     assertEquals(1L, original.get("a"));
+  }
+
+  @Test
+  void shouldCopyCommentsWithoutPositions() {
+    LinkedTomlTable original = parse("# above\na = 1 # after\n\n# footer\n");
+
+    MutableTomlTable copy = MutableTomlTable.copyOf(original);
+
+    List<TomlComment> attached = copy.comments("a");
+    assertEquals(2, attached.size());
+    for (int i = 0; i < 2; i++) {
+      TomlComment source = original.comments("a").get(i);
+      assertNotSame(source, attached.get(i));
+      assertEquals(source.lines(), attached.get(i).lines());
+      assertEquals(source.placement(), attached.get(i).placement());
+      assertNull(attached.get(i).position());
+    }
+    List<TomlComment> unattached = unattachedComments(copy);
+    assertEquals(1, unattached.size());
+    assertNotSame(unattachedComments(original).get(0), unattached.get(0));
+    assertEquals(List.of("footer"), unattached.get(0).lines());
+    assertNull(unattached.get(0).placement());
+    assertNull(unattached.get(0).position());
   }
 
   @Test
@@ -504,6 +528,242 @@ class MutableTomlTableTest {
     assertTrue(reparsedErrorListener.errors().isEmpty());
     assertFalse(reparsed.isModified());
     assertTrue(Toml.equals(reparsed, result));
+  }
+
+  @Test
+  void shouldReturnAMutableKeyValueFromEntry() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    MutableTomlKeyValue entry = table.entry("a");
+    assertEquals("a", entry.key());
+    assertEquals(1L, entry.value().get());
+  }
+
+  @Test
+  void shouldReturnNullFromEntryForAnUnsetKeyOrTheEmptyPath() {
+    MutableTomlTable table = MutableTomlTable.create();
+    assertNull(table.entry("nope"));
+    assertNull(table.entry(List.of()));
+  }
+
+  @Test
+  void shouldSetCommentAboveThroughTheDottedKeyAndPathShortcuts() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.set("b", 2L);
+    table.set("c", 3L);
+    table.set("d", 4L);
+
+    table.setCommentAbove("a", "line one", "line two");
+    table.setCommentAbove("b", List.of("above b"));
+    table.setCommentAbove(List.of("c"), "above c");
+    table.setCommentAbove(List.of("d"), List.of("above d"));
+
+    assertEquals(List.of("line one", "line two"), table.comments("a").get(0).lines());
+    assertEquals(List.of("above b"), table.comments("b").get(0).lines());
+    assertEquals(List.of("above c"), table.comments("c").get(0).lines());
+    assertEquals(List.of("above d"), table.comments("d").get(0).lines());
+  }
+
+  @Test
+  void shouldSetCommentAfterAndReadBackAboveThenAfterInOrder() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+
+    table.setCommentAbove("a", "above");
+    table.setCommentAfter("a", "after");
+
+    List<TomlComment> comments = table.comments("a");
+    assertEquals(2, comments.size());
+    assertEquals(TomlComment.Placement.ABOVE, comments.get(0).placement());
+    assertEquals(TomlComment.Placement.AFTER, comments.get(1).placement());
+    assertEquals(comments, table.entry("a").comments());
+  }
+
+  @Test
+  void shouldReplaceAnExistingCommentRunThroughTheShortcut() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.setCommentAbove("a", "first");
+
+    table.setCommentAbove(List.of("a"), List.of("second"));
+
+    List<TomlComment> comments = table.comments("a");
+    assertEquals(1, comments.size());
+    assertEquals("second", comments.get(0).text());
+  }
+
+  @Test
+  void shouldSetCommentFromTextAndPlacementThroughTheDottedKeyAndPathShortcuts() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.set("b", 2L);
+
+    table.setComment("a", "a\nb", TomlComment.Placement.ABOVE);
+    table.setComment(List.of("b"), "line", TomlComment.Placement.AFTER);
+
+    assertEquals(List.of("a", "b"), table.comments("a").get(0).lines());
+    assertEquals(List.of("line"), table.comments("b").get(0).lines());
+  }
+
+  @Test
+  void shouldRejectSetCommentFromTextAndPlacementOnAnUnsetKey() {
+    MutableTomlTable table = MutableTomlTable.create();
+
+    assertThrows(NoSuchElementException.class, () -> table.setComment("nope", "x", TomlComment.Placement.ABOVE));
+  }
+
+  @Test
+  void shouldSetAndCopyAttachedCommentThroughTheShortcut() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("source", 1L);
+    table.set("target", 2L);
+    table.setCommentAbove("source", "from source");
+
+    TomlComment sourceComment = table.comments("source").get(0);
+    table.setComment("target", sourceComment);
+
+    List<TomlComment> targetComments = table.comments("target");
+    assertEquals(1, targetComments.size());
+    assertEquals(List.of("from source"), targetComments.get(0).lines());
+    assertNull(targetComments.get(0).position());
+    assertTrue(table.isModified("target"));
+  }
+
+  @Test
+  void shouldRemoveAttachedCommentsThroughTheShortcuts() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.setCommentAbove("a", "above");
+    table.setCommentAfter("a", "after");
+
+    table.removeCommentAbove("a");
+    table.removeCommentAfter(List.of("a"));
+
+    assertTrue(table.comments("a").isEmpty());
+  }
+
+  @Test
+  void shouldRemoveCommentByPlacementThroughTheShortcut() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.setCommentAbove("a", "above");
+    table.setCommentAfter("a", "after");
+
+    table.removeComment("a", TomlComment.Placement.ABOVE);
+
+    List<TomlComment> comments = table.comments("a");
+    assertEquals(1, comments.size());
+    assertEquals(TomlComment.Placement.AFTER, comments.get(0).placement());
+  }
+
+  @Test
+  void shouldNotFlagModificationWhenShortcutRemovesAnAbsentComment() {
+    LinkedTomlTable table = parse("a = 1\n");
+
+    table.removeCommentAbove("a");
+
+    assertFalse(table.isModified("a"));
+  }
+
+  @Test
+  void shouldRejectCommentShortcutsOnAnUnsetKeyOrTheEmptyPath() {
+    MutableTomlTable table = MutableTomlTable.create();
+    TomlComment comment = TomlComment.ofLines(List.of("x"), TomlComment.Placement.ABOVE);
+
+    assertThrows(NoSuchElementException.class, () -> table.setCommentAbove("nope", "x"));
+    assertThrows(NoSuchElementException.class, () -> table.setCommentAfter("nope", "x"));
+    assertThrows(NoSuchElementException.class, () -> table.setComment("nope", comment));
+    assertThrows(NoSuchElementException.class, () -> table.removeCommentAbove("nope"));
+    assertThrows(NoSuchElementException.class, () -> table.removeCommentAfter("nope"));
+    assertThrows(NoSuchElementException.class, () -> table.removeComment("nope", TomlComment.Placement.ABOVE));
+
+    assertThrows(IllegalArgumentException.class, () -> table.setCommentAbove(List.of(), List.of("x")));
+    assertThrows(IllegalArgumentException.class, () -> table.setCommentAfter(List.of(), "x"));
+    assertThrows(IllegalArgumentException.class, () -> table.setComment(List.of(), comment));
+    assertThrows(IllegalArgumentException.class, () -> table.removeCommentAbove(List.of()));
+    assertThrows(IllegalArgumentException.class, () -> table.removeCommentAfter(List.of()));
+    assertThrows(IllegalArgumentException.class, () -> table.removeComment(List.of(), TomlComment.Placement.ABOVE));
+  }
+
+  @Test
+  void shouldAddAndRemoveUnattachedComments() {
+    MutableTomlTable table = MutableTomlTable.create();
+
+    table.addComment("footer");
+    assertEquals(1, unattachedComments(table).size());
+
+    TomlComment comment = unattachedComments(table).get(0);
+    assertTrue(table.removeComment(comment));
+    assertTrue(unattachedComments(table).isEmpty());
+    assertFalse(table.removeComment(comment));
+
+    // The removed comment can be added again.
+    table.addComment(comment);
+    assertEquals(1, unattachedComments(table).size());
+  }
+
+  @Test
+  void shouldAppendAnUnattachedCommentAfterTheLastElement() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+
+    table.addComment("footer");
+
+    List<TomlElement> elements = table.elements();
+    assertEquals(2, elements.size());
+    assertEquals("a", ((TomlKeyValue) elements.get(0)).key());
+    assertEquals("footer", ((TomlComment) elements.get(1)).text());
+  }
+
+  @Test
+  void shouldRoundTripAddingAndRemovingAnAlreadyUnattachedComment() {
+    // An API comment with no placement and no position: addComment(comment) has nothing to change, so it stores
+    // comment itself, and removeComment(comment) then finds that same object by identity.
+    TomlComment comment = TomlComment.ofLines(List.of("note"), null);
+    MutableTomlTable table = MutableTomlTable.create();
+
+    table.addComment(comment);
+
+    assertSame(comment, table.elements().get(0));
+    assertTrue(table.removeComment(comment));
+  }
+
+  @Test
+  void shouldCopyAParsedUnattachedCommentWhenAddedToAnotherTable() {
+    // A parsed comment has a position, so addComment always copies it, even though it is already unattached; removing
+    // the original object from the destination therefore returns false.
+    LinkedTomlTable source = parse("# above\na = 1 # after\n\n# footer\n");
+    TomlComment parsedComment = unattachedComments(source).get(0);
+    MutableTomlTable target = MutableTomlTable.create();
+
+    target.addComment(parsedComment);
+
+    assertFalse(target.removeComment(parsedComment));
+    assertEquals(1, unattachedComments(target).size());
+  }
+
+  @Test
+  void shouldRejectAddingAnAttachedComment() {
+    LinkedTomlTable table = parse("# above\na = 1 # after\n");
+    List<TomlComment> attached = table.comments("a");
+    assertEquals(2, attached.size());
+    assertThrows(IllegalArgumentException.class, () -> table.addComment(attached.get(0)));
+    assertThrows(IllegalArgumentException.class, () -> table.addComment(attached.get(1)));
+
+    assertTrue(unattachedComments(table).isEmpty());
+    assertFalse(table.isModified());
+  }
+
+  @Test
+  void shouldReturnFalseWhenRemovingAnAttachedCommentAsUnattached() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.setCommentAbove("a", "note");
+
+    TomlComment attached = table.comments("a").get(0);
+
+    assertFalse(table.removeComment(attached));
   }
 
   // A minimal TomlTable of another implementation, holding one level of literal keys, for the deep-copy cases.

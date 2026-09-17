@@ -124,7 +124,7 @@ final class Comments {
     TomlParser.LineBreakContext lineBreak = (TomlParser.LineBreakContext) nodes.get(index);
     TerminalNode comment = lineEndComment(lineBreak);
     if (comment != null && !endsElementLine(nodes, index)) {
-      container.addComment(of(comment, null));
+      container.addParsedComment(of(comment, null));
     }
     List<TomlParser.CommentRunContext> runs = lineBreak.commentRun();
     int count = runs.size();
@@ -133,7 +133,7 @@ final class Comments {
       count--;
     }
     for (int i = 0; i < count; ++i) {
-      container.addComment(of(runs.get(i), null));
+      container.addParsedComment(of(runs.get(i), null));
     }
   }
 

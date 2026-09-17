@@ -302,7 +302,7 @@ class MutableTomlArrayTest {
     MutableTomlArray copy = MutableTomlArray.copyOf(original);
 
     assertTrue(Toml.equals(original, copy));
-    assertEquals(original.comments(0), copy.comments(0));
+    assertEquals(original.comments(0).get(0).text(), copy.comments(0).get(0).text());
     assertNull(copy.inputPositionOf(0));
     assertNull(copy.inputPositionOf(1));
     assertTrue(copy.isModified(0));
@@ -312,6 +312,30 @@ class MutableTomlArrayTest {
 
     copy.set(0, 99L);
     assertEquals(1L, original.get(0));
+  }
+
+  @Test
+  void shouldCopyCommentsWithoutPositions() {
+    LinkedTomlTable table = parse("a = [\n  # above\n  1, # after\n  # trailing\n]\n");
+    ListTomlArray original = (ListTomlArray) table.get("a");
+
+    MutableTomlArray copy = MutableTomlArray.copyOf(original);
+
+    List<TomlComment> attached = copy.comments(0);
+    assertEquals(2, attached.size());
+    for (int i = 0; i < 2; i++) {
+      TomlComment source = original.comments(0).get(i);
+      assertNotSame(source, attached.get(i));
+      assertEquals(source.lines(), attached.get(i).lines());
+      assertEquals(source.placement(), attached.get(i).placement());
+      assertNull(attached.get(i).position());
+    }
+    List<TomlComment> unattached = unattachedComments(copy);
+    assertEquals(1, unattached.size());
+    assertNotSame(unattachedComments(original).get(0), unattached.get(0));
+    assertEquals(List.of("trailing"), unattached.get(0).lines());
+    assertNull(unattached.get(0).placement());
+    assertNull(unattached.get(0).position());
   }
 
   @Test
@@ -353,5 +377,158 @@ class MutableTomlArrayTest {
     assertEquals(2, elements.size());
     assertEquals("first", ((TomlComment) elements.get(0)).text());
     assertEquals("second", ((TomlComment) elements.get(1)).text());
+  }
+
+  @Test
+  void shouldReturnAMutableEntryFromEntry() {
+    MutableTomlArray array = MutableTomlArray.of(1L, 2L);
+    MutableTomlEntry entry = array.entry(0);
+    assertEquals(1L, entry.value().get());
+  }
+
+  @Test
+  void shouldSetCommentAboveAfterAndReadBackInOrderThroughTheShortcuts() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+
+    array.setCommentAbove(0, "above");
+    array.setCommentAfter(0, "after");
+
+    List<TomlComment> comments = array.comments(0);
+    assertEquals(2, comments.size());
+    assertEquals(TomlComment.Placement.ABOVE, comments.get(0).placement());
+    assertEquals(TomlComment.Placement.AFTER, comments.get(1).placement());
+  }
+
+  @Test
+  void shouldSetCommentAboveWithAListThroughTheShortcut() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+
+    array.setCommentAbove(0, List.of("line one", "line two"));
+
+    assertEquals(List.of("line one", "line two"), array.comments(0).get(0).lines());
+  }
+
+  @Test
+  void shouldSetCommentFromTextAndPlacementThroughTheShortcut() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+
+    array.setComment(0, "x", TomlComment.Placement.AFTER);
+
+    assertEquals(List.of("x"), array.comments(0).get(0).lines());
+  }
+
+  @Test
+  void shouldRejectSetCommentFromTextAndPlacementOutOfBounds() {
+    MutableTomlArray array = MutableTomlArray.create();
+
+    assertThrows(IndexOutOfBoundsException.class, () -> array.setComment(0, "x", TomlComment.Placement.AFTER));
+  }
+
+  @Test
+  void shouldSetAndCopyAttachedCommentThroughTheShortcut() {
+    MutableTomlArray array = MutableTomlArray.of(1L, 2L);
+    array.setCommentAbove(0, "from source");
+
+    TomlComment sourceComment = array.comments(0).get(0);
+    array.setComment(1, sourceComment);
+
+    List<TomlComment> targetComments = array.comments(1);
+    assertEquals(1, targetComments.size());
+    assertEquals(List.of("from source"), targetComments.get(0).lines());
+    assertNull(targetComments.get(0).position());
+    assertTrue(array.isModified(1));
+  }
+
+  @Test
+  void shouldRemoveCommentAboveAfterAndByPlacementThroughTheShortcuts() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+    array.setCommentAbove(0, "above");
+    array.setCommentAfter(0, "after");
+
+    array.removeCommentAbove(0);
+    assertEquals(1, array.comments(0).size());
+    assertEquals(TomlComment.Placement.AFTER, array.comments(0).get(0).placement());
+
+    array.removeCommentAfter(0);
+    assertTrue(array.comments(0).isEmpty());
+
+    array.setCommentAbove(0, "above again");
+    array.removeComment(0, TomlComment.Placement.ABOVE);
+    assertTrue(array.comments(0).isEmpty());
+  }
+
+  @Test
+  void shouldNotFlagModificationWhenShortcutRemovesAnAbsentComment() {
+    LinkedTomlTable table = parse("a = [1]\n");
+    ListTomlArray array = (ListTomlArray) table.get("a");
+
+    array.removeCommentAbove(0);
+
+    assertFalse(array.isModified(0));
+  }
+
+  @Test
+  void shouldRejectCommentShortcutsOutOfBounds() {
+    MutableTomlArray array = MutableTomlArray.create();
+    TomlComment comment = TomlComment.ofLines(List.of("x"), TomlComment.Placement.ABOVE);
+
+    assertThrows(IndexOutOfBoundsException.class, () -> array.setCommentAbove(0, "x"));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.setCommentAfter(0, "x"));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.setComment(0, comment));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.removeCommentAbove(0));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.removeCommentAfter(0));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.removeComment(0, TomlComment.Placement.ABOVE));
+  }
+
+  @Test
+  void shouldAddAndRemoveUnattachedComments() {
+    MutableTomlArray array = MutableTomlArray.create();
+
+    array.addComment("footer");
+    assertEquals(1, unattachedComments(array).size());
+
+    TomlComment comment = unattachedComments(array).get(0);
+    assertTrue(array.removeComment(comment));
+    assertTrue(unattachedComments(array).isEmpty());
+    assertFalse(array.removeComment(comment));
+
+    // The removed comment can be added again.
+    array.addComment(comment);
+    assertEquals(1, unattachedComments(array).size());
+  }
+
+  @Test
+  void shouldAppendAnUnattachedCommentAfterTheLastElement() {
+    MutableTomlArray array = MutableTomlArray.create();
+    array.add(1L);
+
+    array.addComment("footer");
+
+    List<TomlElement> elements = array.elements();
+    assertEquals(2, elements.size());
+    assertEquals(1L, ((TomlEntry) elements.get(0)).value().get());
+    assertEquals("footer", ((TomlComment) elements.get(1)).text());
+  }
+
+  @Test
+  void shouldRejectAddingAnAttachedComment() {
+    ListTomlArray array = (ListTomlArray) parse("a = [\n# above\n1 # after\n]\n").get("a");
+    List<TomlComment> attached = array.comments(0);
+    assertEquals(2, attached.size());
+    assertThrows(IllegalArgumentException.class, () -> array.addComment(attached.get(0)));
+    assertThrows(IllegalArgumentException.class, () -> array.addComment(attached.get(1)));
+
+    assertTrue(unattachedComments(array).isEmpty());
+    assertFalse(array.isModified());
+  }
+
+  @Test
+  void shouldReturnFalseWhenRemovingAnAttachedCommentAsUnattached() {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+    array.setCommentAbove(0, "note");
+
+    TomlComment attached = array.comments(0).get(0);
+
+    assertFalse(array.removeComment(attached));
   }
 }

@@ -147,7 +147,8 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
   @Override
   public Object remove(int index) {
     Entry.Indexed removed = entries.remove(index);
-    removeElement(removed);
+    boolean removedFromElements = removeElement(removed);
+    assert removedFromElements : "removed entry is not among elements()";
     return removed.value().get();
   }
 
@@ -159,7 +160,18 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
 
   @Override
   public boolean isModified(int index) {
-    return entries.get(index).modified();
+    return entries.get(index).isModified();
+  }
+
+  @Override
+  public ListTomlArray addComment(TomlComment comment) {
+    addEditedComment(comment.requireUnattached().withoutPosition());
+    return this;
+  }
+
+  @Override
+  public boolean removeComment(TomlComment comment) {
+    return removeElement(comment);
   }
 
   /**
@@ -185,9 +197,9 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
 
   /**
    * Build an array with the same entries as another, walked through its public interface: the same entries in the same
-   * order, each with no position and marked as added, keeping each entry's attached comments and the unattached
-   * comments in their places. A nested table or array is copied recursively, through {@link TomlValues#normalize};
-   * every other value is shared.
+   * order, each with no position and marked as added, with each entry's attached comments and the unattached comments
+   * in their places, copied without their positions. A nested table or array is copied recursively, through
+   * {@link TomlValues#normalize}; every other value is shared.
    *
    * @param array The array to copy.
    * @param isTableArray Whether the copy holds the tables of a {@code [[x]]} header.
@@ -197,12 +209,12 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
     ListTomlArray copy = new ListTomlArray(isTableArray, null);
     for (TomlElement element : array.elements()) {
       if (element instanceof TomlComment) {
-        copy.addComment((TomlComment) element);
+        copy.addParsedComment(((TomlComment) element).withoutPosition());
       } else {
         TomlEntry original = (TomlEntry) element;
         // A fresh wrapper even for a scalar: the entry's position is its value's, and a copy has none.
         Value value = Value.of(TomlValues.normalize(original.value().get()), null);
-        copy.appendEdited(value, original.comments());
+        copy.appendEdited(value, TomlComment.copyWithoutPositions(original.comments()));
       }
     }
     return copy;

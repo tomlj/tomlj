@@ -73,7 +73,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
           // the root table rather than to that section.
           LinkedTomlTable container =
               (((TomlParser.ExpressionContext) child).table() != null) ? rootTable : currentTable;
-          separated.forEach(container::addComment);
+          separated.forEach(container::addParsedComment);
           separated = null;
         }
         attached = TomlComment.withoutNulls(Comments.above(previous), Comments.after(next));
@@ -82,7 +82,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
         // A run directly above an expression is handed to it when it is reached; this one documents nothing.
         TomlComment comment = Comments.of((TomlParser.CommentRunContext) child, null);
         if (Comments.glued(previous, beforePrevious)) {
-          currentTable.addComment(comment);
+          currentTable.addParsedComment(comment);
         } else {
           if (separated == null) {
             separated = new ArrayList<>();
@@ -93,7 +93,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
     }
     if (separated != null) {
       // No expression follows the runs left at the end of the document, so they belong to the root table.
-      separated.forEach(rootTable::addComment);
+      separated.forEach(rootTable::addParsedComment);
     }
     return rootTable;
   }

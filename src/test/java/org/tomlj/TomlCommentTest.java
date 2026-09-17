@@ -14,12 +14,14 @@ package org.tomlj;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -924,5 +926,114 @@ class TomlCommentTest {
   void shouldThrowExceptionForAnUnparseableDottedKeyThroughThePublicApi() {
     TomlParseResult result = Toml.parse("a = 1\n");
     assertThrows(IllegalArgumentException.class, () -> result.comments("a@b"));
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // Editing API factory: ofLines, withoutPosition and unattached
+  // ---------------------------------------------------------------------------------------------------------------
+
+  @Test
+  void shouldBuildACommentFromLinesWithNoPosition() {
+    TomlComment comment = TomlComment.ofLines(List.of("one", "two"), TomlComment.Placement.ABOVE);
+    assertEquals(List.of("one", "two"), comment.lines());
+    assertEquals(TomlComment.Placement.ABOVE, comment.placement());
+    assertNull(comment.position());
+  }
+
+  @Test
+  void shouldRoundTripAnEmptyLineAndTextWithNoLeadingSpaceThroughOfLines() {
+    TomlComment comment = TomlComment.ofLines(Arrays.asList("first", "", "third"), null);
+    assertEquals(Arrays.asList("first", "", "third"), comment.lines());
+  }
+
+  @Test
+  void shouldRejectAnEmptyLineListInOfLines() {
+    assertThrows(IllegalArgumentException.class, () -> TomlComment.ofLines(List.of(), null));
+  }
+
+  @Test
+  void shouldRejectALineWithANewlineInOfLines() {
+    assertThrows(IllegalArgumentException.class, () -> TomlComment.ofLines(List.of("line\nbreak"), null));
+  }
+
+  @Test
+  void shouldRejectALineWithAnotherControlCharacterInOfLines() {
+    assertThrows(IllegalArgumentException.class, () -> TomlComment.ofLines(List.of(String.valueOf((char) 1)), null));
+  }
+
+  @Test
+  void shouldRejectALineWithDelInOfLines() {
+    assertThrows(IllegalArgumentException.class, () -> TomlComment.ofLines(List.of(String.valueOf((char) 0x7f)), null));
+  }
+
+  @Test
+  void shouldRejectALineWithALoneSurrogateInOfLines() {
+    assertThrows(IllegalArgumentException.class, () -> TomlComment.ofLines(List.of("\ud800"), null));
+  }
+
+  @Test
+  void shouldAcceptASurrogatePairInOfLines() {
+    String emoji = "😀";
+    TomlComment comment = TomlComment.ofLines(List.of(emoji), null);
+    assertEquals(List.of(emoji), comment.lines());
+  }
+
+  @Test
+  void shouldRejectNullLinesAndANullLineInOfLines() {
+    assertThrows(NullPointerException.class, () -> TomlComment.ofLines(null, null));
+    List<String> withNullElement = Arrays.asList("a", null);
+    assertThrows(NullPointerException.class, () -> TomlComment.ofLines(withNullElement, null));
+  }
+
+  @Test
+  void shouldRejectAfterWithMoreThanOneLineInOfLines() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> TomlComment.ofLines(List.of("one", "two"), TomlComment.Placement.AFTER));
+  }
+
+  @Test
+  void shouldReturnAnUnattachedCommentFromRequireUnattached() {
+    LinkedTomlTable table = parse("# note\n\na = 1\n");
+    TomlComment parsed = (TomlComment) table.elements().get(0);
+    assertNotNull(parsed.position());
+
+    assertSame(parsed, parsed.requireUnattached());
+
+    TomlComment copy = parsed.withoutPosition();
+    assertEquals(parsed.lines(), copy.lines());
+    assertNull(copy.placement());
+    assertNull(copy.position());
+  }
+
+  @Test
+  void shouldRejectAnAttachedCommentFromRequireUnattached() {
+    LinkedTomlTable table = parse("# above\na = 1 # after\n");
+    List<TomlComment> attached = table.comments("a");
+    assertEquals(2, attached.size());
+
+    assertThrows(IllegalArgumentException.class, () -> attached.get(0).requireUnattached());
+    assertThrows(IllegalArgumentException.class, () -> attached.get(1).requireUnattached());
+  }
+
+  @Test
+  void shouldReturnItselfWhenAlreadyPositionless() {
+    TomlComment attached = TomlComment.ofLines(List.of("note"), TomlComment.Placement.ABOVE);
+    assertSame(attached, attached.withoutPosition());
+    TomlComment unattached = TomlComment.ofLines(List.of("note"), null);
+    assertSame(unattached, unattached.withoutPosition());
+  }
+
+  @Test
+  void shouldCopyWithoutPositionKeepingPlacement() {
+    LinkedTomlTable table = parse("a = 1 # after\n");
+    TomlComment after = table.comments("a").get(0);
+
+    TomlComment copy = after.withoutPosition();
+
+    assertEquals(after.lines(), copy.lines());
+    assertEquals(TomlComment.Placement.AFTER, copy.placement());
+    assertNull(copy.position());
+    assertNotNull(after.position());
   }
 }
