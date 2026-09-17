@@ -65,19 +65,14 @@ final class Parser {
 
       @Override
       @Nullable
-      public Object get(List<String> path) {
-        return table.get(path);
-      }
-
-      @Override
-      @Nullable
       public TomlPosition inputPositionOf(List<String> path) {
         return table.inputPositionOf(path);
       }
 
       @Override
-      public List<TomlComment> comments(List<String> path) {
-        return table.comments(path);
+      @Nullable
+      public TomlKeyValue entry(List<String> path) {
+        return table.entry(path);
       }
 
       @Override

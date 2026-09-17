@@ -57,19 +57,14 @@ final class EmptyTomlTable implements TomlTable {
 
   @Nullable
   @Override
-  public Object get(List<String> path) {
+  public TomlPosition inputPositionOf(List<String> path) {
     return null;
   }
 
   @Nullable
   @Override
-  public TomlPosition inputPositionOf(List<String> path) {
+  public TomlKeyValue entry(List<String> path) {
     return null;
-  }
-
-  @Override
-  public List<TomlComment> comments(List<String> path) {
-    return Collections.emptyList();
   }
 
   @Override

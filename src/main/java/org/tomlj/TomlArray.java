@@ -48,11 +48,16 @@ public interface TomlArray {
   /**
    * Get a value at a specified index.
    *
+   * <p>
+   * This is a shortcut for {@link #entry(int)}, returning its value.
+   *
    * @param index The array index.
    * @return The value.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
    */
-  Object get(int index);
+  default Object get(int index) {
+    return entry(index).get();
+  }
 
   /**
    * {@code true} if the value at an index is a string.
@@ -327,11 +332,16 @@ public interface TomlArray {
   /**
    * Get the position where a value is defined in the TOML document.
    *
+   * <p>
+   * This is a shortcut for {@link #entry(int)}, returning its position.
+   *
    * @param index The array index.
    * @return The input position.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
    */
-  TomlPosition inputPositionOf(int index);
+  default TomlPosition inputPositionOf(int index) {
+    return entry(index).position();
+  }
 
   /**
    * Get the comments attached to a value.
@@ -344,11 +354,30 @@ public interface TomlArray {
    * In an array of tables, the comments on each {@code [[x]]} header are attached to the table it opens:
    * {@code comments(0)} for the first header, and so on.
    *
+   * <p>
+   * This is a shortcut for {@link #entry(int)}, returning its comments.
+   *
    * @param index The array index.
    * @return The attached comments, in document order. Unmodifiable.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
    */
-  List<TomlComment> comments(int index);
+  default List<TomlComment> comments(int index) {
+    return entry(index).comments();
+  }
+
+  /**
+   * Get the entry at an index.
+   *
+   * <p>
+   * The entry is the {@link TomlValue} that {@link #elements()} holds for the index. {@link #get(int)},
+   * {@link #inputPositionOf(int)} and {@link #comments(int)} are shortcuts that read the value, position and comments
+   * of this entry.
+   *
+   * @param index The array index.
+   * @return The entry.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  TomlValue entry(int index);
 
   /**
    * Get the elements written in this array, in document order.

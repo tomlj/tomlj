@@ -27,12 +27,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.antlr.v4.runtime.CharStreams;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 class MutableTomlTableTest {
+
+  private static MutableTomlTable parse(String document) {
+    return Parser
+        .parseTable(CharStreams.fromString(document), TomlParseOptions.defaults(), new AccumulatingErrorListener());
+  }
 
   @Test
   void emptyTableIsEmpty() {
@@ -224,5 +230,50 @@ class MutableTomlTableTest {
         + "  \"alpha\" : \"03:25:43\"\n"
         + "}\n";
     assertEquals(expected.replace("\n", System.lineSeparator()), table.toJson());
+  }
+
+  @Test
+  void shouldReturnTheEntryForAKey() {
+    MutableTomlTable table = parse("a = 1\n[t]\nb = \"x\" # after\n");
+    assertSame(table.elements().get(0), table.entry("a"));
+    TomlKeyValue entry = table.entry(List.of("t", "b"));
+    assertSame(table.getTable("t").elements().get(0), entry);
+    assertEquals("b", entry.key());
+    assertEquals("x", entry.value().getString());
+    assertEquals(1, entry.comments().size());
+    assertEquals(TomlComment.Placement.AFTER, entry.comments().get(0).placement());
+    assertEquals(table.inputPositionOf("t.b"), entry.position());
+  }
+
+  @Test
+  void shouldReturnNullForAMissingEntry() {
+    MutableTomlTable table = parse("a = 1\n[t]\nb = \"x\"\n");
+    assertNull(table.entry("missing"));
+    assertNull(table.entry(List.of("t", "missing")));
+    assertNull(table.entry(List.of()));
+    assertNull(table.entry(List.of("a", "x")));
+    assertNull(EMPTY_TABLE.entry(List.of("a")));
+  }
+
+  @Test
+  void shouldReadShortcutsThroughTheEntry() {
+    MutableTomlTable table = parse("a = 1\n[t]\nb = \"x\" # after\n");
+    assertEquals(table.entry("t.b").value().get(), table.get("t.b"));
+    assertEquals(table.entry("t.b").comments(), table.comments("t.b"));
+    assertEquals(table.entry("t.b").position(), table.inputPositionOf("t.b"));
+    assertSame(table, table.get(List.of()));
+  }
+
+  @Test
+  void shouldReturnTheEntryAtAnArrayIndex() {
+    MutableTomlTable table = parse("a = [ 1, # one\n 2 ]\n");
+    TomlArray array = table.getArray("a");
+    assertSame(array.elements().get(0), array.entry(0));
+    assertEquals(2L, array.entry(1).getLong());
+    assertEquals(array.comments(0), array.entry(0).comments());
+    assertEquals(array.inputPositionOf(0), array.entry(0).position());
+    assertThrows(IndexOutOfBoundsException.class, () -> array.entry(2));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.entry(-1));
+    assertThrows(IndexOutOfBoundsException.class, () -> EMPTY_ARRAY.entry(0));
   }
 }

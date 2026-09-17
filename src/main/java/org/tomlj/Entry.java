@@ -38,17 +38,17 @@ abstract class Entry implements TomlElement {
 
     // The single key in its table, not a dotted path.
     final String key;
-    final Value element;
+    final Value value;
 
     // Not final: a table header such as [a] can define a table that an earlier dotted key created implicitly, and
     // this pair then takes over the header's position and attached comments, in place, so it keeps its spot in the
-    // table's sequence rather than being replaced by a new element.
+    // table's sequence rather than being replaced by a new entry.
     private TomlPosition position;
     private List<TomlComment> attachedComments;
 
-    KeyValue(String key, Value element, TomlPosition position, List<TomlComment> attachedComments) {
+    KeyValue(String key, Value value, TomlPosition position, List<TomlComment> attachedComments) {
       this.key = key;
-      this.element = element;
+      this.value = value;
       this.position = position;
       this.attachedComments = attachedComments;
     }
@@ -60,7 +60,7 @@ abstract class Entry implements TomlElement {
 
     @Override
     public TomlValue value() {
-      return element;
+      return value;
     }
 
     @Override
@@ -119,7 +119,7 @@ abstract class Entry implements TomlElement {
     public abstract Object get();
 
     /**
-     * Wrap a value read from the document as the element a table or array can place in its sequence.
+     * Wrap a value read from the document as the entry a table or array can place in its sequence.
      *
      * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link MutableTomlTable} /
      *        {@link MutableTomlArray}, which is already a {@link Value}.
@@ -131,7 +131,7 @@ abstract class Entry implements TomlElement {
     }
 
     /**
-     * Wrap a value read from an array as an element the array can place in its sequence, with its comments attached.
+     * Wrap a value read from an array as the entry the array can place in its sequence, with its comments attached.
      *
      * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link MutableTomlTable} /
      *        {@link MutableTomlArray}, which is already a {@link Value}.
@@ -141,9 +141,9 @@ abstract class Entry implements TomlElement {
      *         the comments attached either way.
      */
     static Value of(Object value, TomlPosition position, List<TomlComment> attachedComments) {
-      Value element = of(value, position);
-      element.attach(attachedComments);
-      return element;
+      Value entry = of(value, position);
+      entry.attach(attachedComments);
+      return entry;
     }
   }
 
