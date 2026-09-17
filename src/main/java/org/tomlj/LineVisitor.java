@@ -118,7 +118,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
           throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
         }
         currentTable
-            .setParsed(path, Entry.Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
+            .setParsed(path, Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
             .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
       }
       return rootTable;

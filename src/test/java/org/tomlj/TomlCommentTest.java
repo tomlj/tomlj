@@ -15,6 +15,7 @@ package org.tomlj;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -639,14 +640,14 @@ class TomlCommentTest {
     List<TomlElement> elements = array.elements();
     assertEquals(3, elements.size());
 
-    assertTrue(elements.get(0) instanceof TomlValue);
-    assertEquals(1L, ((TomlValue) elements.get(0)).get());
+    assertTrue(elements.get(0) instanceof TomlEntry);
+    assertEquals(1L, ((TomlEntry) elements.get(0)).value().get());
 
     assertTrue(elements.get(1) instanceof TomlComment);
     assertUnattached((TomlComment) elements.get(1), "note");
 
-    assertTrue(elements.get(2) instanceof TomlValue);
-    assertEquals(2L, ((TomlValue) elements.get(2)).get());
+    assertTrue(elements.get(2) instanceof TomlEntry);
+    assertEquals(2L, ((TomlEntry) elements.get(2)).value().get());
 
     List<TomlComment> comments = unattached(array);
     assertEquals(1, comments.size());
@@ -681,12 +682,14 @@ class TomlCommentTest {
   @Test
   void shouldReadAValueThroughItsTypedAccessors() {
     LinkedTomlTable table = parse("key = \"v\" # after\n");
-    TomlValue value = ((TomlKeyValue) table.elements().get(0)).value();
+    TomlKeyValue pair = (TomlKeyValue) table.elements().get(0);
+    TomlValue value = pair.value();
     assertTrue(value.isString());
     assertFalse(value.isLong());
     assertEquals("v", value.getString());
     assertThrows(TomlInvalidTypeException.class, value::getLong);
-    assertTrue(value.comments().isEmpty(), "the comment belongs to the pair, not the value");
+    assertEquals(1, pair.comments().size());
+    assertComment(pair.comments().get(0), TomlComment.Placement.AFTER, "after");
   }
 
   @Test
@@ -776,10 +779,22 @@ class TomlCommentTest {
   @Test
   void shouldGiveAnArrayEntryTheSameCommentsAndPositionAsTheIndexLookup() {
     ListTomlArray array = subArray(parse("a = [\n# above\n1, # after\n]\n"), "a");
-    TomlValue entry = (TomlValue) array.elements().get(0);
-    assertEquals(1L, entry.get());
+    TomlEntry entry = (TomlEntry) array.elements().get(0);
+    assertEquals(1L, entry.value().get());
     assertEquals(array.comments(0), entry.comments());
     assertEquals(array.inputPositionOf(0), entry.position());
+  }
+
+  @Test
+  void shouldGiveAnArrayEntryItsCommentsAndValue() {
+    ListTomlArray array = subArray(parse("a = [\n# above\n1, # after\n]\n"), "a");
+    TomlEntry entry = array.entry(0);
+    assertSame(array.elements().get(0), entry);
+    List<TomlComment> comments = entry.comments();
+    assertEquals(2, comments.size());
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above");
+    assertComment(comments.get(1), TomlComment.Placement.AFTER, "after");
+    assertEquals(1L, entry.value().getLong());
   }
 
   @Test
@@ -797,12 +812,12 @@ class TomlCommentTest {
     List<TomlElement> arrayElements = array.elements();
     assertEquals(2, arrayElements.size());
 
-    assertTrue(arrayElements.get(0) instanceof TomlValue);
-    TomlTable first = ((TomlValue) arrayElements.get(0)).getTable();
+    assertTrue(arrayElements.get(0) instanceof TomlEntry);
+    TomlTable first = ((TomlEntry) arrayElements.get(0)).value().getTable();
     assertEquals(1L, first.getLong("a"));
 
-    assertTrue(arrayElements.get(1) instanceof TomlValue);
-    TomlTable second = ((TomlValue) arrayElements.get(1)).getTable();
+    assertTrue(arrayElements.get(1) instanceof TomlEntry);
+    TomlTable second = ((TomlEntry) arrayElements.get(1)).value().getTable();
     assertEquals(2L, second.getLong("b"));
 
     // "# between" ends the first [[x]] section, so, like a run at the end of any section, it lands in that table's

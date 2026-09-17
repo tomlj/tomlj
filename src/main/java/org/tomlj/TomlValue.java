@@ -16,7 +16,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.util.List;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.framework.qual.DefaultQualifier;
@@ -28,7 +27,8 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * <p>
  * A table or array is itself the value, so a {@link TomlTable} or {@link TomlArray} read from a document is also a
  * {@code TomlValue}. The unattached comments written inside it are among its {@link TomlTable#elements()} or
- * {@link TomlArray#elements()}; its {@link #comments()} are the comments on it in the array it was written in.
+ * {@link TomlArray#elements()}. A value never carries comments of its own: the comments written around it belong to the
+ * entry that holds it, read through {@link TomlEntry#comments()}.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
@@ -271,20 +271,4 @@ public interface TomlValue extends TomlElement {
     }
     return (TomlTable) value;
   }
-
-  /**
-   * The comments attached to this value in an array.
-   *
-   * <p>
-   * Returns the comments in document order: the run written directly above the value, if any, then the comment on its
-   * line, if any, so at most two, each with its {@link TomlComment#placement()}. These are the comments
-   * {@link TomlArray#comments(int)} returns for the value's index.
-   *
-   * <p>
-   * A value under a key has none: the comments on a key/value pair are attached to the pair, and are read with
-   * {@link TomlKeyValue#comments()}.
-   *
-   * @return The attached comments, in document order. Unmodifiable.
-   */
-  List<TomlComment> comments();
 }

@@ -202,18 +202,13 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
   /**
    * Append a key/value pair to this table's sequence, and index it by key.
    *
-   * <p>
-   * The comments belong to the pair, not to the value, even when the value is a table or array: in {@code k = v # c}
-   * the comment is attached to {@code k}.
-   *
    * @param key The key.
    * @param value The value.
    * @param position The input position.
    * @param comments The comments attached to the entry.
    * @return The entry created.
    */
-  private Entry.KeyValue put(String key, Entry.Value value, TomlPosition position, List<TomlComment> comments) {
-    assert value.comments().isEmpty() : "Comments on a key/value pair belong to the pair, not the value";
+  private Entry.KeyValue put(String key, Value value, TomlPosition position, List<TomlComment> comments) {
     Entry.KeyValue entry = new Entry.KeyValue(key, value, position, comments);
     add(entry);
     properties.put(key, entry);
@@ -284,7 +279,7 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
     LinkedTomlTable newTable = new LinkedTomlTable(position);
     // Each header of an array of tables is an expression of its own, so its comments belong to the element it opens
     // rather than to the array as a whole.
-    array.appendParsed(Entry.Value.of(newTable, position, comments));
+    array.appendParsed(newTable, position, comments);
     return newTable;
   }
 
@@ -311,14 +306,14 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
       value = ((Integer) value).longValue();
     }
     assert (typeFor(value).isPresent()) : "Unexpected value of type " + value.getClass();
-    return setParsed(path, Entry.Value.of(value, position), position, comments);
+    return setParsed(path, Value.of(value, position), position, comments);
   }
 
   /**
    * Set the value at a key path, creating any intermediate tables the path needs.
    *
    * @param path The key path.
-   * @param value The value, already wrapped as an entry; see {@link Entry.Value#of}.
+   * @param value The value, already wrapped; see {@link Value#of}.
    * @param position The input position.
    * @param comments The comments attached to the entry.
    * @return The intermediate tables created along the path, each paired with the position it should be defined at if a
@@ -326,7 +321,7 @@ final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements 
    */
   List<AbstractMap.SimpleEntry<LinkedTomlTable, TomlPosition>> setParsed(
       List<String> path,
-      Entry.Value value,
+      Value value,
       TomlPosition position,
       List<TomlComment> comments) {
     int depth = path.size();

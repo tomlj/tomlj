@@ -13,14 +13,15 @@
 package org.tomlj;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-class ListTomlArray extends ElementContainer<Entry.Value> implements TomlArray {
+class ListTomlArray extends ElementContainer<Entry.Indexed> implements TomlArray {
 
-  // The values of this array, in document order; the index into this list is the array index. This is a separate
-  // index over the same value elements that elements() holds, kept for lookup by position.
-  private final List<Entry.Value> values = new ArrayList<>();
+  // The entries of this array, in document order; the index into this list is the array index. This is a separate
+  // index over the same entries that elements() holds, kept for lookup by position.
+  private final List<Entry.Indexed> entries = new ArrayList<>();
   private final boolean isTableArray;
 
   // Final, unlike a table's: an array only ever comes from a literal written in the document, at a position known
@@ -50,17 +51,17 @@ class ListTomlArray extends ElementContainer<Entry.Value> implements TomlArray {
 
   @Override
   public int size() {
-    return values.size();
+    return entries.size();
   }
 
   @Override
   public boolean isEmpty() {
-    return values.isEmpty();
+    return entries.isEmpty();
   }
 
   @Override
-  public Entry.Value entry(int index) {
-    return values.get(index);
+  public Entry.Indexed entry(int index) {
+    return entries.get(index);
   }
 
   /**
@@ -71,31 +72,33 @@ class ListTomlArray extends ElementContainer<Entry.Value> implements TomlArray {
    * @return This array.
    */
   ListTomlArray appendParsed(Object value, TomlPosition position) {
-    if (value instanceof Integer) {
-      value = ((Integer) value).longValue();
-    }
-    return appendParsed(Entry.Value.of(value, position));
+    return appendParsed(value, position, Collections.emptyList());
   }
 
   /**
-   * Append a value to this array's sequence, and index it by position.
+   * Append a value to this array's sequence, with its comments attached, and index it by position.
    *
-   * @param value The value, already wrapped as an entry with its comments attached; see
-   *        {@link Entry.Value#of(Object, TomlPosition, List)}.
+   * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link LinkedTomlTable} /
+   *        {@link ListTomlArray}, which is already a {@link Value}.
+   * @param position The input position.
+   * @param comments The comments attached to the value in the array.
    * @return This array.
    */
-  ListTomlArray appendParsed(Entry.Value value) {
-    Object rawValue = value.get();
-    if (!TomlType.typeFor(rawValue).isPresent()) {
-      throw new IllegalArgumentException("Unsupported type " + rawValue.getClass().getSimpleName());
+  ListTomlArray appendParsed(Object value, TomlPosition position, List<TomlComment> comments) {
+    if (value instanceof Integer) {
+      value = ((Integer) value).longValue();
     }
-    add(value);
-    values.add(value);
+    if (!TomlType.typeFor(value).isPresent()) {
+      throw new IllegalArgumentException("Unsupported type " + value.getClass().getSimpleName());
+    }
+    Entry.Indexed entry = new Entry.Indexed(Value.of(value, position), comments);
+    add(entry);
+    entries.add(entry);
     return this;
   }
 
   @Override
   public List<Object> toList() {
-    return values.stream().map(Entry.Value::get).collect(Collectors.toList());
+    return entries.stream().map(entry -> entry.value().get()).collect(Collectors.toList());
   }
 }
