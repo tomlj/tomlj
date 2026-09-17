@@ -45,10 +45,10 @@ abstract class ElementContainer<E extends Entry> extends Entry.Value {
   /**
    * Append an entry to this table or array's sequence. The caller also indexes it, by key or position.
    *
-   * @param element The entry.
+   * @param entry The entry.
    */
-  void add(E element) {
-    elements.add(element);
+  void add(E entry) {
+    elements.add(entry);
   }
 
   /**
