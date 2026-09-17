@@ -157,15 +157,15 @@ class TomlCommentSuiteTest {
       if (comments.size() > 2) {
         failures.add(entry + " has " + comments.size() + " comments attached to it");
       }
-      CommentPlacement previous = null;
+      TomlComment.Placement previous = null;
       for (TomlComment comment : comments) {
-        CommentPlacement placement = comment.placement();
+        TomlComment.Placement placement = comment.placement();
         TomlPosition at = comment.position();
         if (placement == null) {
           failures.add(entry + " has an unattached comment among the comments attached to it");
         } else if (placement == previous) {
           failures.add(entry + " has two " + placement + " comments");
-        } else if (placement == CommentPlacement.ABOVE) {
+        } else if (placement == TomlComment.Placement.ABOVE) {
           if (previous != null) {
             failures.add(entry + " has the comment above it after the one that trails it");
           }

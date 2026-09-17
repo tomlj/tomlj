@@ -24,18 +24,32 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * A comment in a TOML document, either attached to the entry it documents or unattached.
  *
  * <p>
- * A comment attached to an entry is either the run of comment lines directly above it ({@link CommentPlacement#ABOVE})
- * or the comment on its line ({@link CommentPlacement#AFTER}); every other comment is unattached, and belongs to the
- * table or array it was written in. An entry has at most one comment of each placement.
+ * A comment attached to an entry is either the run of comment lines directly above it ({@link Placement#ABOVE}) or the
+ * comment on its line ({@link Placement#AFTER}); every other comment is unattached, and belongs to the table or array
+ * it was written in. An entry has at most one comment of each placement.
  */
 public final class TomlComment {
+
+  /**
+   * Where a comment sits relative to the entry it documents.
+   */
+  public enum Placement {
+    /**
+     * A run of comment lines written directly above the entry it documents.
+     */
+    ABOVE,
+    /**
+     * The comment written on the same line as the entry, after it.
+     */
+    AFTER
+  }
 
   // Each line as it was written after the '#'. A comment is held in the form the document held it, so that the model
   // alone reproduces its text, while the form callers see and write is the text after "# ": the getter drops one
   // leading space and the setter puts one back, so reading a comment and writing it back unchanged changes nothing.
   private final List<String> rawLines;
   private final TomlPosition position;
-  private final @Nullable CommentPlacement placement;
+  private final @Nullable Placement placement;
 
   /**
    * Record a comment from the tokens the lexer matched for it.
@@ -48,7 +62,7 @@ public final class TomlComment {
    * @param placement Where the comment sits relative to what it documents, or {@code null} if it documents nothing.
    * @return A comment.
    */
-  static TomlComment of(List<Token> tokens, @Nullable CommentPlacement placement) {
+  static TomlComment of(List<Token> tokens, @Nullable Placement placement) {
     assert !tokens.isEmpty();
     List<String> rawLines = new ArrayList<>(tokens.size());
     for (Token token : tokens) {
@@ -80,7 +94,7 @@ public final class TomlComment {
     return Collections.unmodifiableList(Arrays.asList(above, after));
   }
 
-  private TomlComment(List<String> rawLines, TomlPosition position, @Nullable CommentPlacement placement) {
+  private TomlComment(List<String> rawLines, TomlPosition position, @Nullable Placement placement) {
     this.rawLines = rawLines;
     this.position = position;
     this.placement = placement;
@@ -95,7 +109,7 @@ public final class TomlComment {
    * an empty string. No entry contains a newline.
    *
    * <p>
-   * An attached {@link CommentPlacement#AFTER} comment has exactly one line.
+   * An attached {@link Placement#AFTER} comment has exactly one line.
    *
    * @return The text of each line, in document order. Unmodifiable.
    */
@@ -133,11 +147,11 @@ public final class TomlComment {
   /**
    * Where this comment sits relative to the entry it documents.
    *
-   * @return {@link CommentPlacement#ABOVE} or {@link CommentPlacement#AFTER} for an attached comment, or {@code null}
-   *         for an unattached one.
+   * @return {@link Placement#ABOVE} or {@link Placement#AFTER} for an attached comment, or {@code null} for an
+   *         unattached one.
    */
   @Nullable
-  public CommentPlacement placement() {
+  public Placement placement() {
     return placement;
   }
 
