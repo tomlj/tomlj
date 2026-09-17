@@ -32,56 +32,6 @@ final class EmptyTomlArray implements TomlArray {
   }
 
   @Override
-  public boolean containsStrings() {
-    return false;
-  }
-
-  @Override
-  public boolean containsLongs() {
-    return false;
-  }
-
-  @Override
-  public boolean containsDoubles() {
-    return false;
-  }
-
-  @Override
-  public boolean containsBooleans() {
-    return false;
-  }
-
-  @Override
-  public boolean containsOffsetDateTimes() {
-    return false;
-  }
-
-  @Override
-  public boolean containsLocalDateTimes() {
-    return false;
-  }
-
-  @Override
-  public boolean containsLocalDates() {
-    return false;
-  }
-
-  @Override
-  public boolean containsLocalTimes() {
-    return false;
-  }
-
-  @Override
-  public boolean containsArrays() {
-    return false;
-  }
-
-  @Override
-  public boolean containsTables() {
-    return false;
-  }
-
-  @Override
   public Object get(int index) {
     throw new IndexOutOfBoundsException("Index: " + index + ", Size: 0");
   }

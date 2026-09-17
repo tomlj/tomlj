@@ -49,56 +49,6 @@ class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArra
   }
 
   @Override
-  public boolean containsStrings() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsLongs() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsDoubles() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsBooleans() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsOffsetDateTimes() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsLocalDateTimes() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsLocalDates() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsLocalTimes() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsArrays() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
-  public boolean containsTables() {
-    throw new UnsupportedOperationException("Deprecated (after 0.5.0, arrays are heterogeneous)");
-  }
-
-  @Override
   public int size() {
     return values.size();
   }
