@@ -766,6 +766,496 @@ class MutableTomlTableTest {
     assertFalse(table.removeComment(attached));
   }
 
+  @Test
+  void shouldInsertAfterAnAnchorThatAnUnattachedCommentFollows() {
+    // A comment run needs a blank line after it, before the next entry, to be unattached rather than that entry's
+    // ABOVE run; see Comments' class documentation.
+    LinkedTomlTable table = parse("a = 1\n# c\n\nb = 2\n");
+    TomlComment comment = (TomlComment) table.elements().get(1);
+
+    table.insertAfter("a", "x", 0L);
+
+    List<TomlElement> elements = table.elements();
+    assertEquals(4, elements.size());
+    assertEquals("a", ((TomlKeyValue) elements.get(0)).key());
+    assertEquals("x", ((TomlKeyValue) elements.get(1)).key());
+    assertSame(comment, elements.get(2));
+    assertEquals("b", ((TomlKeyValue) elements.get(3)).key());
+    assertEquals(List.of("a", "x", "b"), new ArrayList<>(table.keySet()));
+    List<String> entryKeys = new ArrayList<>();
+    for (Map.Entry<String, Object> entry : table.entrySet()) {
+      entryKeys.add(entry.getKey());
+    }
+    assertEquals(List.of("a", "x", "b"), entryKeys);
+    assertEquals(0L, table.get("x"));
+    assertEquals(3, table.size());
+  }
+
+  @Test
+  void shouldInsertBeforeAnAnchorThatAnUnattachedCommentPrecedes() {
+    LinkedTomlTable table = parse("a = 1\n# c\n\nb = 2\n");
+
+    table.insertBefore("b", "y", 0L);
+
+    List<TomlElement> elements = table.elements();
+    assertEquals(4, elements.size());
+    assertEquals("a", ((TomlKeyValue) elements.get(0)).key());
+    assertEquals("c", ((TomlComment) elements.get(1)).text());
+    assertEquals("y", ((TomlKeyValue) elements.get(2)).key());
+    assertEquals("b", ((TomlKeyValue) elements.get(3)).key());
+    assertEquals(List.of("a", "y", "b"), new ArrayList<>(table.keySet()));
+  }
+
+  @Test
+  void shouldInsertBeforeTheFirstEntryAndAfterTheLastEntry() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.set("b", 2L);
+
+    table.insertBefore("a", "first", 0L);
+    table.insertAfter("b", "last", 3L);
+
+    assertEquals(List.of("first", "a", "b", "last"), new ArrayList<>(table.keySet()));
+  }
+
+  @Test
+  void shouldInsertIntoANestedTableThroughADottedAnchor() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("t.a", 1L);
+    table.set("t.b", 2L);
+
+    table.insertBefore("t.b", "a2", 3L);
+
+    assertEquals(List.of("a", "a2", "b"), new ArrayList<>(table.getTable("t").keySet()));
+  }
+
+  @Test
+  void shouldInsertThroughTheListPathForm() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.set("b", 2L);
+
+    table.insertBefore(List.of("b"), "x", 9L);
+
+    assertEquals(List.of("a", "x", "b"), new ArrayList<>(table.keySet()));
+  }
+
+  @Test
+  void shouldInsertBesideAQuotedAnchorKey() {
+    LinkedTomlTable table = parse("\"a.b\" = 1\nc = 2\n");
+
+    table.insertAfter(List.of("a.b"), "x", 9L);
+
+    assertEquals(List.of("a.b", "x", "c"), new ArrayList<>(table.keySet()));
+  }
+
+  @Test
+  void shouldGiveTheNewEntryNoPositionNoCommentsAndMarkItModified() {
+    LinkedTomlTable table = parse("a = 1\nb = 2\n");
+    assertFalse(table.isModified());
+
+    table.insertBefore("b", "x", 9L);
+
+    assertNull(table.inputPositionOf("x"));
+    assertEquals(List.of(), table.comments("x"));
+    assertTrue(table.isModified("x"));
+    assertTrue(table.isModified());
+  }
+
+  @Test
+  void shouldStoreATableValueAsADeepCopyWhenInserting() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    MutableTomlTable original = MutableTomlTable.create();
+    original.set("x", 1L);
+
+    table.insertBefore("a", "t", original);
+
+    original.set("x", 2L);
+    assertEquals(1L, table.get("t.x"));
+  }
+
+  @Test
+  void shouldRejectAnEmptyAnchorPathWhenInserting() {
+    MutableTomlTable table = MutableTomlTable.create();
+    assertThrows(IllegalArgumentException.class, () -> table.insertBefore(List.of(), "x", 1L));
+    assertThrows(IllegalArgumentException.class, () -> table.insertAfter(List.of(), "x", 1L));
+  }
+
+  @Test
+  void shouldRejectANullAnchorPathElementOrNullKeyLeavingTheTableUnchanged() {
+    LinkedTomlTable table = parse("a = 1\n");
+
+    assertThrows(NullPointerException.class, () -> table.insertBefore(Arrays.asList("a", null), "x", 1L));
+    assertThrows(NullPointerException.class, () -> table.insertBefore("a", null, 1L));
+
+    assertEquals(1, table.elements().size());
+    assertFalse(table.isModified());
+  }
+
+  @Test
+  void shouldRejectNullAndUnconvertibleValuesWhenInsertingLeavingTheTableUnchanged() {
+    LinkedTomlTable table = parse("a = 1\n");
+
+    assertThrows(NullPointerException.class, () -> table.insertBefore("a", "x", null));
+    assertThrows(IllegalArgumentException.class, () -> table.insertBefore("a", "x", new Object()));
+
+    assertEquals(1, table.elements().size());
+    assertFalse(table.isModified());
+  }
+
+  @Test
+  void shouldRejectInsertingBesideAnAnchorThatIsNotSet() {
+    MutableTomlTable table = MutableTomlTable.create();
+    NoSuchElementException e = assertThrows(NoSuchElementException.class, () -> table.insertBefore("nope", "x", 1L));
+    assertEquals("nope is not set", e.getMessage());
+  }
+
+  @Test
+  void shouldRejectInsertingThroughAMissingIntermediateTable() {
+    MutableTomlTable table = MutableTomlTable.create();
+    assertThrows(NoSuchElementException.class, () -> table.insertBefore("missing.a", "x", 1L));
+  }
+
+  @Test
+  void shouldRejectInsertingThroughANonTableIntermediate() {
+    LinkedTomlTable table = parse("a = 1\n");
+    TomlInvalidTypeException e = assertThrows(TomlInvalidTypeException.class, () -> table.insertBefore("a.b", "x", 1L));
+    assertEquals("Value of 'a' is a integer", e.getMessage());
+  }
+
+  @Test
+  void shouldRejectInsertingAnAlreadySetKey() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("t.a", 1L);
+    table.set("t.b", 2L);
+
+    TomlKeyAlreadySetException e =
+        assertThrows(TomlKeyAlreadySetException.class, () -> table.insertBefore("t.b", "a", 3L));
+    assertEquals("a is already set", e.getMessage());
+  }
+
+  @Test
+  void shouldRejectInsertingTheAnchorsOwnKey() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+
+    assertThrows(TomlKeyAlreadySetException.class, () -> table.insertBefore("a", "a", 2L));
+  }
+
+  @Test
+  void shouldInsertCommentBeforeAndAfterAnEntryWithVarargsAndList() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.set("b", 2L);
+
+    table.insertCommentBefore("b", "above b");
+    table.insertCommentAfter(List.of("a"), List.of("after a"));
+    // Each insertion goes directly beside its entry, so it lands inside the comment inserted before it.
+    table.insertCommentBefore(List.of("b"), "also above b");
+    table.insertCommentAfter("a", List.of("also after a"));
+
+    List<TomlElement> elements = table.elements();
+    assertEquals(6, elements.size());
+    assertEquals("a", ((TomlKeyValue) elements.get(0)).key());
+    assertEquals("also after a", ((TomlComment) elements.get(1)).text());
+    assertEquals("after a", ((TomlComment) elements.get(2)).text());
+    assertEquals("above b", ((TomlComment) elements.get(3)).text());
+    assertEquals("also above b", ((TomlComment) elements.get(4)).text());
+    assertEquals("b", ((TomlKeyValue) elements.get(5)).key());
+  }
+
+  @Test
+  void shouldInsertACommentCopiedFromAnotherDocument() {
+    LinkedTomlTable source = parse("# footer\n");
+    TomlComment sourceComment = (TomlComment) source.elements().get(0);
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+
+    table.insertCommentBefore("a", sourceComment);
+
+    TomlComment inserted = (TomlComment) table.elements().get(0);
+    assertNull(inserted.placement());
+    assertNull(inserted.position());
+    assertEquals(sourceComment.text(), inserted.text());
+    assertNotSame(sourceComment, inserted);
+    assertEquals(1, unattachedComments(source).size());
+  }
+
+  @Test
+  void shouldInsertCommentBeforeAnEntryWithAnAboveRunKeepingTheRunAttached() {
+    LinkedTomlTable table = parse("# above\na = 1\n");
+    List<TomlComment> aboveRun = table.comments("a");
+
+    table.insertCommentBefore("a", "new");
+
+    assertEquals(aboveRun, table.comments("a"));
+    List<TomlElement> elements = table.elements();
+    assertEquals(2, elements.size());
+    assertEquals("new", ((TomlComment) elements.get(0)).text());
+    assertEquals("a", ((TomlKeyValue) elements.get(1)).key());
+    assertTrue(table.isModified());
+  }
+
+  @Test
+  void shouldFindACommentInsertedBesideAnAnchorWithRemoveComment() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+
+    table.insertCommentBefore("a", "note");
+
+    TomlComment inserted = (TomlComment) table.elements().get(0);
+    assertTrue(table.removeComment(inserted));
+  }
+
+  @Test
+  void shouldRejectInsertingACommentBesideAnAnchorThatIsNotSet() {
+    MutableTomlTable table = MutableTomlTable.create();
+    assertThrows(NoSuchElementException.class, () -> table.insertCommentBefore("nope", "x"));
+    assertThrows(NoSuchElementException.class, () -> table.insertCommentAfter("nope", "x"));
+  }
+
+  @Test
+  void shouldRejectInsertingACommentWithAnEmptyAnchorPath() {
+    MutableTomlTable table = MutableTomlTable.create();
+    assertThrows(IllegalArgumentException.class, () -> table.insertCommentBefore(List.of(), List.of("x")));
+  }
+
+  @Test
+  void shouldRejectInsertingACommentWithEmptyLinesOrAnUnwritableLine() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+
+    assertThrows(IllegalArgumentException.class, () -> table.insertCommentBefore(List.of("a"), List.of()));
+    assertThrows(IllegalArgumentException.class, () -> table.insertCommentBefore("a", "bad\u0001line"));
+  }
+
+  @Test
+  void shouldRejectInsertingAnAttachedComment() {
+    LinkedTomlTable table = parse("# above\na = 1\n");
+    TomlComment attached = table.comments("a").get(0);
+    TomlElement anchor = table.entry("a");
+
+    assertThrows(IllegalArgumentException.class, () -> table.insertCommentBefore("a", attached));
+    assertThrows(IllegalArgumentException.class, () -> table.insertCommentAfter(List.of("a"), attached));
+    assertThrows(IllegalArgumentException.class, () -> table.insertCommentBefore(anchor, attached));
+    assertThrows(IllegalArgumentException.class, () -> table.insertCommentAfter(anchor, attached));
+
+    assertEquals(1, table.elements().size());
+    assertFalse(table.isModified());
+  }
+
+  @Test
+  void shouldRejectInsertingANullComment() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    assertThrows(NullPointerException.class, () -> table.insertCommentBefore(List.of("a"), (TomlComment) null));
+  }
+
+  @Test
+  void shouldInsertAnEntryBetweenTwoConsecutiveUnattachedComments() {
+    LinkedTomlTable table = parse("a = 1\n\n# one\n\n# two\n\nb = 2\n");
+    TomlComment two = (TomlComment) table.elements().get(2);
+
+    table.insertBefore(two, "x", 9L);
+
+    List<TomlElement> elements = table.elements();
+    assertEquals(5, elements.size());
+    assertEquals("a", ((TomlKeyValue) elements.get(0)).key());
+    assertEquals("one", ((TomlComment) elements.get(1)).text());
+    assertEquals("x", ((TomlKeyValue) elements.get(2)).key());
+    assertEquals("two", ((TomlComment) elements.get(3)).text());
+    assertEquals("b", ((TomlKeyValue) elements.get(4)).key());
+    assertEquals(List.of("a", "x", "b"), new ArrayList<>(table.keySet()));
+    assertEquals(2L, table.get("b"));
+  }
+
+  @Test
+  void shouldInsertACommentBetweenTwoConsecutiveUnattachedCommentsBeforeAndAfterEach() {
+    LinkedTomlTable table = parse("a = 1\n\n# one\n\n# two\n\nb = 2\n");
+    TomlComment one = (TomlComment) table.elements().get(1);
+    TomlComment two = (TomlComment) table.elements().get(2);
+
+    table.insertCommentAfter(one, "after one");
+    table.insertCommentBefore(two, "before two");
+
+    List<TomlElement> elements = table.elements();
+    assertEquals(6, elements.size());
+    assertEquals("a", ((TomlKeyValue) elements.get(0)).key());
+    assertEquals("one", ((TomlComment) elements.get(1)).text());
+    assertEquals("after one", ((TomlComment) elements.get(2)).text());
+    assertEquals("before two", ((TomlComment) elements.get(3)).text());
+    assertEquals("two", ((TomlComment) elements.get(4)).text());
+    assertEquals("b", ((TomlKeyValue) elements.get(5)).key());
+  }
+
+  @Test
+  void shouldInsertBeforeAndAfterAnEntryThroughItsElement() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.set("b", 2L);
+
+    table.insertBefore(table.entry("b"), "x", 9L);
+    table.insertAfter(table.entry("a"), "y", 8L);
+
+    assertEquals(List.of("a", "y", "x", "b"), new ArrayList<>(table.keySet()));
+  }
+
+  @Test
+  void shouldInsertBeforeAnEntryThroughItsElementKeepingItsAboveRunAttached() {
+    LinkedTomlTable table = parse("# above\na = 1\n");
+    List<TomlComment> aboveRun = table.comments("a");
+    TomlElement anchor = table.elements().get(0);
+
+    table.insertBefore(anchor, "x", 9L);
+
+    assertEquals(aboveRun, table.comments("a"));
+    List<TomlElement> elements = table.elements();
+    assertEquals(2, elements.size());
+    assertEquals("x", ((TomlKeyValue) elements.get(0)).key());
+    assertEquals("a", ((TomlKeyValue) elements.get(1)).key());
+  }
+
+  @Test
+  void shouldRejectAnAnchorFromASubTableACopyOrAnotherDocument() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.set("t.x", 1L);
+
+    TomlElement subTableAnchor = table.getTable("t").entry("x");
+    NoSuchElementException e1 =
+        assertThrows(NoSuchElementException.class, () -> table.insertBefore(subTableAnchor, "y", 1L));
+    assertEquals("anchor is not an element of this table", e1.getMessage());
+
+    MutableTomlTable copy = MutableTomlTable.copyOf(table);
+    TomlElement copyAnchor = copy.entry("a");
+    assertThrows(NoSuchElementException.class, () -> table.insertBefore(copyAnchor, "y", 1L));
+
+    MutableTomlTable other = MutableTomlTable.create();
+    other.set("z", 1L);
+    TomlElement otherAnchor = other.entry("z");
+    assertThrows(NoSuchElementException.class, () -> table.insertBefore(otherAnchor, "y", 1L));
+  }
+
+  @Test
+  void shouldRejectANullAnchorOrNullKeyOrValueThroughTheElementForm() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    TomlElement anchor = table.entry("a");
+
+    assertThrows(NullPointerException.class, () -> table.insertBefore((TomlElement) null, "x", 1L));
+    assertThrows(NullPointerException.class, () -> table.insertBefore(anchor, null, 1L));
+    assertThrows(NullPointerException.class, () -> table.insertBefore(anchor, "x", null));
+  }
+
+  @Test
+  void shouldRejectANullAnchorOrNullCommentThroughTheElementForm() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    TomlElement anchor = table.entry("a");
+
+    assertThrows(NullPointerException.class, () -> table.insertCommentBefore((TomlElement) null, "x"));
+    assertThrows(NullPointerException.class, () -> table.insertCommentBefore(anchor, (TomlComment) null));
+  }
+
+  @Test
+  void shouldRejectADuplicateKeyThroughTheElementFormWithTheShortMessage() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.set("b", 2L);
+
+    TomlKeyAlreadySetException e =
+        assertThrows(TomlKeyAlreadySetException.class, () -> table.insertBefore(table.entry("b"), "a", 9L));
+    assertEquals("a is already set", e.getMessage());
+  }
+
+  @Test
+  void shouldRejectADuplicateKeyThroughTheElementFormWithAQuotedKey() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    table.set(List.of("a b"), 2L);
+
+    TomlKeyAlreadySetException e =
+        assertThrows(TomlKeyAlreadySetException.class, () -> table.insertBefore(table.entry("a"), "a b", 9L));
+    assertEquals("\"a b\" is already set", e.getMessage());
+  }
+
+  @Test
+  void shouldRejectADuplicateKeyThroughThePathFormNamingOnlyTheKey() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("t.x", 1L);
+    table.set("t.y", 2L);
+
+    TomlKeyAlreadySetException e =
+        assertThrows(TomlKeyAlreadySetException.class, () -> table.insertAfter("t.x", "y", 3L));
+    assertEquals("y is already set", e.getMessage());
+  }
+
+  @Test
+  void shouldLeaveTheTableUnchangedWhenElementFormInsertionIsRejected() {
+    LinkedTomlTable table = parse("a = 1\nb = 2\n");
+
+    assertThrows(TomlKeyAlreadySetException.class, () -> table.insertBefore(table.entry("a"), "b", 9L));
+
+    assertEquals(2, table.elements().size());
+    assertFalse(table.isModified());
+  }
+
+  @Test
+  void shouldLeaveTheTableUnchangedWhenElementCommentInsertionIsRejected() {
+    LinkedTomlTable table = parse("a = 1\n");
+    TomlElement foreignAnchor = MutableTomlTable.create().addComment("x").elements().get(0);
+
+    assertThrows(NoSuchElementException.class, () -> table.insertCommentBefore(foreignAnchor, "note"));
+
+    assertEquals(1, table.elements().size());
+    assertFalse(table.isModified());
+  }
+
+  @Test
+  void shouldMarkOnlyTheInsertedEntryModifiedThroughTheElementForm() {
+    LinkedTomlTable table = parse("a = 1\nb = 2\n");
+    TomlElement anchor = table.entry("b");
+
+    table.insertBefore(anchor, "x", 9L);
+
+    assertTrue(table.isModified("x"));
+    assertTrue(table.isModified());
+    assertFalse(table.isModified("a"));
+    assertFalse(table.isModified("b"));
+  }
+
+  @Test
+  void shouldMarkTheContainerModifiedWhenInsertingACommentThroughTheElementForm() {
+    LinkedTomlTable table = parse("a = 1\n");
+    assertFalse(table.isModified());
+
+    table.insertCommentBefore(table.entry("a"), "note");
+
+    assertTrue(table.isModified());
+    assertFalse(table.isModified("a"));
+  }
+
+  @Test
+  void shouldInsertCommentTextFormsThroughTheElementAnchorAndValidateLines() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    TomlElement anchor = table.entry("a");
+
+    table.insertCommentBefore(anchor, "above");
+    table.insertCommentAfter(anchor, List.of("after"));
+
+    List<TomlElement> elements = table.elements();
+    assertEquals(3, elements.size());
+    assertEquals("above", ((TomlComment) elements.get(0)).text());
+    assertEquals("a", ((TomlKeyValue) elements.get(1)).key());
+    assertEquals("after", ((TomlComment) elements.get(2)).text());
+
+    assertThrows(IllegalArgumentException.class, () -> table.insertCommentBefore(anchor, List.of()));
+    String badLine = "bad" + (char) 1 + "line";
+    assertThrows(IllegalArgumentException.class, () -> table.insertCommentBefore(anchor, badLine));
+  }
+
   // A minimal TomlTable of another implementation, holding one level of literal keys, for the deep-copy cases.
   private static final class ForeignTable implements TomlTable {
     private final Map<String, Object> values;

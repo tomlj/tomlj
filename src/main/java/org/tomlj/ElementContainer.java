@@ -79,22 +79,59 @@ abstract class ElementContainer<E extends Entry> extends Value {
   }
 
   /**
+   * Insert an entry into this table or array's sequence at a position. The caller also indexes the entry, by key or
+   * position.
+   *
+   * @param index The index to insert at.
+   * @param entry The entry.
+   */
+  void insert(int index, E entry) {
+    elements.add(index, entry);
+  }
+
+  /**
+   * Insert an unattached comment through the editing API at a position in this container's sequence, and record the
+   * addition.
+   *
+   * @param index The index to insert at.
+   * @param comment The comment.
+   */
+  void insertEditedComment(int index, TomlComment comment) {
+    elements.add(index, comment);
+    sequenceModified = true;
+  }
+
+  /**
+   * The index of an element in this container's sequence, by identity.
+   *
+   * @param element The element to find.
+   * @return The index of {@code element} in {@link #elements()}, or {@code -1} if it is not among them.
+   */
+  @SuppressWarnings("ReferenceEquality") // a sequence search is about identity, never equals
+  int indexOfElement(TomlElement element) {
+    for (int i = 0; i < elements.size(); i++) {
+      if (elements.get(i) == element) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /**
    * Remove an element from this container's sequence, by identity, and record the removal if it was found. Used for an
    * entry, once the caller has removed it from its own index, and for an unattached comment.
    *
    * @param element The element to remove.
    * @return {@code true} if the element was found, and removed.
    */
-  @SuppressWarnings("ReferenceEquality") // a sequence search is about identity, never equals
   boolean removeElement(TomlElement element) {
-    for (int i = 0; i < elements.size(); i++) {
-      if (elements.get(i) == element) {
-        elements.remove(i);
-        sequenceModified = true;
-        return true;
-      }
+    int index = indexOfElement(element);
+    if (index < 0) {
+      return false;
     }
-    return false;
+    elements.remove(index);
+    sequenceModified = true;
+    return true;
   }
 
   /**
