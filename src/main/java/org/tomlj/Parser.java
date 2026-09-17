@@ -81,8 +81,8 @@ final class Parser {
       }
 
       @Override
-      public List<TomlComment> comments() {
-        return table.comments();
+      public List<TomlElement> elements() {
+        return table.elements();
       }
 
       @Override
@@ -101,8 +101,8 @@ final class Parser {
    * Parse a document into the table it describes.
    *
    * <p>
-   * This is the whole of parsing; {@link #parse(CharStream, TomlParseOptions)} only pairs the table with the errors
-   * reported while reading it. Tests use it to reach what the table holds but {@link TomlParseResult} does not expose.
+   * {@link #parse(CharStream, TomlParseOptions)} pairs the table with the errors reported while reading it. Tests use
+   * this method to reach what {@link TomlParseResult} does not expose.
    *
    * @param stream The document.
    * @param options The parse options.

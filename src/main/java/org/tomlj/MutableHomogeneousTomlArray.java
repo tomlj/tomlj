@@ -76,7 +76,7 @@ final class MutableHomogeneousTomlArray extends MutableTomlArray {
   }
 
   @Override
-  public MutableHomogeneousTomlArray append(Element.Value value) {
+  public MutableHomogeneousTomlArray append(Entry.Value value) {
     Object rawValue = value.get();
     TomlType origType = type;
     Optional<TomlType> valueType = TomlType.typeFor(rawValue);

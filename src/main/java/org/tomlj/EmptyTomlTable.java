@@ -73,7 +73,7 @@ final class EmptyTomlTable implements TomlTable {
   }
 
   @Override
-  public List<TomlComment> comments() {
+  public List<TomlElement> elements() {
     return Collections.emptyList();
   }
 

@@ -49,7 +49,7 @@ public abstract class AbstractTomlLexer extends Lexer {
    * <p>
    * On, which is the default, a document whose last line has no newline is read as though it had one, so that the
    * parser sees every line ended the same way and no rule needs to say that a line may end at the end of the input
-   * instead. Off for parsing a key on its own, which is no line.
+   * instead. Off when parsing a key on its own, which is not a line.
    *
    * @param endsLine Whether the end of the input ends a line.
    */

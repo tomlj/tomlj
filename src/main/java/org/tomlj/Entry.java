@@ -15,70 +15,30 @@ package org.tomlj;
 import java.util.Collections;
 import java.util.List;
 
-import org.checkerframework.checker.nullness.qual.Nullable;
-
 /**
- * One node of a parsed TOML document.
+ * An entry of a parsed table or array: what its sequence holds besides unattached comments.
  *
  * <p>
  * A document is a tree: the root table holds a sequence of entries and unattached comments, and any entry that is
- * itself a table or array ({@link ElementContainer}) holds a sequence of its own. Every node of the tree is an
- * {@code Element}: an {@link Entry} in a container's sequence, or an unattached {@link Comment}.
+ * itself a table or array ({@link ElementContainer}) holds a sequence of its own. The entries are a {@link KeyValue}
+ * for a table and a {@link Value} for an array; the unattached comments are the {@link TomlComment} objects themselves.
+ * Both are {@link TomlElement}s, which is what {@link ElementContainer#elements()} lists.
+ *
+ * <p>
+ * A container's unattached comments are among its {@link ElementContainer#elements()}; an entry's own comments, the run
+ * above it and the comment after it, are its {@code comments()}. A pair is not a value, so the two kinds of entry share
+ * no public type: a pair is a {@link TomlKeyValue} and an array's value a {@link TomlValue}.
  */
-abstract class Element {
-
-  /**
-   * Where this element was written in the document.
-   *
-   * @return The position, or {@code null} if this element has none yet: a table created implicitly by a dotted key,
-   *         before a header defines it.
-   */
-  @Nullable
-  abstract TomlPosition position();
-
-  /**
-   * An unattached comment: one in a table or array that belongs to no entry.
-   */
-  static final class Comment extends Element {
-
-    final TomlComment comment;
-
-    Comment(TomlComment comment) {
-      this.comment = comment;
-    }
-
-    @Override
-    @Nullable
-    TomlPosition position() {
-      return comment.position();
-    }
-  }
-
-  /**
-   * What a table or array holds besides unattached comments: a key/value pair for a table, or a value for an array.
-   *
-   * <p>
-   * {@link ElementContainer#comments()} is the unattached comments of a container; an entry's own comments, the run
-   * above it and the comment after it, are {@link #attachedComments()}, so the two never share a name.
-   */
-  abstract static class Entry extends Element {
-
-    /**
-     * The comments attached to this entry, in document order: the run above it, then the comment after it.
-     *
-     * @return The attached comments, in document order. Unmodifiable.
-     */
-    abstract List<TomlComment> attachedComments();
-  }
+abstract class Entry implements TomlElement {
 
   /**
    * A key/value pair written in a table.
    */
-  static final class KeyValue extends Entry {
+  static final class KeyValue extends Entry implements TomlKeyValue {
 
     // The single key in its table, not a dotted path.
     final String key;
-    final Value value;
+    final Value element;
 
     // Not final: a table header such as [a] can define a table that an earlier dotted key created implicitly, and
     // this pair then takes over the header's position and attached comments, in place, so it keeps its spot in the
@@ -86,20 +46,30 @@ abstract class Element {
     private TomlPosition position;
     private List<TomlComment> attachedComments;
 
-    KeyValue(String key, Value value, TomlPosition position, List<TomlComment> attachedComments) {
+    KeyValue(String key, Value element, TomlPosition position, List<TomlComment> attachedComments) {
       this.key = key;
-      this.value = value;
+      this.element = element;
       this.position = position;
       this.attachedComments = attachedComments;
     }
 
     @Override
-    TomlPosition position() {
+    public String key() {
+      return key;
+    }
+
+    @Override
+    public TomlValue value() {
+      return element;
+    }
+
+    @Override
+    public TomlPosition position() {
       return position;
     }
 
     @Override
-    List<TomlComment> attachedComments() {
+    public List<TomlComment> comments() {
       return attachedComments;
     }
 
@@ -118,7 +88,7 @@ abstract class Element {
   /**
    * Anything a key or an array slot holds: a scalar, a table or an array.
    */
-  abstract static class Value extends Entry {
+  abstract static class Value extends Entry implements TomlValue {
 
     // The comments attached to this value in an array; empty for a value under a key in a table, whose comments
     // belong to the KeyValue (see MutableTomlTable#put). Not final: a nested table or array is built by the visitor
@@ -126,7 +96,7 @@ abstract class Element {
     private List<TomlComment> attachedComments = Collections.emptyList();
 
     @Override
-    List<TomlComment> attachedComments() {
+    public List<TomlComment> comments() {
       return attachedComments;
     }
 
@@ -145,7 +115,8 @@ abstract class Element {
      *
      * @return The value.
      */
-    abstract Object get();
+    @Override
+    public abstract Object get();
 
     /**
      * Wrap a value read from the document as the element a table or array can place in its sequence.
@@ -190,12 +161,12 @@ abstract class Element {
     }
 
     @Override
-    Object get() {
+    public Object get() {
       return value;
     }
 
     @Override
-    TomlPosition position() {
+    public TomlPosition position() {
       return position;
     }
   }

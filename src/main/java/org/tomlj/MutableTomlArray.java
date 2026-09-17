@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-class MutableTomlArray extends ElementContainer<Element.Value> implements TomlArray {
+class MutableTomlArray extends ElementContainer<Entry.Value> implements TomlArray {
 
   /**
    * Create an array for an array written in a document.
@@ -48,7 +48,7 @@ class MutableTomlArray extends ElementContainer<Element.Value> implements TomlAr
 
   // The values of this array, in document order; the index into this list is the array index. This is a separate
   // index over the same value elements that elements() holds, kept for lookup by position.
-  private final List<Element.Value> values = new ArrayList<>();
+  private final List<Entry.Value> values = new ArrayList<>();
   private final boolean isTableArray;
 
   // Final, unlike a table's: an array only ever comes from a literal written in the document, at a position known
@@ -65,7 +65,7 @@ class MutableTomlArray extends ElementContainer<Element.Value> implements TomlAr
   }
 
   @Override
-  TomlPosition position() {
+  public TomlPosition position() {
     return position;
   }
 
@@ -150,17 +150,17 @@ class MutableTomlArray extends ElementContainer<Element.Value> implements TomlAr
     if (value instanceof Integer) {
       value = ((Integer) value).longValue();
     }
-    return append(Element.Value.of(value, position));
+    return append(Entry.Value.of(value, position));
   }
 
   /**
    * Append a value to this array's sequence, and index it by position.
    *
    * @param value The value, already wrapped as an element with its comments attached; see
-   *        {@link Element.Value#of(Object, TomlPosition, List)}.
+   *        {@link Entry.Value#of(Object, TomlPosition, List)}.
    * @return This array.
    */
-  MutableTomlArray append(Element.Value value) {
+  MutableTomlArray append(Entry.Value value) {
     Object rawValue = value.get();
     if (!TomlType.typeFor(rawValue).isPresent()) {
       throw new IllegalArgumentException("Unsupported type " + rawValue.getClass().getSimpleName());
@@ -172,11 +172,11 @@ class MutableTomlArray extends ElementContainer<Element.Value> implements TomlAr
 
   @Override
   public List<TomlComment> comments(int index) {
-    return values.get(index).attachedComments();
+    return values.get(index).comments();
   }
 
   @Override
   public List<Object> toList() {
-    return values.stream().map(Element.Value::get).collect(Collectors.toList());
+    return values.stream().map(Entry.Value::get).collect(Collectors.toList());
   }
 }

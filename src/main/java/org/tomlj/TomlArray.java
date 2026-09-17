@@ -145,42 +145,15 @@ public interface TomlArray {
   Object get(int index);
 
   /**
-   * Get the position where a value is defined in the TOML document.
+   * {@code true} if the value at an index is a string.
    *
    * @param index The array index.
-   * @return The input position.
+   * @return {@code true} if the value at the index is a string.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
    */
-  TomlPosition inputPositionOf(int index);
-
-  /**
-   * Get the comments that document an element.
-   *
-   * <p>
-   * Returns the comments in document order: the run written directly above the element, if any, then the comment on its
-   * line, if any, so at most two, each stating its own {@link TomlComment#placement()}.
-   *
-   * <p>
-   * For an array of tables, each element's header comments are here: {@code [[x]]} is documented on the element table
-   * it opens, so its comments are read with {@code comments(0)} and so on.
-   *
-   * @param index The array index.
-   * @return The comments documenting the element, in document order. Unmodifiable.
-   * @throws IndexOutOfBoundsException If the index is out of bounds.
-   */
-  List<TomlComment> comments(int index);
-
-  /**
-   * Get the comments written in this array that document none of its elements.
-   *
-   * <p>
-   * These are the unattached comments: a run separated by a blank line from the element below it, a run before the
-   * closing bracket, or the comment ending a line no element was written on, in document order. The comments
-   * documenting an element are read with {@link #comments(int)}.
-   *
-   * @return The comments written in this array that document none of its elements, in document order. Unmodifiable.
-   */
-  List<TomlComment> comments();
+  default boolean isString(int index) {
+    return get(index) instanceof String;
+  }
 
   /**
    * Get a string at a specified index.
@@ -188,7 +161,7 @@ public interface TomlArray {
    * @param index The array index.
    * @return The value.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
-   * @throws TomlInvalidTypeException If the value is not a long.
+   * @throws TomlInvalidTypeException If the value is not a string.
    */
   default String getString(int index) {
     Object value = get(index);
@@ -196,6 +169,17 @@ public interface TomlArray {
       throw new TomlInvalidTypeException("key at index " + index + " is a " + TomlType.typeNameFor(value));
     }
     return (String) value;
+  }
+
+  /**
+   * {@code true} if the value at an index is a long.
+   *
+   * @param index The array index.
+   * @return {@code true} if the value at the index is a long.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  default boolean isLong(int index) {
+    return get(index) instanceof Long;
   }
 
   /**
@@ -215,12 +199,23 @@ public interface TomlArray {
   }
 
   /**
+   * {@code true} if the value at an index is a double.
+   *
+   * @param index The array index.
+   * @return {@code true} if the value at the index is a double.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  default boolean isDouble(int index) {
+    return get(index) instanceof Double;
+  }
+
+  /**
    * Get a double at a specified index.
    *
    * @param index The array index.
    * @return The value.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
-   * @throws TomlInvalidTypeException If the value is not a long.
+   * @throws TomlInvalidTypeException If the value is not a double.
    */
   default double getDouble(int index) {
     Object value = get(index);
@@ -231,12 +226,23 @@ public interface TomlArray {
   }
 
   /**
+   * {@code true} if the value at an index is a boolean.
+   *
+   * @param index The array index.
+   * @return {@code true} if the value at the index is a boolean.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  default boolean isBoolean(int index) {
+    return get(index) instanceof Boolean;
+  }
+
+  /**
    * Get a boolean at a specified index.
    *
    * @param index The array index.
    * @return The value.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
-   * @throws TomlInvalidTypeException If the value is not a long.
+   * @throws TomlInvalidTypeException If the value is not a boolean.
    */
   default boolean getBoolean(int index) {
     Object value = get(index);
@@ -244,6 +250,17 @@ public interface TomlArray {
       throw new TomlInvalidTypeException("key at index " + index + " is a " + TomlType.typeNameFor(value));
     }
     return (Boolean) value;
+  }
+
+  /**
+   * {@code true} if the value at an index is an offset date-time.
+   *
+   * @param index The array index.
+   * @return {@code true} if the value at the index is an offset date-time.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  default boolean isOffsetDateTime(int index) {
+    return get(index) instanceof OffsetDateTime;
   }
 
   /**
@@ -263,6 +280,17 @@ public interface TomlArray {
   }
 
   /**
+   * {@code true} if the value at an index is a local date-time.
+   *
+   * @param index The array index.
+   * @return {@code true} if the value at the index is a local date-time.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  default boolean isLocalDateTime(int index) {
+    return get(index) instanceof LocalDateTime;
+  }
+
+  /**
    * Get a local date time at a specified index.
    *
    * @param index The array index.
@@ -276,6 +304,17 @@ public interface TomlArray {
       throw new TomlInvalidTypeException("key at index " + index + " is a " + TomlType.typeNameFor(value));
     }
     return (LocalDateTime) value;
+  }
+
+  /**
+   * {@code true} if the value at an index is a local date.
+   *
+   * @param index The array index.
+   * @return {@code true} if the value at the index is a local date.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  default boolean isLocalDate(int index) {
+    return get(index) instanceof LocalDate;
   }
 
   /**
@@ -295,6 +334,17 @@ public interface TomlArray {
   }
 
   /**
+   * {@code true} if the value at an index is a local time.
+   *
+   * @param index The array index.
+   * @return {@code true} if the value at the index is a local time.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  default boolean isLocalTime(int index) {
+    return get(index) instanceof LocalTime;
+  }
+
+  /**
    * Get a local time at a specified index.
    *
    * @param index The array index.
@@ -308,6 +358,17 @@ public interface TomlArray {
       throw new TomlInvalidTypeException("key at index " + index + " is a " + TomlType.typeNameFor(value));
     }
     return (LocalTime) value;
+  }
+
+  /**
+   * {@code true} if the value at an index is an array.
+   *
+   * @param index The array index.
+   * @return {@code true} if the value at the index is an array.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  default boolean isArray(int index) {
+    return get(index) instanceof TomlArray;
   }
 
   /**
@@ -327,6 +388,17 @@ public interface TomlArray {
   }
 
   /**
+   * {@code true} if the value at an index is a table.
+   *
+   * @param index The array index.
+   * @return {@code true} if the value at the index is a table.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  default boolean isTable(int index) {
+    return get(index) instanceof TomlTable;
+  }
+
+  /**
    * Get a table at a specified index.
    *
    * @param index The array index.
@@ -341,6 +413,45 @@ public interface TomlArray {
     }
     return (TomlTable) value;
   }
+
+  /**
+   * Get the position where a value is defined in the TOML document.
+   *
+   * @param index The array index.
+   * @return The input position.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  TomlPosition inputPositionOf(int index);
+
+  /**
+   * Get the comments attached to a value.
+   *
+   * <p>
+   * Returns the comments in document order: the run directly above the value, if any, then the comment on its line, if
+   * any, so at most two, each with its {@link TomlComment#placement()}.
+   *
+   * <p>
+   * In an array of tables, the comments on each {@code [[x]]} header are attached to the table it opens:
+   * {@code comments(0)} for the first header, and so on.
+   *
+   * @param index The array index.
+   * @return The attached comments, in document order. Unmodifiable.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   */
+  List<TomlComment> comments(int index);
+
+  /**
+   * Get the elements written in this array, in document order.
+   *
+   * <p>
+   * Each element is a {@link TomlValue}, a value of this array, or an unattached {@link TomlComment}. The values are
+   * those {@link #get(int)} returns, in the same order. A comment is unattached when it is neither directly above a
+   * value nor on its line: a run separated by a blank line from the value below it, a run before the closing bracket,
+   * or a comment on a line with no value.
+   *
+   * @return The elements, in document order. Unmodifiable.
+   */
+  List<TomlElement> elements();
 
   /**
    * Get the elements of this array as a {@link List}.

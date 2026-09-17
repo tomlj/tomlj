@@ -20,28 +20,25 @@ import java.util.List;
  * The storage shared by a parsed table and a parsed array: the sequence of elements written in it, in document order.
  *
  * <p>
- * A table and an array are both values (either can be nested inside the other), and both hold the same kinds of thing:
- * entries interleaved with unattached comments. Keeping the sequence in one place keeps the two kinds of container in
- * step as the model grows.
+ * A table and an array both hold entries interleaved with unattached comments, and either can be nested in the other,
+ * so both are values.
  *
  * <p>
- * Each subclass also keeps its own index over its entries, a map by key for a table and a list by index for an array,
- * for lookup; this class keeps only the order they were written in.
+ * Each subclass also keeps its own index over its entries, a map by key for a table and a list by index for an array;
+ * this class keeps only the order they were written in.
  *
- * @param <E> The kind of entry this container holds: a key/value pair for a table, a value for an array. The type
- *        parameter fixes the rule that a table holds only pairs and an array only values, on top of the unattached
- *        comments every container holds regardless of what it holds.
+ * @param <E> The kind of entry this container holds: a key/value pair for a table, a value for an array.
  */
-abstract class ElementContainer<E extends Element.Entry> extends Element.Value {
+abstract class ElementContainer<E extends Entry> extends Entry.Value {
 
-  private final List<Element> elements = new ArrayList<>();
+  private final List<TomlElement> elements = new ArrayList<>();
 
   /**
    * The elements written in this table or array, in document order.
    *
    * @return The elements, in document order. Unmodifiable.
    */
-  List<Element> elements() {
+  public List<TomlElement> elements() {
     return Collections.unmodifiableList(elements);
   }
 
@@ -60,22 +57,7 @@ abstract class ElementContainer<E extends Element.Entry> extends Element.Value {
    * @param comment The comment.
    */
   void addComment(TomlComment comment) {
-    elements.add(new Element.Comment(comment));
-  }
-
-  /**
-   * Get the unattached comments in this table or array.
-   *
-   * @return The unattached comments, in document order. Unmodifiable.
-   */
-  public List<TomlComment> comments() {
-    List<TomlComment> comments = new ArrayList<>();
-    for (Element element : elements) {
-      if (element instanceof Element.Comment) {
-        comments.add(((Element.Comment) element).comment);
-      }
-    }
-    return Collections.unmodifiableList(comments);
+    elements.add(comment);
   }
 
   /**
@@ -86,7 +68,7 @@ abstract class ElementContainer<E extends Element.Entry> extends Element.Value {
    * @return This container.
    */
   @Override
-  Object get() {
+  public Object get() {
     return this;
   }
 }

@@ -556,6 +556,22 @@ class TomlTest {
     // @formatter:on
   }
 
+  @Test
+  void shouldReportTheTypeOfAnArrayValue() {
+    TomlParseResult result = Toml.parse("a = [1, \"s\", 1.5, true, [], {}]");
+    assertFalse(result.hasErrors(), () -> result.errors().get(0).toString());
+    TomlArray array = result.getArray("a");
+    assertTrue(array.isLong(0));
+    assertFalse(array.isString(0));
+    assertTrue(array.isString(1));
+    assertTrue(array.isDouble(2));
+    assertTrue(array.isBoolean(3));
+    assertTrue(array.isArray(4));
+    assertTrue(array.isTable(5));
+    assertFalse(array.isTable(4));
+    assertThrows(IndexOutOfBoundsException.class, () -> array.isLong(6));
+  }
+
   @ParameterizedTest
   @MethodSource("tableSupplier")
   void shouldParseTable(String input, String key, Object expected) {

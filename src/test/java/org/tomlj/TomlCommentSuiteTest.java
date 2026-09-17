@@ -126,7 +126,7 @@ class TomlCommentSuiteTest {
     final List<String> failures = new ArrayList<>();
 
     void walk(MutableTomlTable table, String path) {
-      unattached(table.comments(), path.isEmpty() ? "the root table" : path);
+      unattached(unattachedComments(table.elements()), path.isEmpty() ? "the root table" : path);
       for (String key : table.keySet()) {
         List<String> keyPath = Collections.singletonList(key);
         String entry = path + key;
@@ -137,12 +137,22 @@ class TomlCommentSuiteTest {
     }
 
     void walk(MutableTomlArray array, String path) {
-      unattached(array.comments(), path);
+      unattached(unattachedComments(array.elements()), path);
       for (int i = 0; i < array.size(); ++i) {
         String entry = path + "[" + i + "]";
         attached(array.comments(i), entry, array.inputPositionOf(i));
         descend(array.get(i), entry);
       }
+    }
+
+    private static List<TomlComment> unattachedComments(List<TomlElement> elements) {
+      List<TomlComment> comments = new ArrayList<>();
+      for (TomlElement element : elements) {
+        if (element instanceof TomlComment comment) {
+          comments.add(comment);
+        }
+      }
+      return comments;
     }
 
     private void descend(Object value, String entry) {
