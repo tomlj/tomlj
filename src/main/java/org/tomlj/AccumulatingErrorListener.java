@@ -215,7 +215,7 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
   private static String getExpected(IntervalSet expectedTokens) {
     // Where every token that could start a key or a value is expected, the word says what the list of them says, and
     // the reader has one thing to look for rather than nine. A value is checked first, as a string starts either.
-    // A comment may be written wherever a newline may, so naming it in every list would be noise rather than help.
+    // A comment may be written wherever a newline may, so it is left out of every list.
     IntervalSet remaining = expectedTokens.subtract(COMMENT);
     List<TokenName> names = new ArrayList<>();
     if (contains(remaining, VALUE_START)) {

@@ -12,15 +12,24 @@
  */
 package org.tomlj;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 /**
- * A table or array that holds the comments written within it that document none of its entries.
+ * Something written in a table or array: an entry, or an unattached comment.
+ *
+ * <p>
+ * {@link TomlTable#elements()} and {@link TomlArray#elements()} list the elements of a table or array in document
+ * order. Each is a {@link TomlKeyValue} in a table, a {@link TomlValue} in an array, or an unattached
+ * {@link TomlComment}.
  */
-interface CommentContainer {
+public interface TomlElement {
 
   /**
-   * Add an unattached comment, after those already added.
+   * Where this element was written in the document.
    *
-   * @param comment The comment.
+   * @return The position, or {@code null} if this element was not read from a document, or is a table that a dotted key
+   *         created before any header defined it.
    */
-  void addComment(TomlComment comment);
+  @Nullable
+  TomlPosition position();
 }

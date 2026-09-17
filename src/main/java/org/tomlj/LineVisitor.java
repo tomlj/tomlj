@@ -53,11 +53,12 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
    * Visit the lines of the document, handing each expression the comments written around it.
    *
    * <p>
-   * Walked here rather than left to {@link #visitChildren}, because what a comment documents is what the tree holds
-   * beside it: the run before an expression and the end of its line are the comments attached to it, and every other
-   * run is unattached, and belongs to a container. A run glued to the line above it belongs to the container open where
-   * it was written, which is known as it is reached; a run a blank line separates from what precedes it belongs to the
-   * container of the expression that follows, which is not, so those are held until that expression is reached.
+   * Walked here rather than left to {@link #visitChildren}, because what a comment is attached to depends on what the
+   * tree holds beside it: the run before an expression and the comment ending its line are attached to it, and every
+   * other run is unattached and belongs to a container. A run glued to the line above it belongs to the container open
+   * where it was written, which is known when the run is reached. A run separated by a blank line from what precedes it
+   * belongs to the container of the expression that follows, which is not known yet, so such runs are held until that
+   * expression is reached.
    */
   @Override
   public MutableTomlTable visitToml(TomlParser.TomlContext ctx) {
@@ -72,7 +73,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
         if (separated != null) {
           // A header is written in the document rather than in the section it opens, so the runs before it belong to
           // the root table rather than to that section.
-          CommentContainer container =
+          MutableTomlTable container =
               (((TomlParser.ExpressionContext) child).table() != null) ? rootTable : currentTable;
           separated.forEach(container::addComment);
           separated = null;
@@ -93,7 +94,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
       }
     }
     if (separated != null) {
-      // No expression follows the runs left at the end of the document, so they belong to the document itself.
+      // No expression follows the runs left at the end of the document, so they belong to the root table.
       separated.forEach(rootTable::addComment);
     }
     return rootTable;
@@ -123,7 +124,7 @@ final class LineVisitor extends TomlParserBaseVisitor<MutableTomlTable> {
           throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
         }
         currentTable
-            .set(path, value, new TomlPosition(ctx), comments)
+            .set(path, Entry.Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
             .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
       }
       return rootTable;

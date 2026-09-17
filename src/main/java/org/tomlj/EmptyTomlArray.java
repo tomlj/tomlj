@@ -97,7 +97,7 @@ final class EmptyTomlArray implements TomlArray {
   }
 
   @Override
-  public List<TomlComment> comments() {
+  public List<TomlElement> elements() {
     return Collections.emptyList();
   }
 

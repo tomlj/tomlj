@@ -13,89 +13,87 @@
 package org.tomlj;
 
 
-import java.util.List;
 import java.util.Optional;
 
 final class MutableHomogeneousTomlArray extends MutableTomlArray {
 
+  // The one type every value holds, or null while the array is empty: an empty array contains no type, so each
+  // containsX() answers false until the first value is appended.
   private TomlType type = null;
 
-  MutableHomogeneousTomlArray(boolean tableArray) {
-    super(tableArray);
+  MutableHomogeneousTomlArray(boolean tableArray, TomlPosition position) {
+    super(tableArray, position);
   }
 
   @Override
   public boolean containsStrings() {
-    return type == null || type == TomlType.STRING;
+    return type == TomlType.STRING;
   }
 
   @Override
   public boolean containsLongs() {
-    return type == null || type == TomlType.INTEGER;
+    return type == TomlType.INTEGER;
   }
 
   @Override
   public boolean containsDoubles() {
-    return type == null || type == TomlType.FLOAT;
+    return type == TomlType.FLOAT;
   }
 
   @Override
   public boolean containsBooleans() {
-    return type == null || type == TomlType.BOOLEAN;
+    return type == TomlType.BOOLEAN;
   }
 
   @Override
   public boolean containsOffsetDateTimes() {
-    return type == null || type == TomlType.OFFSET_DATE_TIME;
+    return type == TomlType.OFFSET_DATE_TIME;
   }
 
   @Override
   public boolean containsLocalDateTimes() {
-    return type == null || type == TomlType.LOCAL_DATE_TIME;
+    return type == TomlType.LOCAL_DATE_TIME;
   }
 
   @Override
   public boolean containsLocalDates() {
-    return type == null || type == TomlType.LOCAL_DATE;
+    return type == TomlType.LOCAL_DATE;
   }
 
   @Override
   public boolean containsLocalTimes() {
-    return type == null || type == TomlType.LOCAL_TIME;
+    return type == TomlType.LOCAL_TIME;
   }
 
   @Override
   public boolean containsArrays() {
-    return type == null || type == TomlType.ARRAY;
+    return type == TomlType.ARRAY;
   }
 
   @Override
   public boolean containsTables() {
-    return type == null || type == TomlType.TABLE;
+    return type == TomlType.TABLE;
   }
 
   @Override
-  public MutableHomogeneousTomlArray append(Object value, TomlPosition position, List<TomlComment> comments) {
-    if (value instanceof Integer) {
-      value = ((Integer) value).longValue();
-    }
-
+  public MutableHomogeneousTomlArray append(Entry.Value value) {
+    Object rawValue = value.get();
     TomlType origType = type;
-    Optional<TomlType> valueType = TomlType.typeFor(value);
+    Optional<TomlType> valueType = TomlType.typeFor(rawValue);
     if (!valueType.isPresent()) {
-      throw new IllegalArgumentException("Unsupported type " + value.getClass().getSimpleName());
+      throw new IllegalArgumentException("Unsupported type " + rawValue.getClass().getSimpleName());
     }
     if (type != null) {
       if (valueType.get() != type) {
         throw new TomlInvalidTypeException(
-            "Cannot add a " + TomlType.typeNameFor(value) + " to an array containing " + type.typeName() + "s");
+            "Cannot add a " + TomlType.typeNameFor(rawValue) + " to an array containing " + type.typeName() + "s");
       }
     } else {
       type = valueType.get();
     }
 
     try {
-      super.append(value, position, comments);
+      super.append(value);
     } catch (Throwable e) {
       type = origType;
       throw e;

@@ -23,25 +23,25 @@ import org.junit.jupiter.api.Test;
 class MutableHomogeneousTomlArrayTest {
 
   @Test
-  void emptyArrayContainsAllTypes() {
-    TomlArray array = new MutableHomogeneousTomlArray(false);
+  void emptyArrayContainsNoTypes() {
+    TomlArray array = new MutableHomogeneousTomlArray(false, positionAt(1, 1));
     assertTrue(array.isEmpty());
     assertEquals(0, array.size());
-    assertTrue(array.containsStrings());
-    assertTrue(array.containsLongs());
-    assertTrue(array.containsDoubles());
-    assertTrue(array.containsBooleans());
-    assertTrue(array.containsOffsetDateTimes());
-    assertTrue(array.containsLocalDateTimes());
-    assertTrue(array.containsLocalDates());
-    assertTrue(array.containsLocalTimes());
-    assertTrue(array.containsArrays());
-    assertTrue(array.containsTables());
+    assertFalse(array.containsStrings());
+    assertFalse(array.containsLongs());
+    assertFalse(array.containsDoubles());
+    assertFalse(array.containsBooleans());
+    assertFalse(array.containsOffsetDateTimes());
+    assertFalse(array.containsLocalDateTimes());
+    assertFalse(array.containsLocalDates());
+    assertFalse(array.containsLocalTimes());
+    assertFalse(array.containsArrays());
+    assertFalse(array.containsTables());
   }
 
   @Test
   void arrayContainsTypeAfterAddingItem() {
-    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false, positionAt(1, 1));
     array.append("foo", positionAt(2, 3));
     assertFalse(array.isEmpty());
     assertEquals(1, array.size());
@@ -59,14 +59,14 @@ class MutableHomogeneousTomlArrayTest {
 
   @Test
   void cannotAppendUnsupportedType() {
-    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false, positionAt(1, 1));
     assertThrows(IllegalArgumentException.class, () -> array.append(this, positionAt(1, 1)));
     assertThrows(NullPointerException.class, () -> array.append(null, positionAt(1, 1)));
   }
 
   @Test
   void cannotAppendDifferentTypes() {
-    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false, positionAt(1, 1));
     array.append("Foo", positionAt(1, 1));
     assertThrows(TomlInvalidTypeException.class, () -> array.append(1L, positionAt(1, 1)));
     array.append("Bar", positionAt(1, 1));
@@ -75,13 +75,13 @@ class MutableHomogeneousTomlArrayTest {
 
   @Test
   void shouldReturnNullForUnknownIndex() {
-    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false, positionAt(1, 1));
     assertThrows(IndexOutOfBoundsException.class, () -> array.get(0));
   }
 
   @Test
   void shouldReturnInputPosition() {
-    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false);
+    MutableHomogeneousTomlArray array = new MutableHomogeneousTomlArray(false, positionAt(1, 1));
     array.append("Foo", positionAt(4, 3));
     array.append("Bar", positionAt(9, 5));
     assertEquals(positionAt(4, 3), array.inputPositionOf(0));

@@ -28,7 +28,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * comment on its line ({@link Placement#AFTER}); every other comment is unattached, and belongs to the table or array
  * it was written in. An entry has at most one comment of each placement.
  */
-public final class TomlComment {
+public final class TomlComment implements TomlElement {
 
   /**
    * Where a comment sits relative to the entry it documents.
@@ -44,19 +44,14 @@ public final class TomlComment {
     AFTER
   }
 
-  // Each line as it was written after the '#'. A comment is held in the form the document held it, so that the model
-  // alone reproduces its text, while the form callers see and write is the text after "# ": the getter drops one
-  // leading space and the setter puts one back, so reading a comment and writing it back unchanged changes nothing.
+  // Each line as written after the '#', kept verbatim so that a writer can reproduce it; lines() strips one leading
+  // space.
   private final List<String> rawLines;
   private final TomlPosition position;
   private final @Nullable Placement placement;
 
   /**
    * Record a comment from the tokens the lexer matched for it.
-   *
-   * <p>
-   * Built from the tokens rather than from text extracted at the call site, so that the source-preserving writer can
-   * later record a span here without the recording side having to find the tokens again.
    *
    * @param tokens The comment tokens, one per line, on consecutive lines of the document.
    * @param placement Where the comment sits relative to what it documents, or {@code null} if it documents nothing.
@@ -66,7 +61,7 @@ public final class TomlComment {
     assert !tokens.isEmpty();
     List<String> rawLines = new ArrayList<>(tokens.size());
     for (Token token : tokens) {
-      // Every comment token begins with the '#' that opened it, which is delimiter syntax rather than content.
+      // Drop the '#' that opens the line.
       rawLines.add(token.getText().substring(1));
     }
     Token first = tokens.get(0);
@@ -139,6 +134,7 @@ public final class TomlComment {
    * @return The position of the {@code #} opening the first line, or {@code null} if this comment was not read from a
    *         document.
    */
+  @Override
   @Nullable
   public TomlPosition position() {
     return position;

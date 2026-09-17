@@ -14,9 +14,11 @@ package org.tomlj;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -55,12 +57,22 @@ class TomlCommentTest {
     return table.comments(List.of(path));
   }
 
-  private static List<TomlComment> unattached(MutableTomlTable table) {
-    return table.comments();
+  private static List<TomlComment> unattached(TomlTable table) {
+    return unattachedComments(table.elements());
   }
 
-  private static List<TomlComment> unattached(MutableTomlArray array) {
-    return array.comments();
+  private static List<TomlComment> unattached(TomlArray array) {
+    return unattachedComments(array.elements());
+  }
+
+  private static List<TomlComment> unattachedComments(List<TomlElement> elements) {
+    List<TomlComment> comments = new ArrayList<>();
+    for (TomlElement element : elements) {
+      if (element instanceof TomlComment comment) {
+        comments.add(comment);
+      }
+    }
+    return comments;
   }
 
   private static MutableTomlTable subTable(MutableTomlTable table, String... path) {
@@ -86,7 +98,10 @@ class TomlCommentTest {
   }
 
   private static void assertPosition(TomlComment comment, int line, int column) {
-    TomlPosition position = comment.position();
+    assertPosition(comment.position(), line, column);
+  }
+
+  private static void assertPosition(TomlPosition position, int line, int column) {
     assertEquals(line, position.line());
     assertEquals(column, position.column());
   }
@@ -559,6 +574,257 @@ class TomlCommentTest {
   }
 
   // ---------------------------------------------------------------------------------------------------------------
+  // Document order
+  // ---------------------------------------------------------------------------------------------------------------
+
+  @Test
+  void shouldSequenceRootTableElementsInDocumentOrder() {
+    MutableTomlTable table = parse(
+        "a = 1\n"
+            + "# separated from b by the blank line\n"
+            + "\n"
+            + "b = 2 # after b\n"
+            + "# glued to the line above, so unattached and here\n");
+    List<TomlElement> elements = table.elements();
+    assertEquals(4, elements.size());
+
+    assertTrue(elements.get(0) instanceof TomlKeyValue);
+    TomlKeyValue a = (TomlKeyValue) elements.get(0);
+    assertEquals("a", a.key());
+    assertEquals(1L, a.value().get());
+    assertTrue(a.comments().isEmpty());
+
+    assertTrue(elements.get(1) instanceof TomlComment);
+    assertUnattached((TomlComment) elements.get(1), "separated from b by the blank line");
+
+    assertTrue(elements.get(2) instanceof TomlKeyValue);
+    TomlKeyValue b = (TomlKeyValue) elements.get(2);
+    assertEquals("b", b.key());
+    assertEquals(2L, b.value().get());
+    assertEquals(1, b.comments().size());
+    assertComment(b.comments().get(0), TomlComment.Placement.AFTER, "after b");
+
+    assertTrue(elements.get(3) instanceof TomlComment);
+    assertUnattached((TomlComment) elements.get(3), "glued to the line above, so unattached and here");
+  }
+
+  @Test
+  void shouldSequenceASectionTablesElementsSeparatelyFromTheRoot() {
+    MutableTomlTable table = parse("# above t\n[t]\nx = 1\n# unattached\n");
+
+    List<TomlElement> rootElements = table.elements();
+    assertEquals(1, rootElements.size());
+    assertTrue(rootElements.get(0) instanceof TomlKeyValue);
+    TomlKeyValue t = (TomlKeyValue) rootElements.get(0);
+    assertEquals("t", t.key());
+    assertEquals(1, t.comments().size());
+    assertComment(t.comments().get(0), TomlComment.Placement.ABOVE, "above t");
+
+    List<TomlElement> tElements = subTable(table, "t").elements();
+    assertEquals(2, tElements.size());
+
+    assertTrue(tElements.get(0) instanceof TomlKeyValue);
+    TomlKeyValue x = (TomlKeyValue) tElements.get(0);
+    assertEquals("x", x.key());
+    assertEquals(1L, x.value().get());
+    assertTrue(x.comments().isEmpty());
+
+    assertTrue(tElements.get(1) instanceof TomlComment);
+    assertUnattached((TomlComment) tElements.get(1), "unattached");
+  }
+
+  @Test
+  void shouldInterleaveArrayValuesAndUnattachedCommentsInDocumentOrder() {
+    MutableTomlArray array = subArray(parse("a = [1,\n# note\n\n2\n]\n"), "a");
+    List<TomlElement> elements = array.elements();
+    assertEquals(3, elements.size());
+
+    assertTrue(elements.get(0) instanceof TomlValue);
+    assertEquals(1L, ((TomlValue) elements.get(0)).get());
+
+    assertTrue(elements.get(1) instanceof TomlComment);
+    assertUnattached((TomlComment) elements.get(1), "note");
+
+    assertTrue(elements.get(2) instanceof TomlValue);
+    assertEquals(2L, ((TomlValue) elements.get(2)).get());
+
+    List<TomlComment> comments = unattached(array);
+    assertEquals(1, comments.size());
+    assertUnattached(comments.get(0), "note");
+  }
+
+  @Test
+  void shouldGiveEachNestedArrayValueItsOwnSequenceAndPosition() {
+    MutableTomlArray outer = subArray(parse("a = [[1, 2], [3]]\n"), "a");
+    assertEquals(2, outer.size());
+
+    MutableTomlArray first = subArray(outer, 0);
+    assertEquals(2, first.size());
+    assertEquals(1L, first.get(0));
+    assertEquals(2L, first.get(1));
+    assertPosition(first.position(), 1, 6);
+
+    MutableTomlArray second = subArray(outer, 1);
+    assertEquals(1, second.size());
+    assertEquals(3L, second.get(0));
+    assertPosition(second.position(), 1, 14);
+  }
+
+  @Test
+  void shouldReportKeyValueAndScalarPositionsSeparately() {
+    MutableTomlTable table = parse("key = \"v\"\n");
+    TomlKeyValue keyValue = (TomlKeyValue) table.elements().get(0);
+    assertPosition(keyValue.position(), 1, 1);
+    assertPosition(keyValue.value().position(), 1, 7);
+  }
+
+  @Test
+  void shouldReadAValueThroughItsTypedAccessors() {
+    MutableTomlTable table = parse("key = \"v\" # after\n");
+    TomlValue value = ((TomlKeyValue) table.elements().get(0)).value();
+    assertTrue(value.isString());
+    assertFalse(value.isLong());
+    assertEquals("v", value.getString());
+    assertThrows(TomlInvalidTypeException.class, value::getLong);
+    assertTrue(value.comments().isEmpty(), "the comment belongs to the pair, not the value");
+  }
+
+  @Test
+  void shouldReportATableHeaderPositionAsTheTablesOwnPosition() {
+    MutableTomlTable table = subTable(parse("[t]\n"), "t");
+    assertPosition(table.position(), 1, 1);
+  }
+
+  @Test
+  void shouldReportEachArrayTableElementsOwnHeaderPosition() {
+    MutableTomlTable table = parse("[[x]]\na = 1\n[[x]]\nb = 2\n");
+    MutableTomlArray array = subArray(table, "x");
+    assertPosition(array.position(), 1, 1);
+    assertPosition(((MutableTomlTable) array.get(0)).position(), 1, 1);
+    assertPosition(((MutableTomlTable) array.get(1)).position(), 3, 1);
+  }
+
+  @Test
+  void shouldReportAnInlineTablesPositionAsItsOpeningBrace() {
+    MutableTomlTable inline = subTable(parse("k = { a = 1 }\n"), "k");
+    assertPosition(inline.position(), 1, 5);
+  }
+
+  @Test
+  void shouldPlaceTheRootTableAtTheStartOfTheDocument() {
+    MutableTomlTable table = parse("\n# leading comment\n[t]\n");
+    assertPosition(table.position(), 1, 1);
+    assertEquals(TomlPosition.positionAt(1, 1), table.inputPositionOf(List.of()));
+    assertEquals(TomlPosition.positionAt(3, 1), subTable(table, "t").inputPositionOf(List.of()));
+  }
+
+  @Test
+  void shouldLeaveAnImplicitlyCreatedTableWithNoPositionUntilAHeaderDefinesIt() {
+    // [a.b] creates "a" implicitly, as the leading key of its header path, with no position of its own; [a] later
+    // defines "a" directly, taking over the spot its implicit creation already holds in the root table's sequence.
+    assertNull(subTable(parse("[a.b]\nx = 1\n"), "a").position());
+
+    MutableTomlTable table = parse("[a.b]\nx = 1\n[a]\nc = 2\n");
+    MutableTomlTable a = subTable(table, "a");
+    assertEquals(TomlPosition.positionAt(3, 1), a.position());
+    assertEquals(TomlPosition.positionAt(3, 1), table.inputPositionOf(List.of("a")));
+  }
+
+  @Test
+  void shouldAttachCommentsToAnArrayMembersValueRatherThanTheArray() {
+    MutableTomlArray array = subArray(parse("a = [ # after bracket\n  # above one\n  1, # after one\n]\n"), "a");
+    List<TomlComment> comments = array.comments(0);
+    assertEquals(2, comments.size());
+    assertComment(comments.get(0), TomlComment.Placement.ABOVE, "above one");
+    assertComment(comments.get(1), TomlComment.Placement.AFTER, "after one");
+
+    List<TomlComment> arrayComments = unattached(array);
+    assertEquals(1, arrayComments.size());
+    assertUnattached(arrayComments.get(0), "after bracket");
+  }
+
+  @Test
+  void shouldSequenceInlineTableElementsInDocumentOrder() {
+    MutableTomlTable inline = subTable(parse("t = { a = 1, # after a\n# unattached\n\nb = 2 }\n"), "t");
+    List<TomlElement> elements = inline.elements();
+    assertEquals(3, elements.size());
+
+    assertTrue(elements.get(0) instanceof TomlKeyValue);
+    TomlKeyValue a = (TomlKeyValue) elements.get(0);
+    assertEquals("a", a.key());
+    assertEquals(1L, a.value().get());
+    assertEquals(1, a.comments().size());
+    assertComment(a.comments().get(0), TomlComment.Placement.AFTER, "after a");
+
+    assertTrue(elements.get(1) instanceof TomlComment);
+    assertUnattached((TomlComment) elements.get(1), "unattached");
+
+    assertTrue(elements.get(2) instanceof TomlKeyValue);
+    TomlKeyValue b = (TomlKeyValue) elements.get(2);
+    assertEquals("b", b.key());
+    assertEquals(2L, b.value().get());
+  }
+
+  @Test
+  void shouldGiveAnEntryTheSameCommentsAsTheTableLookup() {
+    MutableTomlTable table = parse("# above a\na = 1 # after a\n");
+    TomlKeyValue a = (TomlKeyValue) table.elements().get(0);
+    assertEquals(table.comments("a"), a.comments());
+    assertEquals(table.inputPositionOf("a"), a.position());
+  }
+
+  @Test
+  void shouldGiveAnArrayEntryTheSameCommentsAndPositionAsTheIndexLookup() {
+    MutableTomlArray array = subArray(parse("a = [\n# above\n1, # after\n]\n"), "a");
+    TomlValue entry = (TomlValue) array.elements().get(0);
+    assertEquals(1L, entry.get());
+    assertEquals(array.comments(0), entry.comments());
+    assertEquals(array.inputPositionOf(0), entry.position());
+  }
+
+  @Test
+  void shouldSequenceAnArrayOfTablesAsEntriesOfTheArray() {
+    MutableTomlTable table = parse("[[x]]\na = 1\n# between\n\n[[x]]\nb = 2\n");
+
+    List<TomlElement> rootElements = table.elements();
+    assertEquals(1, rootElements.size());
+    assertTrue(rootElements.get(0) instanceof TomlKeyValue);
+    TomlKeyValue x = (TomlKeyValue) rootElements.get(0);
+    assertEquals("x", x.key());
+    assertTrue(x.value().isArray());
+
+    TomlArray array = x.value().getArray();
+    List<TomlElement> arrayElements = array.elements();
+    assertEquals(2, arrayElements.size());
+
+    assertTrue(arrayElements.get(0) instanceof TomlValue);
+    TomlTable first = ((TomlValue) arrayElements.get(0)).getTable();
+    assertEquals(1L, first.getLong("a"));
+
+    assertTrue(arrayElements.get(1) instanceof TomlValue);
+    TomlTable second = ((TomlValue) arrayElements.get(1)).getTable();
+    assertEquals(2L, second.getLong("b"));
+
+    // "# between" ends the first [[x]] section, so, like a run at the end of any section, it lands in that table's
+    // own elements rather than the array's.
+    List<TomlElement> firstElements = first.elements();
+    assertEquals(2, firstElements.size());
+    assertTrue(firstElements.get(1) instanceof TomlComment);
+    assertUnattached((TomlComment) firstElements.get(1), "between");
+  }
+
+  @Test
+  void shouldReportNoPositionForATableCreatedByADottedKeyUntilAHeaderDefinesIt() {
+    MutableTomlTable table = parse("a.b = 1\n");
+    TomlKeyValue a = (TomlKeyValue) table.elements().get(0);
+    assertNull(a.value().position());
+    assertPosition(table.inputPositionOf("a"), 1, 1);
+
+    MutableTomlTable defined = parse("[a.b]\n[a]\n");
+    assertPosition(((TomlValue) defined.getTable("a")).position(), 2, 1);
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------------------------------------------
 
@@ -600,7 +866,7 @@ class TomlCommentTest {
   @Test
   void shouldReadUnattachedTableCommentsThroughThePublicApi() {
     TomlParseResult result = Toml.parse("a = 1\n\n# footer\n");
-    List<TomlComment> comments = result.comments();
+    List<TomlComment> comments = unattached(result);
     assertEquals(1, comments.size());
     assertUnattached(comments.get(0), "footer");
   }
@@ -612,31 +878,31 @@ class TomlCommentTest {
     List<TomlComment> attached = result.comments("a");
     assertThrows(UnsupportedOperationException.class, () -> attached.add(attached.get(0)));
 
-    List<TomlComment> unattached = result.comments();
-    assertThrows(UnsupportedOperationException.class, () -> unattached.add(unattached.get(0)));
+    List<TomlElement> elements = result.elements();
+    assertThrows(UnsupportedOperationException.class, () -> elements.add(elements.get(0)));
 
     TomlArray array = Toml.parse("a = [\n1 # after\n]\n").getArray("a");
     List<TomlComment> elementComments = array.comments(0);
     assertThrows(UnsupportedOperationException.class, () -> elementComments.add(elementComments.get(0)));
 
-    List<TomlComment> arrayUnattached = array.comments();
-    assertThrows(UnsupportedOperationException.class, () -> arrayUnattached.add(elementComments.get(0)));
+    List<TomlElement> arrayElements = array.elements();
+    assertThrows(UnsupportedOperationException.class, () -> arrayElements.add(arrayElements.get(0)));
   }
 
   @Test
   void shouldReturnEmptyCommentsForAMissingTableThroughThePublicApi() {
     TomlParseResult result = Toml.parse("a = 1\n");
     TomlTable missing = result.getTableOrEmpty("nope");
-    assertTrue(missing.comments().isEmpty());
     assertTrue(missing.comments("k").isEmpty());
+    assertTrue(missing.elements().isEmpty());
   }
 
   @Test
   void shouldReturnEmptyCommentsForAMissingArrayThroughThePublicApi() {
     TomlParseResult result = Toml.parse("a = 1\n");
     TomlArray missing = result.getArrayOrEmpty("nope");
-    assertTrue(missing.comments().isEmpty());
     assertThrows(IndexOutOfBoundsException.class, () -> missing.comments(0));
+    assertTrue(missing.elements().isEmpty());
   }
 
   @Test

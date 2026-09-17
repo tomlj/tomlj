@@ -114,13 +114,13 @@ final class Comments {
   }
 
   /**
-   * Hand the comments of a line break that document nothing to the array or inline table they were written in.
+   * Add the unattached comments of a line break to the array or inline table they were written in.
    *
    * @param nodes The flattened nodes of that array or inline table.
    * @param index The index of the line break.
    * @param container The array or inline table.
    */
-  static void unattached(List<ParseTree> nodes, int index, CommentContainer container) {
+  static void unattached(List<ParseTree> nodes, int index, ElementContainer<?> container) {
     TomlParser.LineBreakContext lineBreak = (TomlParser.LineBreakContext) nodes.get(index);
     TerminalNode comment = lineEndComment(lineBreak);
     if (comment != null && !endsElementLine(nodes, index)) {
@@ -138,7 +138,7 @@ final class Comments {
   }
 
   /**
-   * Whether a line break holds any comment, and so whether an array holding nothing else still has to hold something.
+   * Whether a line break holds any comment.
    *
    * @param lineBreak The line break.
    * @return {@code true} if the line break holds a comment.
