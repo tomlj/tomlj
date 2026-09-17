@@ -270,7 +270,7 @@ class LinkedTomlTableTest {
     LinkedTomlTable table = parse("a = [ 1, # one\n 2 ]\n");
     TomlArray array = table.getArray("a");
     assertSame(array.elements().get(0), array.entry(0));
-    assertEquals(2L, array.entry(1).getLong());
+    assertEquals(2L, array.entry(1).value().getLong());
     assertEquals(array.comments(0), array.entry(0).comments());
     assertEquals(array.inputPositionOf(0), array.entry(0).position());
     assertThrows(IndexOutOfBoundsException.class, () -> array.entry(2));

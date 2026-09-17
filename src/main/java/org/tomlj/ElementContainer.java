@@ -27,9 +27,9 @@ import java.util.List;
  * Each subclass also keeps its own index over its entries, a map by key for a table and a list by index for an array;
  * this class keeps only the order they were written in.
  *
- * @param <E> The kind of entry this container holds: a key/value pair for a table, a value for an array.
+ * @param <E> The kind of entry this container holds: a key/value pair for a table, an indexed value for an array.
  */
-abstract class ElementContainer<E extends Entry> extends Entry.Value {
+abstract class ElementContainer<E extends Entry> extends Value {
 
   private final List<TomlElement> elements = new ArrayList<>();
 

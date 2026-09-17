@@ -12,24 +12,39 @@
  */
 package org.tomlj;
 
+import java.util.List;
+
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.framework.qual.DefaultQualifier;
 import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
- * A key/value pair written in a table, with the comments attached to it.
+ * An entry of a table or array: the slot a container indexes, with the value it holds and the comments attached to it.
+ *
+ * <p>
+ * A table's entries are {@link TomlKeyValue}s; an array's entries are plain {@code TomlEntry}s. The other kind of
+ * element a container's {@code elements()} holds is an unattached {@link TomlComment}, which is not an entry.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
-public interface TomlKeyValue extends TomlEntry {
+public interface TomlEntry extends TomlElement {
 
   /**
-   * The key of this pair.
+   * The value this entry holds.
+   *
+   * @return The value.
+   */
+  TomlValue value();
+
+  /**
+   * The comments attached to this entry.
    *
    * <p>
-   * This is the single key in its table, not a dotted path: the raw key as {@link TomlTable#keySet()} returns it.
+   * Returns the comments in document order: the run written directly above it, if any, then the comment on its line, if
+   * any, so at most two, each with its {@link TomlComment#placement()}. These are the comments
+   * {@link TomlTable#comments(List)} returns for a key and {@link TomlArray#comments(int)} for an index.
    *
-   * @return The key.
+   * @return The attached comments, in document order. Unmodifiable.
    */
-  String key();
+  List<TomlComment> comments();
 }

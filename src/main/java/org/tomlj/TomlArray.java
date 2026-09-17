@@ -56,7 +56,7 @@ public interface TomlArray {
    * @throws IndexOutOfBoundsException If the index is out of bounds.
    */
   default Object get(int index) {
-    return entry(index).get();
+    return entry(index).value().get();
   }
 
   /**
@@ -369,23 +369,22 @@ public interface TomlArray {
    * Get the entry at an index.
    *
    * <p>
-   * The entry is the {@link TomlValue} that {@link #elements()} holds for the index. {@link #get(int)},
-   * {@link #inputPositionOf(int)} and {@link #comments(int)} are shortcuts that read the value, position and comments
-   * of this entry.
+   * The entry is the {@link TomlEntry} that {@link #elements()} holds for the index. {@link #get(int)},
+   * {@link #inputPositionOf(int)} and {@link #comments(int)} are shortcuts reading its value, position and comments.
    *
    * @param index The array index.
    * @return The entry.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
    */
-  TomlValue entry(int index);
+  TomlEntry entry(int index);
 
   /**
    * Get the elements written in this array, in document order.
    *
    * <p>
-   * Each element is a {@link TomlValue}, a value of this array, or an unattached {@link TomlComment}. The values are
-   * those {@link #get(int)} returns, in the same order. A comment is unattached when it is neither directly above a
-   * value nor on its line: a run separated by a blank line from the value below it, a run before the closing bracket,
+   * Each element is a {@link TomlEntry}, an entry of this array, or an unattached {@link TomlComment}. The entries hold
+   * the values {@link #get(int)} returns, in the same order. A comment is unattached when it is neither directly above
+   * a value nor on its line: a run separated by a blank line from the value below it, a run before the closing bracket,
    * or a comment on a line with no value.
    *
    * @return The elements, in document order. Unmodifiable.

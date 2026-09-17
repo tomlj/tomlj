@@ -200,7 +200,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     }
     TomlPosition position = new TomlPosition(ctx);
     try {
-      array.appendParsed(Entry.Value.of(value, position, comments));
+      array.appendParsed(value, position, comments);
     } catch (TomlInvalidTypeException e) {
       throw new TomlParseError(e.getMessage(), position);
     }
@@ -258,7 +258,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     Object value = valContext.accept(this);
     if (value != null) {
       table
-          .setParsed(path, Entry.Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
+          .setParsed(path, Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
           .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
     }
   }
