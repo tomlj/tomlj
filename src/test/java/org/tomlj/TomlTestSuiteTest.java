@@ -130,12 +130,15 @@ class TomlTestSuiteTest {
     Object expected = new JsonReader(Files.readString(json, UTF_8)).read();
     assertMatches(expected, result, "");
 
-    String serialized = result.toToml();
+    StringBuilder builder = new StringBuilder();
+    Serializer.toToml(result, builder, version);
+    String serialized = builder.toString();
     TomlParseResult reparsed = Toml.parse(serialized, version);
     assertFalse(
         reparsed.hasErrors(),
         () -> "Unexpected errors after serializing to TOML: " + reparsed.errors() + "\n" + serialized);
     assertMatches(expected, reparsed, "After serializing to TOML: ");
+    TomlAssertions.assertSameComments(result, reparsed);
   }
 
   private static void assertMatches(Object expected, TomlParseResult result, String context) {
