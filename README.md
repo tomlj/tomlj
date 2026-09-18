@@ -107,23 +107,10 @@ for (TomlComment comment : result.comments("port")) {
 ```
 
 The unattached comment is read through `elements()`, which lists a table's entries and unattached
-comments together, in document order:
-
-```java
-for (TomlElement element : result.elements()) {
-  if (element instanceof TomlKeyValue) {
-    TomlKeyValue pair = (TomlKeyValue) element;
-    System.out.println(pair.key() + " = " + pair.value().get());
-  } else {
-    System.out.println("# " + ((TomlComment) element).text());
-  }
-}
-```
-
-A comment's text is what follows `# `, one string per line in `lines()`. The comments on a `[[x]]`
-header are attached to the table it opens, so they are read with `getArray("x").comments(0)`.
-`toToml()` writes every comment, at the position it was read from.
-[docs/comments.md](docs/comments.md) states the rules in full, with the cases at their edges.
+comments together, in document order. Comments are set and removed through the editing API, and
+`toToml()` writes every comment back where it was read from. [docs/comments.md](docs/comments.md)
+states the rules in full: how a comment's text is read, which table an unattached comment belongs
+to, how comments are edited and written, and the cases at their edges.
 
 ### Building and editing documents
 

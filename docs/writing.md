@@ -80,18 +80,18 @@ anew, in the place the document gives it:
 * **A comment set above a line** is indented like the line. A comment set after a value is written
   two spaces from it; one that replaces another keeps the spacing the document wrote before it, and
   when one is removed, that spacing is removed with it. An unattached comment added or inserted is
-  written with a blank line below it, and a blank line above it unless it comes after the last line
-  of its table, without doubling one the document already has: a run directly under a line belongs
-  to the table open there, and one after a blank line to the table of the next expression, so the
-  placement keeps the comment in its table on a re-parse. Two unattached comments after the last
-  line of a table are written as one run, joined by an empty comment line, since with a blank line
-  between them a re-parse would read the second as an unattached comment of the root; and a single
-  run left after the last line of a table when the line below it is removed is written directly
-  under the line above it, regardless of the blank lines the document had there. The root is not
-  affected: a run after its last section belongs to the root whether or not a blank line precedes
-  it. An unattached comment added to the root goes after its last section, with a blank line above
-  it. A comment set on a table the document wrote as dotted keys gives it a header to hold the
-  comment.
+  written with a blank line below it, and in a table a blank line above it unless it comes after the
+  last line of the table, without doubling one the document already has: a run directly under a line
+  belongs to the table open there, and one after a blank line to the table of the next expression,
+  so the placement keeps the comment in its table on a re-parse. Two unattached comments after the
+  last line of a table are written as one run, joined by an empty comment line, since with a blank
+  line between them a re-parse would read the second as an unattached comment of the root; and a
+  single run left after the last line of a table when the line below it is removed is written
+  directly under the line above it, regardless of the blank lines the document had there. The root
+  is not affected: a run after its last section belongs to the root whether or not a blank line
+  precedes it. An unattached comment added to the root goes after its last section, with a blank
+  line above it. A comment set on a table the document wrote as dotted keys gives it a header to
+  hold the comment.
 * **An array or inline table edited in place** keeps its line and its brackets. Each element that
   was not replaced is written from its own text, with its literal, its comments and the layout
   around it; an element added or replaced is written in the default style, laid out like the
@@ -115,12 +115,12 @@ written from its parts: the key and the literal each value was written with, the
 holds, and the indentation, spacing and layout the options give. A line keeps one blank line above
 it where the document wrote any, a header always gets one, and the blank lines a document ends with
 are dropped. An unattached comment is laid out as the default style lays it out, with a blank line
-below it and one above it unless it comes after the last line of its table, regardless of the blank
-lines the document had around it. A comment after a value is separated from it by two spaces, and
-the run above a line is indented like the line. An array or inline table is laid out anew: on one
-line if it fits within the maximum line width, and otherwise with each element on its own line. The
-document's structure is kept: a header stays a header, a dotted key stays dotted and an inline table
-stays inline.
+below it, and in a table one above it unless it comes after the last line of the table, regardless
+of the blank lines the document had around it. A comment after a value is separated from it by two
+spaces, and the run above a line is indented like the line. An array or inline table is laid out
+anew: on one line if it fits within the maximum line width, and otherwise with each element on its
+own line. The document's structure is kept: a header stays a header, a dotted key stays dotted and
+an inline table stays inline.
 
 ## The default style
 

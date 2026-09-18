@@ -1,8 +1,8 @@
 # Comments
 
-TomlJ keeps every comment in a document and reads them back through the model. A comment has no
-meaning in TOML, so where one belongs is a matter of convention. This document states the
-conventions TomlJ uses, and the cases at their edges.
+TomlJ keeps every comment in a document, reads them back through the model, lets them be edited,
+and writes them out again. A comment has no meaning in TOML, so where one belongs is a matter of
+convention. This document states the conventions TomlJ uses, and the cases at their edges.
 
 ## What is a comment
 
@@ -24,7 +24,7 @@ port = 8080 # not 80
 ```
 
 The first two lines are one run. `not 80` is a comment on the port's own line. The last line is a
-run of one.
+run of one line.
 
 ## How TomlJ represents comments
 
@@ -104,7 +104,7 @@ table `a`, so it is read with `comment("a.b", ABOVE)`.
 ## Comments after an expression: `AFTER`
 
 A comment on the same line as an expression is attached to it as its `AFTER` comment, and is read
-through the entry in the same way. It is always one line, where an `ABOVE` comment is a run of any
+through the entry in the same way. It is always one line, while an `ABOVE` comment is a run of any
 length.
 
 An entry has at most one comment of each placement, and `comments(key)` lists the `ABOVE` comment
@@ -166,9 +166,9 @@ Every other comment is unattached: a run with a blank line, or nothing, below it
 is `TomlComment.Placement.UNATTACHED`. It is attached to no entry, so no `comment(key, placement)`
 returns it, and asking for that placement is an error. Instead it belongs to a container, which is a
 table (the root, a table with a header, or an inline table) or an array, and appears in its
-`elements()` between the two elements it was written between. `elements()` on a table or an array
-lists its entries and its unattached comments together, in document order. An unattached comment is
-a `TomlComment` element; an entry is a `TomlKeyValue` in a table and a `TomlEntry` in an array.
+`elements()`. `elements()` on a table or an array lists its entries and its unattached comments
+together, in document order. An unattached comment is a `TomlComment` element; an entry is a
+`TomlKeyValue` in a table and a `TomlEntry` in an array.
 
 ```toml
 a = 1
@@ -271,17 +271,89 @@ line, and the next expression is the header `[c]`, which is an expression of the
 an unattached comment of the root, before `c`. It does not belong to `b`, and not to `a` either,
 although it is indented under `b`. Removing `b` does not remove it, and neither does removing `c`.
 
-## Edge cases, gathered
+## Editing comments
+
+An attached comment belongs to its entry: replacing a value keeps the entry's comments, and removing
+the entry removes them. Removing the entries around an unattached comment does not remove it or
+change its place in `elements()`.
+
+Attached comments are set by placement: `setCommentAbove(key, lines...)` and
+`setCommentAfter(key, text)`, with `removeCommentAbove` and `removeCommentAfter` to remove them, or
+`setComment(key, comment)` to copy a `TomlComment` read from another entry, at the placement it has.
+`setComment(key, text, placement)` and `removeComment(key, placement)` take `ABOVE` or `AFTER`;
+`UNATTACHED` is an error there, as it is for `comment(key, placement)`. An `AFTER` comment is one
+line, and a run above is any number of lines. Unattached comments are added after the last element
+with `addComment(lines...)`, or placed with `insertCommentBefore` and `insertCommentAfter`, which
+take the key of an entry, or any element of `elements()`, as the anchor. `removeComment(comment)`
+removes an unattached comment found in `elements()`. An array has the same methods, taking an index
+in place of a key.
+
+A comment line may hold any character except a control character other than tab. A newline in the
+text given to any of these methods starts a new line of the run, so a whole run can be given as one
+string; an `AFTER` comment is one line, so a newline in its text is rejected. A comment inside an
+inline table needs TOML 1.1.0, which allows newlines there.
+
+## Writing comments
+
+`toToml()` writes every comment back, and every comment keeps exactly the text it had, whatever else
+is kept. A document written keeping its layout (`TomlWriteOptions.Keep.LAYOUT`, the default) also
+keeps each comment where it was, with the indentation and blank lines it had. A comment set or
+changed through the API is written from the model, as `#`, a space and its text, or a bare `#` when
+the text is empty, indented like the line it is written next to. An `AFTER` comment follows its line
+after two spaces, or after the spacing the document had where it replaces one.
+
+An unattached comment written anew in a table is separated from the lines around it by a blank line
+above and one below, so that a re-parse reads it as attached to nothing and, by the rule above, in
+the table it was added to. In an array or an inline table written over lines, only the blank line
+below is written, since a run inside the brackets can belong to nothing else. In a table this cannot
+be done after its last line: with a blank line between such a comment and the header that follows, a
+re-parse would read the comment as an unattached comment of the root, so a comment after the last
+line of a table is written directly under that line.
+
+Two such comments cannot both be written that way, since the second would then be a separated run
+before a header. The model can hold two, through `addComment`, or by removing the line between two
+comments the document already had. They are written as one run, with an empty comment line between
+them:
+
+```toml
+[a]
+x = 1
+# one
+#
+# two
+
+[b]
+```
+
+Re-parsed, `a` has one comment with the lines `one`, an empty line and `two`. The root has no such
+limit, since nothing follows it: any number of its trailing comments are written as separate runs.
+
+An array or an inline table holding a comment is written with one element per line, because a
+comment ends at a line break. An inline table written over lines is TOML 1.1.0 syntax, so writing
+one for TOML 1.0.0 throws `IllegalArgumentException`, since 1.0.0 has no way to write it. Only a
+table that has to be inline is affected: a table under a key is written as a section when its
+notation is not kept, and an inline table copied unchanged from the document is written as the
+document wrote it, whatever the version. An array of tables is written as a `key = [ ... ]` line
+rather than as `[[x]]` headers when its entry has a comment, or the array holds an unattached
+comment: a `[[x]]` header carries the comments of its own element, so a re-parse would read either
+as a comment of the first element. Comments attached to the elements are written on their `[[x]]`
+headers.
+
+## Edge cases
 
 * **A run above a line the parser rejects** is dropped along with that line: the document is
   reported with an error, and the comment is not in the model.
 * **A comment at the end of the document without a final newline** is kept like any other.
 * **A comment inside a string** is part of the string. `#` starts a comment only outside a value.
 * **A comment inside an inline table** is TOML 1.1.0 syntax, since it needs a line break inside the
-  braces. Parsed as TOML 1.0.0, the document is reported with an error.
+  braces. Parsed as TOML 1.0.0, the document is reported with an error, and a comment added to an
+  inline table through the API makes writing the document for TOML 1.0.0 throw
+  `IllegalArgumentException`, since 1.0.0 has no way to write it.
 * **A comment on a `[[x]]` header** belongs to that element of the array, not to the array or to
   the table holding it: `comments("x")` is empty.
 * **A comment on an array's opening bracket line** is an unattached comment of the array; one on
   its closing bracket line is the `AFTER` comment of the array's entry.
+* **Two runs after the last line of a table** are written as one run, joined by an empty comment
+  line, as described above.
 * **A comment separated from the last line of a table by a blank line, then followed by a header,**
   belongs to the root even if the author indented it under the table.
