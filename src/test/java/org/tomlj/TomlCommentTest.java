@@ -862,10 +862,10 @@ class TomlCommentTest {
   }
 
   @Test
-  void shouldReportNoPositionForATableCreatedByADottedKeyUntilAHeaderDefinesIt() {
+  void shouldDefineATableCreatedByADottedKeyAtTheKeyValuesPosition() {
     LinkedTomlTable table = parse("a.b = 1\n");
     TomlKeyValue a = (TomlKeyValue) table.elements().get(0);
-    assertNull(a.value().position());
+    assertPosition(a.value().position(), 1, 1);
     assertPosition(table.inputPositionOf("a"), 1, 1);
 
     LinkedTomlTable defined = parse("[a.b]\n[a]\n");
