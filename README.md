@@ -50,6 +50,9 @@ if (port > 65535) {
   a default.
 * **Comments are kept.** Every comment in a document is parsed into the model, attached to an entry
   or unattached in the table or array it was written in. See [Comments](#comments).
+* **Documents can be built and edited.** A parse result is a `MutableTomlTable`: set, insert and
+  remove values and comments, or build a document from scratch, and write it out with `toToml()`.
+  See [Building and editing documents](#building-and-editing-documents).
 * **No dependencies.** The jar carries its own copy of the ANTLR runtime, relocated under TomlJ's
   own package, so there is nothing else to add and no clash with ANTLR elsewhere in your project.
   Works on Java 9 and later.
@@ -120,6 +123,35 @@ A comment's text is what follows `# `, one string per line in `lines()`. The com
 header are attached to the table it opens, so they are read with `getArray("x").comments(0)`.
 `toToml()` does not write comments yet. [docs/comments.md](docs/comments.md) states the rules in
 full, with the cases at their edges.
+
+### Building and editing documents
+
+`MutableTomlTable` and `MutableTomlArray` extend `TomlTable` and `TomlArray` with mutators. A
+document can be built from scratch and written out with `toToml()`:
+
+```java
+MutableTomlTable doc = MutableTomlTable.create();
+doc.set("title", "Example");
+doc.set("owner.name", "Tom");
+doc.getOrCreateTable("database").set("ports", MutableTomlArray.of(8001, 8002));
+String toml = doc.toToml();
+```
+
+A parse result is itself a `MutableTomlTable`, so a document can be parsed, changed and written
+back:
+
+```java
+TomlParseResult result = Toml.parse(source);
+result.set("owner.name", "Chris");
+result.remove("title");
+Files.writeString(source, result.toToml());
+```
+
+`set` and `add` put a new entry after the last element, and `insertBefore` and `insertAfter` put
+one next to an existing entry. Comments are set and removed by placement: a run above an entry,
+the comment after it, or an unattached comment of a table or array.
+[docs/editing.md](docs/editing.md) describes the mutators in full: the values they accept, where a
+new entry goes, and how comments are edited.
 
 ### Specification version
 
