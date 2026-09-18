@@ -12,14 +12,40 @@
  */
 package org.tomlj;
 
+import java.util.List;
+
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /** Helpers for reading the parse tree that the generated parser builds. */
 final class ParseTrees {
 
   private ParseTrees() {}
+
+  /**
+   * The node at an index of a list of nodes.
+   *
+   * @param nodes The nodes.
+   * @param index The index, which may be outside the list.
+   * @return The node at the index, or {@code null} if the index is outside the list.
+   */
+  @Nullable
+  static ParseTree at(List<ParseTree> nodes, int index) {
+    return (index >= 0 && index < nodes.size()) ? nodes.get(index) : null;
+  }
+
+  /**
+   * Whether a node is a token of a given type.
+   *
+   * @param node The node, or {@code null}.
+   * @param type The token type.
+   * @return {@code true} if the node is a terminal holding a token of that type.
+   */
+  static boolean isToken(@Nullable ParseTree node, int type) {
+    return node instanceof TerminalNode && ((TerminalNode) node).getSymbol().getType() == type;
+  }
 
   /**
    * The text matched by a rule whose body is a single token.

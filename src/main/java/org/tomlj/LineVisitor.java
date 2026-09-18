@@ -233,7 +233,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
       if (path == null || path.isEmpty()) {
         return rootTable;
       }
-      Object value = valContext.accept(new ValueVisitor(version));
+      Object value = valContext.accept(new ValueVisitor(version, source));
       if (value != null && !hasSyntaxError(ctx)) {
         if ((long) currentDepth + ctx.nesting > maxNestingDepth) {
           throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));

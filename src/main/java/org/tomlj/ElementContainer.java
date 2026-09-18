@@ -17,6 +17,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 /**
  * The storage shared by a parsed table and a parsed array: the sequence of elements written in it, in document order.
  *
@@ -40,6 +42,14 @@ abstract class ElementContainer<E extends Entry> extends Value {
   private final List<TomlElement> elements = new ArrayList<>();
 
   private boolean sequenceModified;
+
+  // Where the brackets of this table or array were written in the document, and where the whitespace before the
+  // closing one starts. Null for a table or array built through the editing API, for one read from a document parsed
+  // with no source kept, and for the tables of a [[x]] header and the array holding them, which are written as
+  // sections rather than in brackets. A copy shares it, since it describes the brackets rather than a place in a
+  // document.
+  @Nullable
+  ValueSpan bracketSpan;
 
   /**
    * The elements written in this table or array, in document order.

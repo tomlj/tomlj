@@ -77,9 +77,9 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
    *
    * @param value The value.
    * @param position The input position.
-   * @return This array.
+   * @return The entry appended.
    */
-  ListTomlArray appendParsed(Object value, TomlPosition position) {
+  Entry.Indexed appendParsed(Object value, TomlPosition position) {
     return appendParsed(value, position, Collections.emptyList());
   }
 
@@ -90,17 +90,16 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
    *        {@link ListTomlArray}, which is already a {@link Value}.
    * @param position The input position.
    * @param comments The comments attached to the value in the array.
-   * @return This array.
+   * @return The entry appended.
    */
-  ListTomlArray appendParsed(Object value, TomlPosition position, List<TomlComment> comments) {
+  Entry.Indexed appendParsed(Object value, TomlPosition position, List<TomlComment> comments) {
     if (value instanceof Integer) {
       value = ((Integer) value).longValue();
     }
     if (!TomlType.typeFor(value).isPresent()) {
       throw new IllegalArgumentException("Unsupported type " + value.getClass().getSimpleName());
     }
-    append(new Entry.Indexed(Value.of(value, position), comments));
-    return this;
+    return append(new Entry.Indexed(Value.of(value, position), comments));
   }
 
   /**
@@ -318,8 +317,8 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
    * {@link TomlValues#normalize}; every other value is shared.
    *
    * <p>
-   * An entry keeps the record of where it was written, so that a copy of a parsed document can still be written the way
-   * the document was.
+   * An entry keeps the record of where it was written, and so do this array's own brackets, so that a copy of a parsed
+   * document can still be written the way the document was.
    *
    * @param array The array to copy.
    * @param isTableArray Whether the copy holds the tables of a {@code [[x]]} header.
@@ -327,6 +326,9 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
    */
   private static ListTomlArray copyFrom(TomlArray array, boolean isTableArray) {
     ListTomlArray copy = new ListTomlArray(isTableArray, null);
+    if (array instanceof ElementContainer) {
+      copy.bracketSpan = ((ElementContainer<?>) array).bracketSpan;
+    }
     for (TomlElement element : array.elements()) {
       if (element instanceof TomlComment) {
         copy.addParsedComment(((TomlComment) element).withoutPosition());

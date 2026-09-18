@@ -31,8 +31,9 @@ import org.junit.jupiter.api.TestFactory;
  *
  * <p>
  * A valid document has no rejected line, so the text its spans cover is the whole document: writing them out in order,
- * followed by the blank lines the document ends with, must give back the document byte for byte. Until there is a
- * writer to round-trip through, this is what says the spans of a real document fit together.
+ * followed by the blank lines the document ends with, must give back the document byte for byte, and the same holds
+ * between the brackets of every array and inline table it holds. Until there is a writer to round-trip through, this is
+ * what says the spans of a real document fit together.
  */
 class SourceSpanSuiteTest {
 
@@ -51,5 +52,6 @@ class SourceSpanSuiteTest {
     ParsedTomlTable table = Parser
         .parseTable(CharStreams.fromString(document), TomlParseOptions.defaults(), new AccumulatingErrorListener());
     assertEquals(document, SourceSpanTest.reassemble(table));
+    SourceSpanTest.assertContainersReassemble(table);
   }
 }

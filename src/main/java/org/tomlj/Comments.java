@@ -12,6 +12,9 @@
  */
 package org.tomlj;
 
+import static org.tomlj.ParseTrees.at;
+import static org.tomlj.ParseTrees.isToken;
+
 import org.tomlj.internal.TomlParser;
 
 import java.util.ArrayList;
@@ -66,11 +69,8 @@ final class Comments {
    */
   @Nullable
   static TomlComment above(@Nullable ParseTree previous) {
-    // Within brackets the run above an element is the last thing written in the line break before it.
-    ParseTree run = (previous instanceof TomlParser.LineBreakContext) ? lastChild(previous) : previous;
-    return (run instanceof TomlParser.CommentRunContext)
-        ? of((TomlParser.CommentRunContext) run, TomlComment.Placement.ABOVE)
-        : null;
+    TomlParser.CommentRunContext run = runAbove(previous);
+    return (run != null) ? of(run, TomlComment.Placement.ABOVE) : null;
   }
 
   /**
@@ -94,9 +94,21 @@ final class Comments {
    */
   @Nullable
   static TomlComment above(List<ParseTree> nodes, int index) {
-    ParseTree previous = at(nodes, index - 1);
-    // A comma starting the element's line does not separate the element from the run above it.
-    return above(isComma(previous) ? at(nodes, index - 2) : previous);
+    return above(before(nodes, index));
+  }
+
+  /**
+   * The run above the element at an index of a flattened array or inline table, as written.
+   *
+   * <p>
+   * The parse-tree node of the run that {@link #above(List, int)} returns, from which its offsets are read.
+   *
+   * @param nodes The flattened nodes.
+   * @param index The index of the element.
+   * @return The run above the element, or {@code null} if there is none.
+   */
+  static TomlParser.@Nullable CommentRunContext runAbove(List<ParseTree> nodes, int index) {
+    return runAbove(before(nodes, index));
   }
 
   /**
@@ -108,23 +120,45 @@ final class Comments {
    */
   @Nullable
   static TomlComment after(List<ParseTree> nodes, int index) {
-    ParseTree next = at(nodes, index + 1);
-    // A comma does not end the line, so what follows it is still written on the element's line.
-    return after(isComma(next) ? at(nodes, index + 2) : next);
+    TerminalNode comment = commentAfter(nodes, index);
+    return (comment != null) ? of(comment, TomlComment.Placement.AFTER) : null;
   }
 
   /**
-   * Add the unattached comments of a line break to the array or inline table they were written in.
+   * The comment after the element at an index of a flattened array or inline table, as written.
    *
-   * @param nodes The flattened nodes of that array or inline table.
-   * @param index The index of the line break.
-   * @param container The array or inline table.
+   * <p>
+   * The parse-tree node of the comment that {@link #after(List, int)} returns, from which its offsets are read.
+   *
+   * @param nodes The flattened nodes.
+   * @param index The index of the element.
+   * @return The comment after the element, or {@code null} if there is none.
    */
-  static void addUnattached(List<ParseTree> nodes, int index, ElementContainer<?> container) {
+  @Nullable
+  static TerminalNode commentAfter(List<ParseTree> nodes, int index) {
+    ParseTree next = at(nodes, index + 1);
+    // A comma does not end the line, so what follows it is still written on the element's line.
+    return lineEndComment(isComma(next) ? at(nodes, index + 2) : next);
+  }
+
+  /**
+   * The unattached comments of a line break, in the order they were written.
+   *
+   * <p>
+   * Everything the line break holds except the comment ending the line of the element before it, which is the comment
+   * after that element, and the run it ends with when an element follows it, which is the comment above that element.
+   *
+   * @param nodes The flattened nodes of the array or inline table the line break was written in.
+   * @param index The index of the line break.
+   * @return Each comment as the node it was written as: a {@code Comment} terminal for one ending a line, a
+   *         {@code commentRun} for a run of whole lines.
+   */
+  static List<ParseTree> unattached(List<ParseTree> nodes, int index) {
     TomlParser.LineBreakContext lineBreak = (TomlParser.LineBreakContext) nodes.get(index);
+    List<ParseTree> comments = new ArrayList<>();
     TerminalNode comment = lineEndComment(lineBreak);
     if (comment != null && !endsElementLine(nodes, index)) {
-      container.addParsedComment(of(comment, TomlComment.Placement.UNATTACHED));
+      comments.add(comment);
     }
     List<TomlParser.CommentRunContext> runs = lineBreak.commentRun();
     int count = runs.size();
@@ -133,8 +167,9 @@ final class Comments {
       count--;
     }
     for (int i = 0; i < count; ++i) {
-      container.addParsedComment(of(runs.get(i), TomlComment.Placement.UNATTACHED));
+      comments.add(runs.get(i));
     }
+    return comments;
   }
 
   /**
@@ -208,6 +243,17 @@ final class Comments {
     return TomlComment.of(Collections.singletonList(comment.getSymbol()), placement);
   }
 
+  /**
+   * Record an unattached comment, written as one of the nodes {@link #unattached} returns.
+   *
+   * @param node A {@code Comment} terminal or a {@code commentRun}.
+   * @return The comment.
+   */
+  static TomlComment ofUnattached(ParseTree node) {
+    return (node instanceof TerminalNode) ? of((TerminalNode) node, TomlComment.Placement.UNATTACHED)
+        : of((TomlParser.CommentRunContext) node, TomlComment.Placement.UNATTACHED);
+  }
+
   private static void flattenInto(ParseTree node, List<ParseTree> nodes) {
     int childCount = node.getChildCount();
     for (int i = 0; i < childCount; ++i) {
@@ -225,6 +271,22 @@ final class Comments {
         || node instanceof TomlParser.ArrayValueContext
         || node instanceof TomlParser.InlineTableValuesContext
         || node instanceof TomlParser.InlineTableValueContext;
+  }
+
+  // The node an element's comment run would be written as, which is the run itself within brackets only when the line
+  // break it ends is the one before the element.
+  private static TomlParser.@Nullable CommentRunContext runAbove(@Nullable ParseTree previous) {
+    // Within brackets the run above an element is the last thing written in the line break before it.
+    ParseTree run = (previous instanceof TomlParser.LineBreakContext) ? lastChild(previous) : previous;
+    return (run instanceof TomlParser.CommentRunContext) ? (TomlParser.CommentRunContext) run : null;
+  }
+
+  // The node written before the element at an index, skipping a comma, which starts no line of its own.
+  @Nullable
+  private static ParseTree before(List<ParseTree> nodes, int index) {
+    ParseTree previous = at(nodes, index - 1);
+    // A comma starting the element's line does not separate the element from the run above it.
+    return isComma(previous) ? at(nodes, index - 2) : previous;
   }
 
   @Nullable
@@ -262,14 +324,5 @@ final class Comments {
 
   private static boolean isComma(@Nullable ParseTree node) {
     return isToken(node, TomlParser.Comma);
-  }
-
-  private static boolean isToken(@Nullable ParseTree node, int type) {
-    return node instanceof TerminalNode && ((TerminalNode) node).getSymbol().getType() == type;
-  }
-
-  @Nullable
-  private static ParseTree at(List<ParseTree> nodes, int index) {
-    return (index >= 0 && index < nodes.size()) ? nodes.get(index) : null;
   }
 }
