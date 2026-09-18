@@ -61,6 +61,7 @@ final class TomlSerializer {
   private static final String ARRAY_ELEMENT_INDENT = "  ";
 
   private final Appendable out;
+  private final TomlOptions options;
   // The spaces to indent per level of table nesting
   private final int indent;
   // The widest a single-line array's line may be, in code points
@@ -75,6 +76,7 @@ final class TomlSerializer {
 
   private TomlSerializer(Appendable out, TomlOptions options, boolean copySourceLines) {
     this.out = out;
+    this.options = options;
     this.indent = options.indent();
     this.maxLineWidth = options.maxLineWidth();
     this.lineSeparator = options.lineSeparator();
@@ -265,20 +267,27 @@ final class TomlSerializer {
       return false;
     }
     writeCommentAbove(entry.comments(), lineIndent);
-    beginLine(lineIndent);
-    StringBuilder text = new StringBuilder();
+    // The indentation is written with the rest of the line, which lays out anything written anew within it
+    beginLine("");
+    StringBuilder text = new StringBuilder(lineIndent);
     if (span.keyParts == keyPath.size()) {
       text.append(span.source.text(span.keyStart, span.keyStop));
     } else {
       appendKeyPath(text, keyPath);
     }
     ValueSpan value = span.writtenValue(parsed.value);
+    ValueSpan brackets = (value == null) ? span.writtenBrackets(parsed.value) : null;
     if (value != null) {
       text.append(span.source.text(span.keyStop + 1, value.stop));
+    } else if (brackets != null) {
+      // The table or array was edited in place, so it is written within the brackets it was read in
+      text.append(span.source.text(span.keyStop + 1, span.valueStart - 1));
+      EditedContainerSerializer
+          .append(text, (ElementContainer<?>) parsed.value, brackets, EditedContainerSerializer.Context.LINE, options);
     } else {
       // The spacing around the '=' is the line's own; the value it held has been replaced, so it is written anew
       text.append(span.source.text(span.keyStop + 1, span.valueStart - 1));
-      int column = width(lineIndent) + text.codePointCount(0, text.length());
+      int column = text.codePointCount(0, text.length());
       out.append(text);
       text.setLength(0);
       writeLineValue(parsed.value.get(), lineIndent, column);
@@ -317,7 +326,7 @@ final class TomlSerializer {
    * @param column The width of that line before the value, in code points.
    * @param trailing The width of what follows the value on its last line, in code points.
    */
-  private void writeValue(Object value, String lineIndent, int column, int trailing) throws IOException {
+  void writeValue(Object value, String lineIndent, int column, int trailing) throws IOException {
     if (holdsComments(value)) {
       writeOverLines(value, lineIndent);
       return;
@@ -494,6 +503,17 @@ final class TomlSerializer {
   }
 
   /**
+   * Append the single-line form of a value, whatever the maximum line width, as everything written inside an inline
+   * table is.
+   *
+   * @param text The text to append to.
+   * @param value The value.
+   */
+  static void appendInlineValue(StringBuilder text, Object value) {
+    appendInline(value, text, Integer.MAX_VALUE);
+  }
+
+  /**
    * Append the single-line form of a value, giving up once the text is longer than a limit.
    *
    * @param value The value.
@@ -581,7 +601,7 @@ final class TomlSerializer {
    * @param text The text to append to.
    * @param keyPath The key.
    */
-  private static void appendKeyPath(StringBuilder text, List<String> keyPath) {
+  static void appendKeyPath(StringBuilder text, List<String> keyPath) {
     for (int i = 0; i < keyPath.size(); i++) {
       if (i > 0) {
         text.append('.');
@@ -746,8 +766,9 @@ final class TomlSerializer {
    * Whether a value is a table or array holding a comment, at any depth, and so cannot be written on one line.
    *
    * @param value The value.
+   * @return {@code true} if the value holds a comment.
    */
-  private static boolean holdsComments(Object value) {
+  static boolean holdsComments(Object value) {
     List<TomlElement> elements;
     if (value instanceof TomlTable) {
       elements = ((TomlTable) value).elements();

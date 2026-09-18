@@ -46,12 +46,10 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * A line whose value was replaced, or whose comments were set or removed, keeps the place the document gave it: the
  * blank lines above it, its key and the spacing around the {@code =} are written as they were read, and only what
  * changed is written anew. A value the default style writes under a header of its own, a table or an array of tables,
- * cannot stay on a line, so the line goes and the value is written as a section.
- *
- * <p>
- * An array or inline table edited in place is written anew for now.
+ * cannot stay on a line, so the line goes and the value is written as a section. An array or inline table edited in
+ * place keeps its line and its brackets, and is written from the parts of it the document still holds the text of
+ * ({@link EditedContainerSerializer}).
  */
-// The paragraph above goes when an edited array or inline table is written into the brackets the parse read it from.
 final class SourcePreservingSerializer {
 
   // Chunks are written in the order of the offsets they are anchored at, and these ranks order the ones anchored at
@@ -710,52 +708,66 @@ final class SourcePreservingSerializer {
       }
       boolean modelComments = lineEntry.commentsModified();
       String indent = indentOf(span);
+      // The line is assembled whole, so that a value written anew into it is laid out at the column it reaches
+      StringBuilder line = new StringBuilder();
       if (modelComments) {
-        writeCommentAbove(lineEntry, blankWritten ? "" : blankLinesOf(leading), indent);
+        appendCommentAbove(line, lineEntry, blankWritten ? "" : blankLinesOf(leading), indent);
       } else {
-        append(blankWritten ? lastLineOf(leading) : leading);
+        line.append(blankWritten ? lastLineOf(leading) : leading);
         // The comment run above the line and the indentation of the line itself, as they were written
-        append(source.text(firstToken(span), span.keyStart - 1));
+        line.append(source.text(firstToken(span), span.keyStart - 1));
       }
       if (span.kind == SourceSpan.Kind.HEADER) {
-        append(source.text(span.keyStart, span.keyStop));
+        line.append(source.text(span.keyStart, span.keyStop));
       } else {
-        append(source.text(span.keyStart, span.valueStart - 1));
-        writeValue(lineEntry, indent);
+        line.append(source.text(span.keyStart, span.valueStart - 1));
+        appendValue(line, lineEntry, indent);
       }
       // Input the parser skipped between the value or header and the newline lies before the tail, so it is not written
-      append(modelComments ? tailWithCommentAfter(lineEntry) : source.text(span.tailStart, span.stop));
+      line.append(modelComments ? tailWithCommentAfter(lineEntry) : source.text(span.tailStart, span.stop));
+      append(line);
       afterComment = false;
     }
 
-    /** Write the blank lines above the line, then the run of comment lines the model holds, indented like the line. */
-    private void writeCommentAbove(Entry lineEntry, String blankLines, String indent) throws IOException {
-      StringBuilder text = new StringBuilder(blankLines);
+    /** Append the blank lines above the line, then the run of comment lines the model holds, indented like the line. */
+    private void appendCommentAbove(StringBuilder line, Entry lineEntry, String blankLines, String indent)
+        throws IOException {
+      line.append(blankLines);
       TomlComment above = attachedComment(lineEntry, TomlComment.Placement.ABOVE);
       if (above != null) {
-        TomlSerializer.defaultStyle(text, options).writeCommentLines(above, indent);
+        TomlSerializer.defaultStyle(line, options).writeCommentLines(above, indent);
       }
-      text.append(indent);
-      append(text);
+      line.append(indent);
     }
 
     /**
-     * Write the value of the line: the text it was read as, or, where the document holds none that still describes it,
-     * the value in the default style.
+     * Append the value of the line: the text it was read as; an array or inline table edited in place, written within
+     * the brackets it was read in; or, where the document holds no text that still describes the value, the value in
+     * the default style.
      *
+     * @param line The line so far, which the value is written at the end of.
      * @param lineEntry The entry the line holds.
      * @param indent The indentation of the line, which the elements of an array written over lines are indented from.
      */
-    private void writeValue(Entry lineEntry, String indent) throws IOException {
+    private void appendValue(StringBuilder line, Entry lineEntry, String indent) throws IOException {
       ValueSpan value = span.writtenValue(lineEntry.value);
       if (value != null) {
-        append(source.text(value.start, value.stop));
+        line.append(source.text(value.start, value.stop));
         return;
       }
-      StringBuilder text = new StringBuilder();
+      ValueSpan brackets = span.writtenBrackets(lineEntry.value);
+      if (brackets != null) {
+        EditedContainerSerializer
+            .append(
+                line,
+                (ElementContainer<?>) lineEntry.value,
+                brackets,
+                EditedContainerSerializer.Context.LINE,
+                options);
+        return;
+      }
       int column = width(indent) + width(source.text(span.keyStart, span.valueStart - 1));
-      TomlSerializer.defaultStyle(text, options).writeLineValue(lineEntry.value.get(), indent, column);
-      append(text);
+      TomlSerializer.defaultStyle(line, options).writeLineValue(lineEntry.value.get(), indent, column);
     }
 
     /**

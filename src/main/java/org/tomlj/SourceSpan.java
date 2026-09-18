@@ -350,6 +350,24 @@ final class SourceSpan {
     return (written != null && written.source == source && written.start == valueStart) ? written : null;
   }
 
+  /**
+   * The brackets of the array or inline table written between this span's key and its tail, whether or not it has been
+   * edited since, so that a container that was edited in place can be written within the brackets it was read in.
+   *
+   * @param value The value the line or element holds.
+   * @return The span of the brackets, or {@code null} if the value is not a table or array, or is one that was stored
+   *         here through the editing API or came from another line or another document.
+   */
+  @Nullable
+  @SuppressWarnings("ReferenceEquality") // the brackets are part of this span's own text, not of a text equal to it
+  ValueSpan writtenBrackets(Value value) {
+    if (!(value instanceof ElementContainer)) {
+      return null;
+    }
+    ValueSpan written = ((ElementContainer<?>) value).bracketSpan;
+    return (written != null && written.source == source && written.start == valueStart) ? written : null;
+  }
+
   @Override
   public String toString() {
     return "SourceSpan{"
