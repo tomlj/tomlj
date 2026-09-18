@@ -97,6 +97,22 @@ public final class TomlComment implements TomlElement {
     return Collections.unmodifiableList(Arrays.asList(first, second));
   }
 
+  /**
+   * Check that a placement is one an entry holds a comment at.
+   *
+   * @param placement The placement.
+   * @return {@code placement}.
+   * @throws NullPointerException If {@code placement} is {@code null}.
+   * @throws IllegalArgumentException If {@code placement} is {@link Placement#UNATTACHED}.
+   */
+  static Placement requireAttached(Placement placement) {
+    requireNonNull(placement);
+    if (placement == Placement.UNATTACHED) {
+      throw new IllegalArgumentException("placement must be ABOVE or AFTER");
+    }
+    return placement;
+  }
+
   private TomlComment(List<String> rawLines, TomlPosition position, Placement placement) {
     this.rawLines = rawLines;
     this.position = position;

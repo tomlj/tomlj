@@ -21,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.util.*;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.framework.qual.DefaultQualifier;
 import org.checkerframework.framework.qual.TypeUseLocation;
 
@@ -363,6 +364,25 @@ public interface TomlArray {
    */
   default List<TomlComment> comments(int index) {
     return entry(index).comments();
+  }
+
+  /**
+   * Get the comment attached to a value at a placement.
+   *
+   * <p>
+   * This is a shortcut for {@link #entry(int)}, returning {@link TomlEntry#comment(TomlComment.Placement)}.
+   *
+   * @param index The array index.
+   * @param placement {@link TomlComment.Placement#ABOVE} for the run directly above the value, or
+   *        {@link TomlComment.Placement#AFTER} for the comment on its line.
+   * @return The comment at that placement, or {@code null} if there is none.
+   * @throws IndexOutOfBoundsException If the index is out of bounds.
+   * @throws NullPointerException If {@code placement} is {@code null}.
+   * @throws IllegalArgumentException If {@code placement} is {@link TomlComment.Placement#UNATTACHED}.
+   */
+  @Nullable
+  default TomlComment comment(int index, TomlComment.Placement placement) {
+    return entry(index).comment(placement);
   }
 
   /**
