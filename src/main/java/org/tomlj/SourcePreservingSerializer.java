@@ -43,10 +43,15 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * written with the literal it was read as.
  *
  * <p>
- * A line whose value or comments changed is written anew for now.
+ * A line whose value was replaced, or whose comments were set or removed, keeps the place the document gave it: the
+ * blank lines above it, its key and the spacing around the {@code =} are written as they were read, and only what
+ * changed is written anew. A value the default style writes under a header of its own, a table or an array of tables,
+ * cannot stay on a line, so the line goes and the value is written as a section.
+ *
+ * <p>
+ * An array or inline table edited in place is written anew for now.
  */
-// The paragraph above goes when a replaced value, an edited comment and an edited array or inline table are written
-// into the line the parse read them on.
+// The paragraph above goes when an edited array or inline table is written into the brackets the parse read it from.
 final class SourcePreservingSerializer {
 
   // Chunks are written in the order of the offsets they are anchored at, and these ranks order the ones anchored at
@@ -164,7 +169,7 @@ final class SourcePreservingSerializer {
       if (element instanceof TomlComment) {
         SourceSpan span = ((TomlComment) element).span();
         if (span != null && usable(span, SourceSpan.Kind.COMMENT)) {
-          addLine(span, section, part);
+          addLine(span, null, section, part);
         } else {
           pending.add(i);
         }
@@ -176,11 +181,8 @@ final class SourcePreservingSerializer {
       String key = pair.key();
       if (writtenOnALine(pair)) {
         SourceSpan span = pair.span;
-        if (!pair.isModified()
-            && span != null
-            && usable(span, SourceSpan.Kind.LINE)
-            && span.keyParts == (relative.size() + 1)) {
-          addLine(span, section, part);
+        if (span != null && usable(span, SourceSpan.Kind.LINE) && span.keyParts == (relative.size() + 1)) {
+          addLine(span, pair, section, part);
         } else {
           pending.add(i);
         }
@@ -195,7 +197,7 @@ final class SourcePreservingSerializer {
         if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
           Group group = new Group(section);
           subtrees[i] = group;
-          addHeader(header, group);
+          addHeader(header, pair, group);
           collectTable(subTable, path(sectionPath, relative, key), Collections.emptyList(), group, header.stop, false);
         } else if (!pair.valueModified && !pair.commentsModified() && writtenAsDottedKeys(subTable)) {
           // A table the document opened with a dotted key, or on the way to a header of its own: its lines belong to
@@ -220,7 +222,7 @@ final class SourcePreservingSerializer {
           }
           if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
             Group group = new Group(arrayGroup);
-            addHeader(header, group);
+            addHeader(header, indexed, group);
             collectTable(
                 (LinkedTomlTable) indexed.value,
                 arrayPath,
@@ -329,14 +331,14 @@ final class SourcePreservingSerializer {
     }
   }
 
-  private void addLine(SourceSpan span, Group section, Contribution part) {
-    chunks.add(new LineChunk(span));
+  private void addLine(SourceSpan span, @Nullable Entry entry, Group section, Contribution part) {
+    chunks.add(new LineChunk(span, entry));
     section.addLine(span.stop);
     part.add(span.start, span.stop, indentOf(span));
   }
 
-  private void addHeader(SourceSpan header, Group group) {
-    chunks.add(new LineChunk(header));
+  private void addHeader(SourceSpan header, Entry entry, Group group) {
+    chunks.add(new LineChunk(header, entry));
     group.addLine(header.stop);
   }
 
@@ -370,12 +372,12 @@ final class SourcePreservingSerializer {
    *
    * @param entry The entry holding the table, whose comments are written on the header.
    * @param table The table.
-   * @return The header's span, or {@code null} if the table was stored through the editing API, or the comments on its
-   *         header were, since the header line is written as it was read, comments included.
+   * @return The header's span, or {@code null} if the table was stored through the editing API, since the header then
+   *         names the path the table was read at rather than the one it is written at.
    */
   @Nullable
   private static SourceSpan headerOf(Entry entry, LinkedTomlTable table) {
-    return (entry.valueModified || entry.commentsModified()) ? null : table.headerSpan;
+    return entry.valueModified ? null : table.headerSpan;
   }
 
   /**
@@ -391,15 +393,17 @@ final class SourcePreservingSerializer {
    * Whether an entry is written as a {@code key = value} line, rather than under a header of its own.
    *
    * <p>
-   * Unlike every other table, an inline table is written on the line of the entry holding it, and an array written as a
-   * literal stays a literal however it is filled, unlike the array of the tables of {@code [[x]]} headers.
+   * Unlike every other table, an inline table is written on the line of the entry holding it. An array the document
+   * wrote as a literal stays a literal however it is filled, unlike the array of the tables of {@code [[x]]} headers;
+   * an array stored through the editing API was never written at all, so the default style decides how it is written,
+   * and the entry holding it keeps its line only if that style writes the array on one.
    */
-  private static boolean writtenOnALine(TomlEntry entry) {
-    Object value = entry.value().get();
+  private static boolean writtenOnALine(Entry entry) {
+    Object value = entry.value.get();
     if (value instanceof LinkedTomlTable) {
       return ((LinkedTomlTable) value).isInline();
     }
-    if (value instanceof ListTomlArray && ((ListTomlArray) value).isTableArray()) {
+    if (value instanceof ListTomlArray && (entry.valueModified || ((ListTomlArray) value).isTableArray())) {
       return TomlSerializer.isLine(entry);
     }
     return true;
@@ -417,7 +421,7 @@ final class SourcePreservingSerializer {
   private static int lastLineIndex(List<TomlElement> elements) {
     for (int i = elements.size() - 1; i >= 0; i--) {
       TomlElement element = elements.get(i);
-      if (element instanceof TomlEntry && writtenOnALine((TomlEntry) element)) {
+      if (element instanceof Entry && writtenOnALine((Entry) element)) {
         return i;
       }
     }
@@ -453,6 +457,30 @@ final class SourcePreservingSerializer {
   /** The text after the last newline, which is the last line of a run of whitespace. */
   private static String lastLineOf(String text) {
     return text.substring(text.lastIndexOf('\n') + 1);
+  }
+
+  /**
+   * The blank lines of a span's leading whitespace: everything before the indentation of its first line, which the
+   * lines written in place of that first line carry instead.
+   */
+  private static String blankLinesOf(String leading) {
+    return leading.substring(0, leading.lastIndexOf('\n') + 1);
+  }
+
+  /** The comment attached to an entry at a placement, or {@code null} if it has none there. */
+  @Nullable
+  private static TomlComment attachedComment(Entry entry, TomlComment.Placement placement) {
+    for (TomlComment comment : entry.comments()) {
+      if (comment.placement() == placement) {
+        return comment;
+      }
+    }
+    return null;
+  }
+
+  /** The width of a text with no newline in it, in code points, every character of which is one column wide. */
+  private static int width(String text) {
+    return text.codePointCount(0, text.length());
   }
 
   private static String spaces(int width) {
@@ -641,15 +669,21 @@ final class SourcePreservingSerializer {
   }
 
   /**
-   * A key/value line, a table header or an unattached comment, written from the text it was read from.
+   * A key/value line, a table header or an unattached comment, written from the text it was read from, with the value
+   * and the comments of a line the editing API touched written from the model instead.
    */
   private final class LineChunk extends Chunk {
 
     private final SourceSpan span;
 
-    LineChunk(SourceSpan span) {
+    /** The entry the line or header holds, or {@code null} for an unattached comment. */
+    @Nullable
+    private final Entry entry;
+
+    LineChunk(SourceSpan span, @Nullable Entry entry) {
       super(SOURCE_LINE);
       this.span = span;
+      this.entry = entry;
     }
 
     @Override
@@ -666,16 +700,80 @@ final class SourcePreservingSerializer {
         requestBlankLine();
       }
       boolean blankWritten = flushBlankLine();
-      // A blank line written above this one already separates it from what came before
-      append(blankWritten ? lastLineOf(leading) : leading);
-      if (span.kind == SourceSpan.Kind.HEADER) {
-        // Input the parser skipped between the header and its newline lies between the two texts, and is not written
-        append(source.text(firstToken(span), span.keyStop));
-        append(source.text(span.tailStart, span.stop));
-      } else {
+      Entry lineEntry = entry;
+      if (lineEntry == null) {
+        // A blank line written above this one already separates it from what came before
+        append(blankWritten ? lastLineOf(leading) : leading);
         append(source.text(firstToken(span), span.stop));
+        afterComment = true;
+        return;
       }
-      afterComment = (span.kind == SourceSpan.Kind.COMMENT);
+      boolean modelComments = lineEntry.commentsModified();
+      String indent = indentOf(span);
+      if (modelComments) {
+        writeCommentAbove(lineEntry, blankWritten ? "" : blankLinesOf(leading), indent);
+      } else {
+        append(blankWritten ? lastLineOf(leading) : leading);
+        // The comment run above the line and the indentation of the line itself, as they were written
+        append(source.text(firstToken(span), span.keyStart - 1));
+      }
+      if (span.kind == SourceSpan.Kind.HEADER) {
+        append(source.text(span.keyStart, span.keyStop));
+      } else {
+        append(source.text(span.keyStart, span.valueStart - 1));
+        writeValue(lineEntry, indent);
+      }
+      // Input the parser skipped between the value or header and the newline lies before the tail, so it is not written
+      append(modelComments ? tailWithCommentAfter(lineEntry) : source.text(span.tailStart, span.stop));
+      afterComment = false;
+    }
+
+    /** Write the blank lines above the line, then the run of comment lines the model holds, indented like the line. */
+    private void writeCommentAbove(Entry lineEntry, String blankLines, String indent) throws IOException {
+      StringBuilder text = new StringBuilder(blankLines);
+      TomlComment above = attachedComment(lineEntry, TomlComment.Placement.ABOVE);
+      if (above != null) {
+        TomlSerializer.defaultStyle(text, options).writeCommentLines(above, indent);
+      }
+      text.append(indent);
+      append(text);
+    }
+
+    /**
+     * Write the value of the line: the text it was read as, or, where the document holds none that still describes it,
+     * the value in the default style.
+     *
+     * @param lineEntry The entry the line holds.
+     * @param indent The indentation of the line, which the elements of an array written over lines are indented from.
+     */
+    private void writeValue(Entry lineEntry, String indent) throws IOException {
+      ValueSpan value = span.writtenValue(lineEntry.value);
+      if (value != null) {
+        append(source.text(value.start, value.stop));
+        return;
+      }
+      StringBuilder text = new StringBuilder();
+      int column = width(indent) + width(source.text(span.keyStart, span.valueStart - 1));
+      TomlSerializer.defaultStyle(text, options).writeLineValue(lineEntry.value.get(), indent, column);
+      append(text);
+    }
+
+    /**
+     * What follows the value, or the header, on a line whose comments the model holds: the comment after it, written
+     * where the document wrote its own, then the newline the line ended with.
+     *
+     * @param lineEntry The entry the line holds.
+     * @return The text.
+     */
+    private String tailWithCommentAfter(Entry lineEntry) {
+      String newline = source.text(span.newlineStart, span.stop);
+      TomlComment after = attachedComment(lineEntry, TomlComment.Placement.AFTER);
+      if (after == null) {
+        return newline;
+      }
+      // The spacing the document wrote before its own comment, or the two spaces of the default style
+      String spacing = (span.afterStart >= 0) ? source.text(span.tailStart, span.afterStart - 1) : "  ";
+      return spacing + '#' + after.rawLines().get(0) + newline;
     }
   }
 

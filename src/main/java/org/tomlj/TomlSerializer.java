@@ -246,8 +246,9 @@ final class TomlSerializer {
   /**
    * Write a line from the text the document it was read from still holds: its key, the spacing around the {@code =},
    * its value and the comment after it, as they were written. The key is written anew when the line was written with a
-   * dotted key that no longer names the entry from here, and the line ends with this writer's own line separator, since
-   * it is being written somewhere the document did not have it.
+   * dotted key that no longer names the entry from here, the value is written anew when the document holds no text that
+   * still describes it, and the line ends with this writer's own line separator, since it is being written somewhere
+   * the document did not have it.
    *
    * @param lineIndent The indentation of the line.
    * @param keyPath The key, as the keys of a dotted key.
@@ -263,10 +264,6 @@ final class TomlSerializer {
     if (span == null || span.kind != SourceSpan.Kind.LINE || parsed.commentsModified()) {
       return false;
     }
-    int valueStop = writtenValueStop(parsed.value);
-    if (valueStop < 0) {
-      return false;
-    }
     writeCommentAbove(entry.comments(), lineIndent);
     beginLine(lineIndent);
     StringBuilder text = new StringBuilder();
@@ -275,28 +272,21 @@ final class TomlSerializer {
     } else {
       appendKeyPath(text, keyPath);
     }
-    text.append(span.source.text(span.keyStop + 1, valueStop));
+    ValueSpan value = span.writtenValue(parsed.value);
+    if (value != null) {
+      text.append(span.source.text(span.keyStop + 1, value.stop));
+    } else {
+      // The spacing around the '=' is the line's own; the value it held has been replaced, so it is written anew
+      text.append(span.source.text(span.keyStop + 1, span.valueStart - 1));
+      int column = width(lineIndent) + text.codePointCount(0, text.length());
+      out.append(text);
+      text.setLength(0);
+      writeLineValue(parsed.value.get(), lineIndent, column);
+    }
     text.append(span.source.text(span.tailStart, span.newlineStart - 1));
     out.append(text);
     endLine();
     return true;
-  }
-
-  /**
-   * The last offset of a value as the document it was read from wrote it.
-   *
-   * @param value The value.
-   * @return The last offset of its literal, or of the closing bracket of a table or array that has not been edited
-   *         since, or {@code -1} if the document holds no text that still describes the value.
-   */
-  private static int writtenValueStop(Value value) {
-    if (value instanceof Value.Scalar) {
-      ValueSpan span = ((Value.Scalar) value).span;
-      return (span != null) ? span.stop : -1;
-    }
-    ElementContainer<?> container = (ElementContainer<?>) value;
-    ValueSpan brackets = container.bracketSpan;
-    return (brackets != null && !container.isModified()) ? brackets.stop : -1;
   }
 
   /**
@@ -306,7 +296,7 @@ final class TomlSerializer {
    * @param lineIndent The indentation of the line the value starts on.
    * @param column The width of that line before the value, in code points.
    */
-  private void writeLineValue(Object value, String lineIndent, int column) throws IOException {
+  void writeLineValue(Object value, String lineIndent, int column) throws IOException {
     if (value instanceof String && ((String) value).indexOf('\n') >= 0) {
       // A string with a newline is written as a multi-line basic string, so it stays readable rather than escaped
       // onto one line. The key's indentation applies only to this line; content lines are never indented.

@@ -32,6 +32,16 @@ abstract class Value implements TomlValue {
   public abstract Object get();
 
   /**
+   * Where this value was written in the document it was read from, where that text still describes it.
+   *
+   * @return The span of the literal, or of the brackets of a table or array that has not been edited since, or
+   *         {@code null} if this value was built through the editing API, or read from a document parsed with no source
+   *         kept.
+   */
+  @Nullable
+  abstract ValueSpan writtenSpan();
+
+  /**
    * Wrap a value read from the document as a {@code Value}, for an entry to hold.
    *
    * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link LinkedTomlTable} /
@@ -86,6 +96,12 @@ abstract class Value implements TomlValue {
     @Override
     public Object get() {
       return value;
+    }
+
+    @Override
+    @Nullable
+    ValueSpan writtenSpan() {
+      return span;
     }
 
     @Override

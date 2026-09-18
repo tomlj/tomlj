@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 /**
  * Where a line, a table header, an unattached comment or an element of an array or inline table was written in the text
  * its document was parsed from.
@@ -330,6 +332,22 @@ final class SourceSpan {
     this.tailStart = tailStart;
     this.newlineStart = newlineStart;
     this.stop = stop;
+  }
+
+  /**
+   * The text of the value written between this span's key and its tail, where the document still holds text that
+   * describes the value.
+   *
+   * @param value The value the line or element holds.
+   * @return The span of the value's text, or {@code null} where it was replaced or edited through the editing API, or
+   *         came from another line or another document, so that the text between the key and the tail is no longer its
+   *         own.
+   */
+  @Nullable
+  @SuppressWarnings("ReferenceEquality") // the value's text is part of this span's own text, not of a text equal to it
+  ValueSpan writtenValue(Value value) {
+    ValueSpan written = value.writtenSpan();
+    return (written != null && written.source == source && written.start == valueStart) ? written : null;
   }
 
   @Override

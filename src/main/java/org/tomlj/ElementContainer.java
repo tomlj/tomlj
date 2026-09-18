@@ -185,6 +185,19 @@ abstract class ElementContainer<E extends Entry> extends Value {
   }
 
   /**
+   * {@inheritDoc}
+   *
+   * <p>
+   * The brackets this table or array was written in describe what it held when it was read, so they no longer describe
+   * it once anything in it has been edited.
+   */
+  @Override
+  @Nullable
+  ValueSpan writtenSpan() {
+    return isModified() ? null : bracketSpan;
+  }
+
+  /**
    * A container is its own value: {@link LinkedTomlTable} and {@link ListTomlArray} implement the public
    * {@link TomlTable} / {@link TomlArray} interfaces directly, so the object the public API exposes is the container
    * itself.
