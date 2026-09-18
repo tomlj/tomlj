@@ -52,6 +52,10 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * {@link #insertAfter}, {@link #insertCommentBefore}, or {@link #insertCommentAfter}.
  *
  * <p>
+ * A table is written back out with {@link #toToml()}, and {@link #reformat(TomlOptions.Style)} gives it, and everything
+ * nested in it, a style of its own.
+ *
+ * <p>
  * Not safe for use from multiple threads without external synchronization.
  */
 @DefaultQualifier(value = NonNull.class ,

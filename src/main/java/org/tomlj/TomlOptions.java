@@ -23,6 +23,15 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * Options controlling how {@link TomlTable#toToml(TomlOptions)} and {@link TomlArray#toToml(TomlOptions)} write TOML.
+ *
+ * <p>
+ * {@link Style#PRESERVE}, the default, keeps the most: a parsed document is written from the text it was parsed from,
+ * and only what the editing API changed is written anew. {@link Style#PRETTIFY} keeps what was written - the order of
+ * lines, the comments, the table structure and the literal form of each key and value - but writes the whitespace,
+ * indentation and the layout of arrays and inline tables from these options instead of how the document had them.
+ * {@link Style#CANONICAL} keeps none of it, writing the whole document in the default style. A table or array with no
+ * text to write from - one built through the editing API, or read from a document parsed with
+ * {@link TomlParseOptions#withoutSource()} - is written in the default style whatever style is asked for.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})

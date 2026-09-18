@@ -51,8 +51,9 @@ if (port > 65535) {
 * **Comments are kept.** Every comment in a document is parsed into the model, attached to an entry
   or unattached in the table or array it was written in. See [Comments](#comments).
 * **Documents can be built and edited.** A parse result is a `MutableTomlTable`: set, insert and
-  remove values and comments, or build a document from scratch, and write it out with `toToml()`.
-  See [Building and editing documents](#building-and-editing-documents).
+  remove values and comments, or build a document from scratch, and write it out with `toToml()`. A
+  parsed document writes back as it was read, changed only where it was edited. See
+  [Building and editing documents](#building-and-editing-documents).
 * **No dependencies.** The jar carries its own copy of the ANTLR runtime, relocated under TomlJ's
   own package, so there is nothing else to add and no clash with ANTLR elsewhere in your project.
   Works on Java 9 and later.
@@ -121,7 +122,7 @@ for (TomlElement element : result.elements()) {
 
 A comment's text is what follows `# `, one string per line in `lines()`. The comments on a `[[x]]`
 header are attached to the table it opens, so they are read with `getArray("x").comments(0)`.
-`toToml()` does not write comments yet.
+`toToml()` writes every comment back, in its place.
 
 ### Building and editing documents
 
@@ -145,6 +146,13 @@ result.set("owner.name", "Chris");
 result.remove("title");
 Files.writeString(source, result.toToml());
 ```
+
+`toToml()` writes a parse result from the text it was read from: an unedited document comes back
+byte for byte, and an edit changes only the lines it touches. A replaced value keeps its line and
+comments, a new entry goes after the nearest line of its table, a new table becomes a section after
+its parent's, and a removed entry takes its lines with it. Parse with
+`TomlParseOptions.defaults().withoutSource()` to keep no source text; such a result is written in the
+default style described in [Writing TOML](#writing-toml).
 
 Values may be any of the types the getters return, plus `Integer`, `Short`, `Byte` and `Float`
 (widened to `Long` and `Double`), and a `Map` or `Collection` (converted to a table or an array).
@@ -188,6 +196,43 @@ edited through the entry itself: `entry("port")` returns a `MutableTomlKeyValue`
 Entries added through the mutators have no input position, and `isModified` reports which entries,
 tables or arrays have changed since the document was parsed. Mutable tables and arrays are not
 safe for use from multiple threads without external synchronization.
+
+### Writing TOML
+
+`toToml(TomlOptions)` chooses how much of a parsed document's own layout is kept. `TomlOptions`
+offers three styles:
+
+* **Preserve**, the default: a parsed document is written from the text it was parsed from, and only
+  what the editing API changed is written anew, as described above.
+* **`prettify()`**: keeps the order of lines, the comments, the table structure and the literal form
+  of every key and value, but lays out whitespace, indentation, blank lines, and arrays and inline
+  tables, from the options.
+* **`canonical()`**: writes the whole document in the default style, as a document built with the
+  editing API is written, ignoring how it was written.
+
+`withIndent`, `withMaxLineWidth` and `withLineSeparator` shape that layout. New lines end the way the
+document's own lines do unless `withLineSeparator` asks for a separator:
+
+```java
+String pretty = result.toToml(TomlOptions.defaults().prettify().withIndent(2));
+```
+
+`MutableTomlTable` and `MutableTomlArray` also have `reformat(TomlOptions.Style)`, which writes one
+table or array, and everything nested in it, in a style of its own - `PRETTIFY` or `CANONICAL` - the
+next time the document is written:
+
+```java
+result.getTable("server").reformat(TomlOptions.Style.CANONICAL);
+```
+
+The default style - used for anything with no text to write from: a table or array built through the
+editing API, a document parsed with `withoutSource()`, or anything `canonical()` writes - is
+`key = value` lines, a table's values before its sub-tables, a sub-table under its own `[a.b]`
+header, and each table of an array of tables under its own `[[a]]` header. A table or array nested
+inside an array or an inline table is written inline, `{ k = v }` or `[1, 2]`. An array is written on
+one line, `[1, 2, 3]`, when that fits within 80 columns, and one element per line otherwise; a string
+holding a newline is written as a multi-line string. Comments are written as the model holds them,
+and an array or an inline table that holds a comment is written over lines, one element per line.
 
 ### Specification version
 

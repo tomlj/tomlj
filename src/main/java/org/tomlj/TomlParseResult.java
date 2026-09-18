@@ -25,8 +25,8 @@ import java.util.List;
  *
  * <p>
  * A parse result is a {@link MutableTomlTable}, so a parsed document can be changed and written back out with
- * {@link #toToml()}. {@link #errors()} reports only what was found while parsing, and is unaffected by any change made
- * afterwards.
+ * {@link #toToml()}, written back from the text it was parsed from; see {@link TomlOptions}. {@link #errors()} reports
+ * only what was found while parsing, and is unaffected by any change made afterwards.
  */
 public interface TomlParseResult extends MutableTomlTable {
 

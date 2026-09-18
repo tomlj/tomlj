@@ -1422,12 +1422,13 @@ public interface TomlTable {
    * Return a representation of this table using TOML, written with the default options.
    *
    * <p>
-   * A {@link TomlParseResult} is written as the document it was parsed from, with only what the editing API changed
-   * written anew; see {@link TomlOptions.Style#PRESERVE}. Any other table, including a table of a parse result rather
-   * than the result itself, is written in the default style.
+   * A {@link TomlParseResult} is written from the text it was parsed from, with only what the editing API changed
+   * written anew; any other table, including a table of a parse result rather than the result itself, is written in the
+   * default style.
    *
    * @return A TOML representation of this table.
    * @see TomlOptions#defaults()
+   * @see TomlOptions
    */
   default String toToml() {
     return toToml(TomlOptions.defaults());
@@ -1437,11 +1438,12 @@ public interface TomlTable {
    * Return a representation of this table using TOML.
    *
    * <p>
-   * A {@link TomlParseResult} is written as the document it was parsed from unless the options ask for
-   * {@link TomlOptions.Style#CANONICAL}; see {@link #toToml()}.
+   * A {@link TomlParseResult} is written from the text it was parsed from unless {@code options} ask for
+   * {@link TomlOptions.Style#CANONICAL}; any other table is written in the default style. See {@link #toToml()}.
    *
    * @param options Options for the TOML encoder.
    * @return A TOML representation of this table.
+   * @see TomlOptions
    */
   default String toToml(TomlOptions options) {
     StringBuilder builder = new StringBuilder();
@@ -1457,9 +1459,13 @@ public interface TomlTable {
   /**
    * Append a TOML representation of this table to the appendable output, written with the default options.
    *
+   * <p>
+   * Written as {@link #toToml()} writes it.
+   *
    * @param appendable The appendable output.
    * @throws IOException If an IO error occurs.
    * @see TomlOptions#defaults()
+   * @see TomlOptions
    */
   default void toToml(Appendable appendable) throws IOException {
     toToml(appendable, TomlOptions.defaults());
@@ -1468,9 +1474,13 @@ public interface TomlTable {
   /**
    * Append a TOML representation of this table to the appendable output.
    *
+   * <p>
+   * Written as {@link #toToml(TomlOptions)} writes it.
+   *
    * @param appendable The appendable output.
    * @param options Options for the TOML encoder.
    * @throws IOException If an IO error occurs.
+   * @see TomlOptions
    */
   default void toToml(Appendable appendable, TomlOptions options) throws IOException {
     TomlSerializer.toToml(this, appendable, options);
