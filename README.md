@@ -118,7 +118,8 @@ for (TomlElement element : result.elements()) {
 
 A comment's text is what follows `# `, one string per line in `lines()`. The comments on a `[[x]]`
 header are attached to the table it opens, so they are read with `getArray("x").comments(0)`.
-`toToml()` does not write comments yet.
+`toToml()` does not write comments yet. [docs/comments.md](docs/comments.md) states the rules in
+full, with the cases at their edges.
 
 ### Specification version
 
