@@ -76,7 +76,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
           separated.forEach(container::addComment);
           separated = null;
         }
-        attached = TomlComment.attached(Comments.above(previous), Comments.after(next));
+        attached = TomlComment.withoutNulls(Comments.above(previous), Comments.after(next));
         child.accept(this);
       } else if (child instanceof TomlParser.CommentRunContext && !(next instanceof TomlParser.ExpressionContext)) {
         // A run directly above an expression is handed to it when it is reached; this one documents nothing.

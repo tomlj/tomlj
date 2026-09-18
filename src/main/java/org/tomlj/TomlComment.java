@@ -70,23 +70,23 @@ public final class TomlComment implements TomlElement {
   }
 
   /**
-   * Collect the comments attached to one expression, in the order they were written.
+   * List the arguments that are not {@code null}, in argument order.
    *
-   * @param above The run written above the expression, or {@code null} if there is none.
-   * @param after The comment trailing the expression, or {@code null} if there is none.
-   * @return The comments, as an unmodifiable list of at most two.
+   * @param first The first comment, or {@code null}.
+   * @param second The second comment, or {@code null}.
+   * @return The arguments that are not {@code null}, as an unmodifiable list of at most two.
    */
-  static List<TomlComment> attached(@Nullable TomlComment above, @Nullable TomlComment after) {
-    if (above == null && after == null) {
+  static List<TomlComment> withoutNulls(@Nullable TomlComment first, @Nullable TomlComment second) {
+    if (first == null && second == null) {
       return Collections.emptyList();
     }
-    if (above == null) {
-      return Collections.singletonList(after);
+    if (first == null) {
+      return Collections.singletonList(second);
     }
-    if (after == null) {
-      return Collections.singletonList(above);
+    if (second == null) {
+      return Collections.singletonList(first);
     }
-    return Collections.unmodifiableList(Arrays.asList(above, after));
+    return Collections.unmodifiableList(Arrays.asList(first, second));
   }
 
   private TomlComment(List<String> rawLines, TomlPosition position, @Nullable Placement placement) {

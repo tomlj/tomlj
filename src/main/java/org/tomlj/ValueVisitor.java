@@ -186,14 +186,14 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
       if (node instanceof TomlParser.ValContext) {
         append(array, (TomlParser.ValContext) node, nodes, i);
       } else if (node instanceof TomlParser.LineBreakContext) {
-        Comments.unattached(nodes, i, array);
+        Comments.addUnattached(nodes, i, array);
       }
     }
     return array;
   }
 
   private void append(ListTomlArray array, TomlParser.ValContext ctx, List<ParseTree> nodes, int index) {
-    List<TomlComment> comments = TomlComment.attached(Comments.above(nodes, index), Comments.after(nodes, index));
+    List<TomlComment> comments = TomlComment.withoutNulls(Comments.above(nodes, index), Comments.after(nodes, index));
     Object value = ctx.accept(this);
     if (value == null) {
       return;
@@ -230,7 +230,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
         }
         set(table, openTables, (TomlParser.KeyvalContext) node, nodes, i);
       } else if (node instanceof TomlParser.LineBreakContext) {
-        Comments.unattached(nodes, i, table);
+        Comments.addUnattached(nodes, i, table);
       }
     }
     if (openTables != null) {
@@ -254,7 +254,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     if (path == null || path.isEmpty()) {
       return;
     }
-    List<TomlComment> comments = TomlComment.attached(Comments.above(nodes, index), Comments.after(nodes, index));
+    List<TomlComment> comments = TomlComment.withoutNulls(Comments.above(nodes, index), Comments.after(nodes, index));
     Object value = valContext.accept(this);
     if (value != null) {
       table
