@@ -249,6 +249,56 @@ final class SourceSpan {
         aboveStop);
   }
 
+  /**
+   * An element of an array, or an entry of an inline table.
+   *
+   * @param source The text the offsets address.
+   * @param start The first offset after the element before this one, or after the opening bracket.
+   * @param aboveStart The first {@code #} of the comment run above the element, or {@code -1}.
+   * @param aboveStop The last offset of that run, or {@code -1}.
+   * @param keyStart The first offset of the key as written, or {@code -1} for an array element.
+   * @param keyStop The last offset of the key as written, or {@code -1} for an array element.
+   * @param keyParts The number of keys the written key has, or {@code 0} for an array element.
+   * @param valueStart The first offset of the value.
+   * @param commaOffset The offset of the comma in this element's tail, or {@code -1}.
+   * @param afterStart The {@code #} of the comment after the value, or {@code -1}.
+   * @param afterStop The last offset of that comment, or {@code -1}.
+   * @param tailStart The first offset copied after the value.
+   * @param stop The last offset of the tail.
+   * @return The span.
+   */
+  static SourceSpan element(
+      Source source,
+      int start,
+      int aboveStart,
+      int aboveStop,
+      int keyStart,
+      int keyStop,
+      int keyParts,
+      int valueStart,
+      int commaOffset,
+      int afterStart,
+      int afterStop,
+      int tailStart,
+      int stop) {
+    return new SourceSpan(
+        source,
+        Kind.ELEMENT,
+        start,
+        aboveStart,
+        aboveStop,
+        keyStart,
+        keyStop,
+        keyParts,
+        valueStart,
+        commaOffset,
+        afterStart,
+        afterStop,
+        tailStart,
+        -1,
+        stop);
+  }
+
   private SourceSpan(
       Source source,
       Kind kind,

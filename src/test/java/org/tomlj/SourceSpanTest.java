@@ -155,12 +155,55 @@ class SourceSpanTest {
             "[a]\n\n[b]\n\n[c]\n");
   }
 
+  static Stream<String> containerDocuments() {
+    return Stream
+        .of(
+            "a = [1,2,3]\n",
+            "a = [ 1, 2, 3 ]\n",
+            "a = [1, 2, 3,]\n",
+            "a = [ 1 , 2 , 3 , ]\n",
+            "a = []\n",
+            "a = [ ]\n",
+            "a = [\n]\n",
+            "a = {}\n",
+            "a = { }\n",
+            "a = { b = 1 }\n",
+            "a = {b=1,c=2}\n",
+            "a = { b.c = 1, d = 2, b.e = 3 }\n",
+            "a = [\n  1,\n  2,\n]\n",
+            "a = [ # on the bracket line\n  # above the first\n  1, # after the first\n  2 # after the last\n"
+                + "  # before the closing bracket\n]\n",
+            "a = [\n  1,\n\n  # a run of its own\n\n  2,\n]\n",
+            "a = [\n  # only a comment\n]\n",
+            "a = [1 # after the value\n, 2]\n",
+            "a = [1\n, 2]\n",
+            "a = [ [1, 2], [ ], [[3]] ]\n",
+            "a = [ { b = 1 }, { c = [2] } ]\n",
+            "a = {\n  b = 1, # after\n  # above\n  c = 2,\n}\n",
+            "a = [\r\n  1,\r\n  2\r\n]\r\n",
+            "a = [\n\t1,\n\t2\n]\n",
+            "a = [\"😀\", { \"😀\" = \"😀\" }] # 😀\n",
+            "a = [ 'x' ]\nb = [ '''\nml\n''' ]\n");
+  }
+
+  static Stream<String> allDocuments() {
+    return Stream.concat(spanDocuments(), containerDocuments());
+  }
+
   @ParameterizedTest
-  @MethodSource("spanDocuments")
+  @MethodSource("allDocuments")
   void aDocumentIsTheTextOfItsSpansInOrder(String document) {
     ParsedTomlTable table = parse(document);
     assertFalse(table.hasErrors(), () -> errorsOf(table));
     assertEquals(document, reassemble(table));
+  }
+
+  @ParameterizedTest
+  @MethodSource("allDocuments")
+  void aContainerIsTheTextOfItsElementsInOrder(String document) {
+    ParsedTomlTable table = parse(document);
+    assertFalse(table.hasErrors(), () -> errorsOf(table));
+    assertContainersReassemble(table);
   }
 
   static Stream<Arguments> skippedLineDocuments() {
@@ -308,11 +351,100 @@ class SourceSpanTest {
     assertEquals(document, b.source.text(0, b.source.length() - 1));
   }
 
+  // ---- The offsets of the elements of one container ----
+
+  @Test
+  void anElementRecordsTheCommaThatFollowsIt() {
+    SourceSpan first = elementSpanOf(parse("a = [1, 2]\n"), 0);
+    assertEquals(SourceSpan.Kind.ELEMENT, first.kind);
+    assertEquals(",", first.source.text(first.commaOffset, first.commaOffset));
+    assertEquals(6, first.commaOffset);
+    assertEquals(-1, first.keyStart);
+    assertEquals(0, first.keyParts);
+
+    assertEquals(7, elementSpanOf(parse("a = [1 ,2]\n"), 0).commaOffset);
+    assertEquals(9, elementSpanOf(parse("a = [1, 2,]\n"), 1).commaOffset);
+    assertEquals(-1, elementSpanOf(parse("a = [1, 2]\n"), 1).commaOffset);
+  }
+
+  @Test
+  void anElementRecordsTheCommentAfterItWhicheverSideOfTheCommaItIsOn() {
+    SourceSpan afterComma = elementSpanOf(parse("a = [1, # after\n  2]\n"), 0);
+    assertEquals("# after", afterComma.source.text(afterComma.afterStart, afterComma.afterStop));
+    assertTrue(afterComma.commaOffset < afterComma.afterStart);
+    assertEquals("1, # after\n", afterComma.source.text(afterComma.start, afterComma.stop));
+
+    // A comma written on the next line separates the elements but does not end the first one's line.
+    SourceSpan beforeComma = elementSpanOf(parse("a = [1 # after\n, 2]\n"), 0);
+    assertEquals("# after", beforeComma.source.text(beforeComma.afterStart, beforeComma.afterStop));
+    assertEquals(-1, beforeComma.commaOffset);
+    assertEquals("1 # after\n", beforeComma.source.text(beforeComma.start, beforeComma.stop));
+  }
+
+  @Test
+  void anElementRecordsTheRunAboveIt() {
+    String document = "a = [\n  # above\n  1,\n]\n";
+    SourceSpan span = elementSpanOf(parse(document), 0);
+    assertEquals("# above\n", span.source.text(span.aboveStart, span.aboveStop));
+    assertEquals(5, span.start);
+    assertEquals("\n  # above\n  1,\n", span.source.text(span.start, span.stop));
+  }
+
+  @Test
+  void anEntryOfAnInlineTableRecordsItsKey() {
+    ParsedTomlTable table = parse("a = { b.c = 1 }\n");
+    Entry.KeyValue entry = table.entry(List.of("a", "b", "c"));
+    assertNotNull(entry);
+    SourceSpan span = entry.span;
+    assertNotNull(span);
+    assertEquals(SourceSpan.Kind.ELEMENT, span.kind);
+    assertEquals("b.c", span.source.text(span.keyStart, span.keyStop));
+    assertEquals(2, span.keyParts);
+    assertEquals("1", span.source.text(span.valueStart, span.valueStart));
+    assertEquals(span.valueStart + 1, span.tailStart);
+  }
+
+  @Test
+  void aContainerRecordsItsBracketsAndTheWhitespaceBeforeTheClosingOne() {
+    ValueSpan brackets = bracketSpanOf(parse("a = [1, 2 ]\n"), "a");
+    assertEquals("[", brackets.source.text(brackets.start, brackets.start));
+    assertEquals("]", brackets.source.text(brackets.stop, brackets.stop));
+    assertEquals(" ", brackets.source.text(brackets.trailerStart, brackets.stop - 1));
+
+    ValueSpan tight = bracketSpanOf(parse("a = [1, 2]\n"), "a");
+    assertEquals(tight.stop, tight.trailerStart);
+
+    ValueSpan empty = bracketSpanOf(parse("a = []\n"), "a");
+    assertEquals(empty.start + 1, empty.trailerStart);
+    assertEquals(empty.stop, empty.trailerStart);
+
+    ValueSpan braces = bracketSpanOf(parse("a = { b = 1 }\n"), "a");
+    assertEquals("{", braces.source.text(braces.start, braces.start));
+    assertEquals("}", braces.source.text(braces.stop, braces.stop));
+    assertEquals(" ", braces.source.text(braces.trailerStart, braces.stop - 1));
+  }
+
+  @Test
+  void aCommentInsideBracketsRecordsItsOwnLines() {
+    String document = "a = [\n  1,\n  # a run\n  # of two lines\n]\n";
+    ParsedTomlTable table = parse(document);
+    assertFalse(table.hasErrors(), () -> errorsOf(table));
+
+    ListTomlArray array = (ListTomlArray) table.getArray("a");
+    assertNotNull(array);
+    SourceSpan span = commentSpans(array).get(0);
+    assertEquals(SourceSpan.Kind.COMMENT, span.kind);
+    assertEquals("# a run\n# of two lines\n", span.source.text(span.aboveStart, span.aboveStop).replace("  ", ""));
+    assertEquals(span.aboveStop, span.stop);
+    assertEquals("  # a run\n  # of two lines\n", span.source.text(span.start, span.stop));
+  }
+
   // ---- Parsing with no source kept ----
 
   @Test
   void aParseWithoutSourceRecordsNothing() {
-    ParsedTomlTable table = parse("# a comment\n[a] # after\nb = 1\n", TomlParseOptions.defaults().withoutSource());
+    ParsedTomlTable table =
+        parse("# a comment\n[a] # after\nb = 1\nc = [2]\n", TomlParseOptions.defaults().withoutSource());
     assertNull(table.source());
     assertEquals(-1, table.trailerStart());
     assertNull(spanOf(table, "a", "b"));
@@ -323,6 +455,10 @@ class SourceSpanTest {
         assertNull(comment.span());
       }
     }
+    ListTomlArray array = (ListTomlArray) table.getArray(List.of("a", "c"));
+    assertNotNull(array);
+    assertNull(array.bracketSpan);
+    assertNull(array.entry(0).span);
   }
 
   // ---- Copies ----
@@ -338,6 +474,22 @@ class SourceSpanTest {
     assertNotNull(copied);
     assertSame(original.span, copied.span);
     assertSame(((Value.Scalar) original.value).span, ((Value.Scalar) copied.value).span);
+  }
+
+  @Test
+  void aCopyKeepsTheBracketsAndElementsOfAnArrayItCopies() {
+    ParsedTomlTable table = parse("a = [1, { b = 2 } ]\n");
+    ListTomlArray original = (ListTomlArray) table.getArray("a");
+    assertNotNull(original);
+
+    ListTomlArray copied = (ListTomlArray) MutableTomlTable.copyOf(table).getArray("a");
+    assertNotNull(copied);
+    assertSame(original.bracketSpan, copied.bracketSpan);
+    assertSame(original.entry(0).span, copied.entry(0).span);
+    assertSame(((Value.Scalar) original.entry(0).value).span, ((Value.Scalar) copied.entry(0).value).span);
+    assertSame(
+        ((ElementContainer<?>) original.entry(1).value).bracketSpan,
+        ((ElementContainer<?>) copied.entry(1).value).bracketSpan);
   }
 
   @Test
@@ -372,15 +524,15 @@ class SourceSpanTest {
    * @return The document as its spans record it, which is the document itself unless the parser rejected a line.
    */
   static String reassemble(ParsedTomlTable table) {
-    List<SourceSpan> spans = new ArrayList<>();
-    collect(table, spans);
-    spans.sort(Comparator.comparingInt((SourceSpan span) -> span.start));
+    List<Chunk> chunks = new ArrayList<>();
+    collect(table, chunks);
+    chunks.sort(Comparator.comparingInt(chunk -> chunk.start));
 
     Source source = table.source();
     assertNotNull(source);
     StringBuilder written = new StringBuilder();
-    for (SourceSpan span : spans) {
-      written.append(text(span));
+    for (Chunk chunk : chunks) {
+      written.append(chunk.text);
     }
     if (table.trailerStart() >= 0) {
       written.append(source.text(table.trailerStart(), source.length() - 1));
@@ -388,38 +540,110 @@ class SourceSpanTest {
     return written.toString();
   }
 
-  private static String text(SourceSpan span) {
-    Source source = span.source;
-    if (span.kind == SourceSpan.Kind.COMMENT) {
-      return source.text(span.start, span.stop);
+  /** The text one line, header or unattached comment of a section covers, with the offset it starts at. */
+  private static final class Chunk {
+    final int start;
+    final String text;
+
+    Chunk(SourceSpan span, int valueStop) {
+      this.start = span.start;
+      if (span.kind == SourceSpan.Kind.COMMENT) {
+        this.text = span.source.text(span.start, span.stop);
+      } else {
+        this.text = span.source.text(span.start, valueStop) + span.source.text(span.tailStart, span.stop);
+      }
     }
-    // A line's value ends where its tail begins: the value's own span records its end, but an array or an inline table
-    // does not record its brackets yet, so the tail is the only way to find the end of such a value.
-    int stop = (span.kind == SourceSpan.Kind.HEADER) ? span.keyStop : (span.tailStart - 1);
-    return source.text(span.start, stop) + source.text(span.tailStart, span.stop);
   }
 
-  private static void collect(ElementContainer<?> container, List<SourceSpan> spans) {
+  private static void collect(ElementContainer<?> container, List<Chunk> chunks) {
     for (TomlElement element : container.elements()) {
       if (element instanceof TomlComment comment) {
         SourceSpan span = comment.span();
         if (span != null) {
-          spans.add(span);
+          chunks.add(new Chunk(span, -1));
+        }
+        continue;
+      }
+      Entry entry = (Entry) element;
+      Value value = entry.value;
+      if (entry.span != null && entry.span.kind == SourceSpan.Kind.LINE) {
+        int valueStop = valueStop(value);
+        assertEquals(entry.span.tailStart - 1, valueStop, "a line's value ends where its tail begins");
+        chunks.add(new Chunk(entry.span, valueStop));
+      }
+      if (value instanceof LinkedTomlTable table && table.headerSpan != null) {
+        chunks.add(new Chunk(table.headerSpan, table.headerSpan.keyStop));
+      }
+      // What is written between brackets is part of its own line, not a line of a section: only a table a header
+      // opened, an array of such tables, and a table a dotted key opened hold lines of their own.
+      if (value instanceof ElementContainer<?> nested && nested.bracketSpan == null) {
+        collect(nested, chunks);
+      }
+    }
+  }
+
+  /**
+   * Check every array and inline table written between brackets in a document, and everything nested in one: the text
+   * between its brackets is the opening bracket, then each of its elements and comments in the order they were written,
+   * then the whitespace before the closing bracket, then the closing bracket.
+   *
+   * @param container The container to check, and to walk for the ones written in it.
+   */
+  static void assertContainersReassemble(ElementContainer<?> container) {
+    ValueSpan brackets = container.bracketSpan;
+    if (brackets != null) {
+      Source source = brackets.source;
+      StringBuilder written = new StringBuilder(source.text(brackets.start, brackets.start));
+      for (SourceSpan span : elementSpans(container)) {
+        written.append(source.text(span.start, span.stop));
+      }
+      written.append(source.text(brackets.trailerStart, brackets.stop - 1));
+      written.append(source.text(brackets.stop, brackets.stop));
+      assertEquals(source.text(brackets.start, brackets.stop), written.toString());
+    }
+    for (TomlElement element : container.elements()) {
+      if (element instanceof Entry entry && entry.value instanceof ElementContainer<?> nested) {
+        assertContainersReassemble(nested);
+      }
+    }
+  }
+
+  /** The spans of what an array or inline table holds, in the order it was written. */
+  private static List<SourceSpan> elementSpans(ElementContainer<?> container) {
+    List<SourceSpan> spans = new ArrayList<>();
+    addElementSpans(container, spans);
+    spans.sort(Comparator.comparingInt(span -> span.start));
+    return spans;
+  }
+
+  private static void addElementSpans(ElementContainer<?> container, List<SourceSpan> spans) {
+    for (TomlElement element : container.elements()) {
+      if (element instanceof TomlComment comment) {
+        if (comment.span() != null) {
+          spans.add(comment.span());
         }
         continue;
       }
       Entry entry = (Entry) element;
       if (entry.span != null) {
         spans.add(entry.span);
-      }
-      Value value = entry.value;
-      if (value instanceof LinkedTomlTable table && table.headerSpan != null) {
-        spans.add(table.headerSpan);
-      }
-      if (value instanceof ElementContainer<?> nested) {
-        collect(nested, spans);
+      } else if (entry.value instanceof ElementContainer<?> dotted && dotted.bracketSpan == null) {
+        // A dotted key in an inline table opens a table of its own, and the entry written between the braces is the
+        // one the key ends at.
+        addElementSpans(dotted, spans);
       }
     }
+  }
+
+  /** The last offset of a value as written: the literal of a scalar, or the closing bracket of a container. */
+  private static int valueStop(Value value) {
+    if (value instanceof Value.Scalar scalar) {
+      assertNotNull(scalar.span);
+      return scalar.span.stop;
+    }
+    ValueSpan brackets = ((ElementContainer<?>) value).bracketSpan;
+    assertNotNull(brackets);
+    return brackets.stop;
   }
 
   // ---- Reaching into the model ----
@@ -451,6 +675,22 @@ class SourceSpanTest {
   private static SourceSpan headerSpanOf(LinkedTomlTable table) {
     assertNotNull(table);
     return table.headerSpan;
+  }
+
+  private static SourceSpan elementSpanOf(ParsedTomlTable table, int index) {
+    ListTomlArray array = (ListTomlArray) table.getArray("a");
+    assertNotNull(array);
+    SourceSpan span = array.entry(index).span;
+    assertNotNull(span);
+    return span;
+  }
+
+  private static ValueSpan bracketSpanOf(ParsedTomlTable table, String... path) {
+    Entry.KeyValue entry = table.entry(List.of(path));
+    assertNotNull(entry);
+    ValueSpan brackets = ((ElementContainer<?>) entry.value).bracketSpan;
+    assertNotNull(brackets);
+    return brackets;
   }
 
   private static List<SourceSpan> commentSpans(ElementContainer<?> container) {

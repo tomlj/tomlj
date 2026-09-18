@@ -778,8 +778,9 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
    * {@link TomlValues#normalize}; every other value is shared.
    *
    * <p>
-   * An entry keeps the record of where it was written, so that a copy of a parsed document can still be written the way
-   * the document was; the copy's own header span stays null, since a header names a path this table no longer has.
+   * An entry keeps the record of where it was written, and so do this table's own brackets if it was written as an
+   * inline table, so that a copy of a parsed document can still be written the way the document was; the copy's own
+   * header span stays null, since a header names a path this table no longer has.
    *
    * @param table The table to copy.
    * @param inline Whether the copy is an inline table.
@@ -787,6 +788,9 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
    */
   private static LinkedTomlTable copyFrom(TomlTable table, boolean inline) {
     LinkedTomlTable copy = new LinkedTomlTable(null, inline);
+    if (table instanceof ElementContainer) {
+      copy.bracketSpan = ((ElementContainer<?>) table).bracketSpan;
+    }
     for (TomlElement element : table.elements()) {
       if (element instanceof TomlComment) {
         copy.addParsedComment(((TomlComment) element).withoutPosition());
