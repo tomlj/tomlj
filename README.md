@@ -153,6 +153,9 @@ in `elements()`, its input position and its comments; replacing an array element
 and its comments. Removing an entry takes its comments with it and leaves the unattached comments
 around it where they are.
 
+Keys and `String` values must not contain an unpaired surrogate, and dates must be ones TOML can
+write (a year from 0 to 9999, and no seconds in the offset).
+
 `set` and `add` put a new entry after the last element. To place one elsewhere, name the entry it
 goes next to: `insertBefore` and `insertAfter` take an existing key (on an array, an index) and put
 the new entry immediately before or after it. The anchor can also be any element of `elements()`,

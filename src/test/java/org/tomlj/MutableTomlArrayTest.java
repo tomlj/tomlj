@@ -21,13 +21,20 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests for {@link MutableTomlArray}, through the public API only.
@@ -194,6 +201,38 @@ class MutableTomlArrayTest {
     MutableTomlArray array = MutableTomlArray.create();
     assertThrows(NullPointerException.class, () -> array.add(null));
     assertThrows(IllegalArgumentException.class, () -> array.add(new Object()));
+  }
+
+  // A String with a lone high surrogate, an OffsetDateTime whose offset has a seconds part, and a LocalDateTime and a
+  // LocalDate with a year TOML cannot write.
+  private static Stream<Object> badValues() {
+    return Stream
+        .of(
+            "bad\uD800value",
+            OffsetDateTime.of(2020, 1, 1, 0, 0, 0, 0, ZoneOffset.ofHoursMinutesSeconds(5, 0, 30)),
+            LocalDateTime.of(10000, 1, 1, 0, 0),
+            LocalDate.of(10000, 1, 1));
+  }
+
+  @ParameterizedTest
+  @MethodSource("badValues")
+  void shouldRejectValuesTomlCannotRepresentThroughAdd(Object value) {
+    MutableTomlArray array = MutableTomlArray.create();
+    assertThrows(IllegalArgumentException.class, () -> array.add(value));
+  }
+
+  @ParameterizedTest
+  @MethodSource("badValues")
+  void shouldRejectValuesTomlCannotRepresentThroughSet(Object value) {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+    assertThrows(IllegalArgumentException.class, () -> array.set(0, value));
+  }
+
+  @ParameterizedTest
+  @MethodSource("badValues")
+  void shouldRejectValuesTomlCannotRepresentThroughInsertBefore(Object value) {
+    MutableTomlArray array = MutableTomlArray.of(1L);
+    assertThrows(IllegalArgumentException.class, () -> array.insertBefore(0, value));
   }
 
   @Test

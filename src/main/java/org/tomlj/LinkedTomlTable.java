@@ -472,6 +472,7 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
       throw new IllegalArgumentException("path is empty");
     }
     requireNoNullElement(path);
+    checkKeyPath(path);
     Object normalized = TomlValues.normalize(value);
     int depth = path.size();
     LinkedTomlTable table = ensureEditedTable(path.subList(0, depth - 1));
@@ -503,6 +504,7 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
     }
     requireNoNullElement(anchorPath);
     requireNonNull(key);
+    TomlValues.checkKey(key);
     Object normalized = TomlValues.normalize(value);
 
     LinkedTomlTable table = parentTable(anchorPath);
@@ -519,6 +521,7 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
   public LinkedTomlTable insertBefore(TomlElement anchor, String key, Object value) {
     requireNonNull(anchor);
     requireNonNull(key);
+    TomlValues.checkKey(key);
     Object normalized = TomlValues.normalize(value);
     return insertEntry(anchor, key, normalized, false);
   }
@@ -527,6 +530,7 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
   public LinkedTomlTable insertAfter(TomlElement anchor, String key, Object value) {
     requireNonNull(anchor);
     requireNonNull(key);
+    TomlValues.checkKey(key);
     Object normalized = TomlValues.normalize(value);
     return insertEntry(anchor, key, normalized, true);
   }
@@ -624,6 +628,13 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
     }
   }
 
+  // Checked before any table along path is created, so a rejected call leaves the model unchanged.
+  private static void checkKeyPath(List<String> path) {
+    for (String key : path) {
+      TomlValues.checkKey(key);
+    }
+  }
+
   /**
    * Walk to the table at a path for the editing API, creating any table along it that does not already exist.
    *
@@ -663,6 +674,7 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
   @Override
   public LinkedTomlTable getOrCreateTable(List<String> path) {
     requireNoNullElement(path);
+    checkKeyPath(path);
     return ensureEditedTable(path);
   }
 
@@ -672,6 +684,7 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
       throw new IllegalArgumentException("path is empty");
     }
     requireNoNullElement(path);
+    checkKeyPath(path);
     int depth = path.size();
     LinkedTomlTable table = ensureEditedTable(path.subList(0, depth - 1));
     String key = path.get(depth - 1);
@@ -769,6 +782,7 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
         copy.addParsedComment(((TomlComment) element).withoutPosition());
       } else {
         TomlKeyValue original = (TomlKeyValue) element;
+        TomlValues.checkKey(original.key());
         // A fresh wrapper even for a scalar: an entry's position is dropped, and an array entry's is its value's.
         Value value = Value.of(TomlValues.normalize(original.value().get()), null);
         copy.putEdited(original.key(), value, TomlComment.copyWithoutPositions(original.comments()));

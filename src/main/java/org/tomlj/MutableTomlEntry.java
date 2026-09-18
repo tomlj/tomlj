@@ -46,7 +46,8 @@ public interface MutableTomlEntry extends TomlEntry {
    * @param value The replacement value.
    * @return The value this entry held before, as {@link TomlValue#get()} would give it.
    * @throws NullPointerException If {@code value} is {@code null}.
-   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
    */
   Object setValue(Object value);
 

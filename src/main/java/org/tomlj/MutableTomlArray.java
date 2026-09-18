@@ -31,6 +31,11 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * through the getters that return it. {@code null} throws a {@link NullPointerException}.
  *
  * <p>
+ * A key or a {@link String} value must not contain an unpaired surrogate, an {@link java.time.OffsetDateTime}'s offset
+ * must be a whole number of minutes, and a {@link java.time.LocalDate}, {@link java.time.LocalDateTime} or
+ * {@link java.time.OffsetDateTime} must have a year between 0 and 9999, since none of these can be written as TOML.
+ *
+ * <p>
  * An entry's attached comments are edited through its {@link MutableTomlEntry} obtained from {@link #entry}, or through
  * the shortcuts here. An unattached comment is added after the last element with {@link #addComment} and removed with
  * {@link #removeComment}. An entry or a comment can be inserted before or after the entry at an index, or before or
@@ -62,7 +67,7 @@ public interface MutableTomlArray extends TomlArray {
    * @param values The values, each converted as {@link #add(Object)} converts one.
    * @return A new array with one entry per value.
    * @throws NullPointerException If a value is {@code null}.
-   * @throws IllegalArgumentException If a value cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If a value cannot be converted to a TOML value, or cannot be written as TOML.
    */
   static MutableTomlArray of(Object... values) {
     MutableTomlArray array = create();
@@ -82,7 +87,8 @@ public interface MutableTomlArray extends TomlArray {
    * @param value The value to add.
    * @return This array.
    * @throws NullPointerException If {@code value} is {@code null}.
-   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
    */
   MutableTomlArray add(Object value);
 
@@ -100,7 +106,8 @@ public interface MutableTomlArray extends TomlArray {
    * @return This array.
    * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
    * @throws NullPointerException If {@code value} is {@code null}.
-   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
    */
   MutableTomlArray insertBefore(int index, Object value);
 
@@ -120,7 +127,8 @@ public interface MutableTomlArray extends TomlArray {
    * @return This array.
    * @throws IndexOutOfBoundsException If {@code index} is negative or not less than {@link #size()}.
    * @throws NullPointerException If {@code value} is {@code null}.
-   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
    */
   MutableTomlArray insertAfter(int index, Object value);
 
@@ -138,7 +146,8 @@ public interface MutableTomlArray extends TomlArray {
    * @param value The value to insert.
    * @return This array.
    * @throws NullPointerException If {@code anchor} or {@code value} is {@code null}.
-   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
    * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
    */
   MutableTomlArray insertBefore(TomlElement anchor, Object value);
@@ -156,7 +165,8 @@ public interface MutableTomlArray extends TomlArray {
    * @param value The value to insert.
    * @return This array.
    * @throws NullPointerException If {@code anchor} or {@code value} is {@code null}.
-   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
    * @throws NoSuchElementException If {@code anchor} is not an element of this array's {@link #elements()}.
    */
   MutableTomlArray insertAfter(TomlElement anchor, Object value);
@@ -174,7 +184,8 @@ public interface MutableTomlArray extends TomlArray {
    * @return This array.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
    * @throws NullPointerException If {@code value} is {@code null}.
-   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value, or cannot be written as
+   *         TOML.
    */
   MutableTomlArray set(int index, Object value);
 
@@ -583,6 +594,7 @@ public interface MutableTomlArray extends TomlArray {
    *
    * @param array The array to copy.
    * @return A new, independent array with the same entries.
+   * @throws IllegalArgumentException If a value in {@code array} cannot be written as TOML.
    */
   static MutableTomlArray copyOf(TomlArray array) {
     requireNonNull(array);
@@ -602,7 +614,7 @@ public interface MutableTomlArray extends TomlArray {
    * @param values The values, each converted as {@link #add(Object)} converts one.
    * @return A new array with one entry per value.
    * @throws NullPointerException If a value is {@code null}.
-   * @throws IllegalArgumentException If a value cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If a value cannot be converted to a TOML value, or cannot be written as TOML.
    */
   static MutableTomlArray copyOf(Iterable<?> values) {
     requireNonNull(values);

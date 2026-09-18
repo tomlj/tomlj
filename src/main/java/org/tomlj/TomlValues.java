@@ -12,6 +12,9 @@
  */
 package org.tomlj;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -48,6 +51,19 @@ final class TomlValues {
     if (value == null) {
       throw new NullPointerException("TOML has no null value; remove the entry instead of setting it to null");
     }
+    if (value instanceof String) {
+      checkNoUnpairedSurrogate((String) value, "String");
+    } else if (value instanceof OffsetDateTime) {
+      OffsetDateTime dateTime = (OffsetDateTime) value;
+      checkYear(dateTime.getYear());
+      if (dateTime.getOffset().getTotalSeconds() % 60 != 0) {
+        throw new IllegalArgumentException("Offset has a non-zero seconds part");
+      }
+    } else if (value instanceof LocalDateTime) {
+      checkYear(((LocalDateTime) value).getYear());
+    } else if (value instanceof LocalDate) {
+      checkYear(((LocalDate) value).getYear());
+    }
     if (value instanceof TomlTable) {
       return MutableTomlTable.copyOf((TomlTable) value);
     }
@@ -70,6 +86,40 @@ final class TomlValues {
       return value;
     }
     throw new IllegalArgumentException("Cannot convert a " + value.getClass().getSimpleName() + " to a TOML value");
+  }
+
+  /**
+   * Check a key handed to the editing API, before anything is created for it.
+   *
+   * @param key The key.
+   * @throws IllegalArgumentException If {@code key} contains an unpaired surrogate.
+   */
+  static void checkKey(String key) {
+    checkNoUnpairedSurrogate(key, "Key");
+  }
+
+  // TOML text is a sequence of Unicode scalar values, so a surrogate that is not part of a pair encoding one has
+  // nothing valid to write. A high surrogate must be followed by a low one; a low surrogate found on its own, or a
+  // high surrogate found at the end of the string or not followed by a low one, is unpaired.
+  private static void checkNoUnpairedSurrogate(String value, String subject) {
+    int length = value.length();
+    for (int i = 0; i < length; i++) {
+      char c = value.charAt(i);
+      if (Character.isHighSurrogate(c)) {
+        if (i + 1 >= length || !Character.isLowSurrogate(value.charAt(i + 1))) {
+          throw new IllegalArgumentException(subject + " contains an unpaired surrogate");
+        }
+        i++;
+      } else if (Character.isLowSurrogate(c)) {
+        throw new IllegalArgumentException(subject + " contains an unpaired surrogate");
+      }
+    }
+  }
+
+  private static void checkYear(int year) {
+    if (year < 0 || year > 9999) {
+      throw new IllegalArgumentException("Year is outside the range 0 to 9999");
+    }
   }
 
   // Built with set() rather than by touching the new table's entries directly, so that a value nested in the map is

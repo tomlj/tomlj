@@ -18,10 +18,17 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests for {@link MutableTomlEntry} and {@link MutableTomlKeyValue}, through the public API only.
@@ -96,6 +103,27 @@ class MutableTomlEntryTest {
 
     assertThrows(NullPointerException.class, () -> entry.setValue(null));
     assertThrows(IllegalArgumentException.class, () -> entry.setValue(new Object()));
+  }
+
+  // A String with a lone high surrogate, an OffsetDateTime whose offset has a seconds part, and a LocalDateTime and a
+  // LocalDate with a year TOML cannot write.
+  private static Stream<Object> badValues() {
+    return Stream
+        .of(
+            "bad\uD800value",
+            OffsetDateTime.of(2020, 1, 1, 0, 0, 0, 0, ZoneOffset.ofHoursMinutesSeconds(5, 0, 30)),
+            LocalDateTime.of(10000, 1, 1, 0, 0),
+            LocalDate.of(10000, 1, 1));
+  }
+
+  @ParameterizedTest
+  @MethodSource("badValues")
+  void shouldRejectValuesTomlCannotRepresent(Object value) {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    MutableTomlKeyValue entry = table.entry("a");
+
+    assertThrows(IllegalArgumentException.class, () -> entry.setValue(value));
   }
 
   @Test

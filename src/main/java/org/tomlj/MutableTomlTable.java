@@ -35,6 +35,11 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * {@link NullPointerException} and anything else an {@link IllegalArgumentException}.
  *
  * <p>
+ * A key or a {@link String} value must not contain an unpaired surrogate, an {@link java.time.OffsetDateTime}'s offset
+ * must be a whole number of minutes, and a {@link java.time.LocalDate}, {@link java.time.LocalDateTime} or
+ * {@link java.time.OffsetDateTime} must have a year between 0 and 9999, since none of these can be written as TOML.
+ *
+ * <p>
  * A {@link TomlTable} or {@link TomlArray} stored as a value is stored as a deep copy, so later changes to the original
  * are not seen; the stored copy is edited through the getters that return it.
  *
@@ -67,7 +72,7 @@ public interface MutableTomlTable extends TomlTable {
    *
    * @param dottedKey A dotted key (e.g. {@code "server.address"}).
    * @return The table.
-   * @throws IllegalArgumentException If the key cannot be parsed.
+   * @throws IllegalArgumentException If the key cannot be parsed, or contains an unpaired surrogate.
    * @throws TomlInvalidTypeException If an element of the path exists and is not a table.
    */
   default MutableTomlTable getOrCreateTable(String dottedKey) {
@@ -84,6 +89,7 @@ public interface MutableTomlTable extends TomlTable {
    * @param path The key path.
    * @return The table, or this table if {@code path} is empty.
    * @throws NullPointerException If a path element is {@code null}.
+   * @throws IllegalArgumentException If a path element contains an unpaired surrogate.
    * @throws TomlInvalidTypeException If an element of the path exists and is not a table.
    */
   MutableTomlTable getOrCreateTable(List<String> path);
@@ -93,7 +99,7 @@ public interface MutableTomlTable extends TomlTable {
    *
    * @param dottedKey A dotted key (e.g. {@code "server.addresses"}).
    * @return The array.
-   * @throws IllegalArgumentException If the key cannot be parsed.
+   * @throws IllegalArgumentException If the key cannot be parsed, or contains an unpaired surrogate.
    * @throws TomlInvalidTypeException If the value exists and is not an array, or an element of the path preceding the
    *         final key exists and is not a table.
    */
@@ -110,7 +116,7 @@ public interface MutableTomlTable extends TomlTable {
    *
    * @param path The key path.
    * @return The array.
-   * @throws IllegalArgumentException If {@code path} is empty.
+   * @throws IllegalArgumentException If {@code path} is empty, or a path element contains an unpaired surrogate.
    * @throws NullPointerException If a path element is {@code null}.
    * @throws TomlInvalidTypeException If the value exists and is not an array, or an element of the path preceding the
    *         final key exists and is not a table.
@@ -124,7 +130,8 @@ public interface MutableTomlTable extends TomlTable {
    * @param value The value to set.
    * @return This table.
    * @throws NullPointerException If {@code dottedKey} or {@code value} is {@code null}.
-   * @throws IllegalArgumentException If the key cannot be parsed, or {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If the key cannot be parsed or contains an unpaired surrogate, or {@code value}
+   *         cannot be converted to a TOML value or cannot be written as TOML.
    * @throws TomlInvalidTypeException If an element of the path preceding the final key exists and is not a table.
    */
   default MutableTomlTable set(String dottedKey, Object value) {
@@ -147,7 +154,8 @@ public interface MutableTomlTable extends TomlTable {
    * @param path The key path.
    * @param value The value to set.
    * @return This table.
-   * @throws IllegalArgumentException If {@code path} is empty, or {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code path} is empty, a path element contains an unpaired surrogate, or
+   *         {@code value} cannot be converted to a TOML value or cannot be written as TOML.
    * @throws NullPointerException If a path element, or {@code value}, is {@code null}.
    * @throws TomlInvalidTypeException If an element of the path preceding the final key exists and is not a table.
    */
@@ -161,8 +169,8 @@ public interface MutableTomlTable extends TomlTable {
    * @param value The value to set.
    * @return This table.
    * @throws NullPointerException If {@code anchorDottedKey}, {@code key}, or {@code value} is {@code null}.
-   * @throws IllegalArgumentException If the anchor key cannot be parsed, or {@code value} cannot be converted to a TOML
-   *         value.
+   * @throws IllegalArgumentException If the anchor key cannot be parsed, {@code key} contains an unpaired surrogate, or
+   *         {@code value} cannot be converted to a TOML value or cannot be written as TOML.
    * @throws NoSuchElementException If the anchor is not set.
    * @throws TomlKeyAlreadySetException If {@code key} is already set in the anchor's table.
    * @throws TomlInvalidTypeException If an element of the anchor path preceding the final key exists and is not a
@@ -188,8 +196,8 @@ public interface MutableTomlTable extends TomlTable {
    * @param key The key of the new entry.
    * @param value The value to set.
    * @return This table.
-   * @throws IllegalArgumentException If {@code anchorPath} is empty, or {@code value} cannot be converted to a TOML
-   *         value.
+   * @throws IllegalArgumentException If {@code anchorPath} is empty, {@code key} contains an unpaired surrogate, or
+   *         {@code value} cannot be converted to a TOML value or cannot be written as TOML.
    * @throws NoSuchElementException If the anchor is not set.
    * @throws TomlKeyAlreadySetException If {@code key} is already set in the anchor's table.
    * @throws NullPointerException If an element of {@code anchorPath}, {@code key}, or {@code value} is {@code null}.
@@ -206,8 +214,8 @@ public interface MutableTomlTable extends TomlTable {
    * @param value The value to set.
    * @return This table.
    * @throws NullPointerException If {@code anchorDottedKey}, {@code key}, or {@code value} is {@code null}.
-   * @throws IllegalArgumentException If the anchor key cannot be parsed, or {@code value} cannot be converted to a TOML
-   *         value.
+   * @throws IllegalArgumentException If the anchor key cannot be parsed, {@code key} contains an unpaired surrogate, or
+   *         {@code value} cannot be converted to a TOML value or cannot be written as TOML.
    * @throws NoSuchElementException If the anchor is not set.
    * @throws TomlKeyAlreadySetException If {@code key} is already set in the anchor's table.
    * @throws TomlInvalidTypeException If an element of the anchor path preceding the final key exists and is not a
@@ -233,8 +241,8 @@ public interface MutableTomlTable extends TomlTable {
    * @param key The key of the new entry.
    * @param value The value to set.
    * @return This table.
-   * @throws IllegalArgumentException If {@code anchorPath} is empty, or {@code value} cannot be converted to a TOML
-   *         value.
+   * @throws IllegalArgumentException If {@code anchorPath} is empty, {@code key} contains an unpaired surrogate, or
+   *         {@code value} cannot be converted to a TOML value or cannot be written as TOML.
    * @throws NoSuchElementException If the anchor is not set.
    * @throws TomlKeyAlreadySetException If {@code key} is already set in the anchor's table.
    * @throws NullPointerException If an element of {@code anchorPath}, {@code key}, or {@code value} is {@code null}.
@@ -260,7 +268,8 @@ public interface MutableTomlTable extends TomlTable {
    * @param value The value to set.
    * @return This table.
    * @throws NullPointerException If {@code anchor}, {@code key}, or {@code value} is {@code null}.
-   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code key} contains an unpaired surrogate, or {@code value} cannot be
+   *         converted to a TOML value or cannot be written as TOML.
    * @throws NoSuchElementException If {@code anchor} is not an element of this table's {@link #elements()}.
    * @throws TomlKeyAlreadySetException If {@code key} is already set in this table.
    */
@@ -282,7 +291,8 @@ public interface MutableTomlTable extends TomlTable {
    * @param value The value to set.
    * @return This table.
    * @throws NullPointerException If {@code anchor}, {@code key}, or {@code value} is {@code null}.
-   * @throws IllegalArgumentException If {@code value} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If {@code key} contains an unpaired surrogate, or {@code value} cannot be
+   *         converted to a TOML value or cannot be written as TOML.
    * @throws NoSuchElementException If {@code anchor} is not an element of this table's {@link #elements()}.
    * @throws TomlKeyAlreadySetException If {@code key} is already set in this table.
    */
@@ -1018,6 +1028,8 @@ public interface MutableTomlTable extends TomlTable {
    *
    * @param table The table to copy.
    * @return A new, independent table with the same entries.
+   * @throws IllegalArgumentException If a key in {@code table} contains an unpaired surrogate, or a value in it cannot
+   *         be written as TOML.
    */
   static MutableTomlTable copyOf(TomlTable table) {
     requireNonNull(table);
@@ -1037,7 +1049,8 @@ public interface MutableTomlTable extends TomlTable {
    * @param map The map to copy.
    * @return A new table with one entry per entry of {@code map}.
    * @throws NullPointerException If a value in {@code map} is {@code null}.
-   * @throws IllegalArgumentException If a value in {@code map} cannot be converted to a TOML value.
+   * @throws IllegalArgumentException If a key in {@code map} contains an unpaired surrogate, or a value in it cannot be
+   *         converted to a TOML value or cannot be written as TOML.
    */
   static MutableTomlTable copyOf(Map<String, ?> map) {
     requireNonNull(map);

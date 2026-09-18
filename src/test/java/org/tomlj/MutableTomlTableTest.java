@@ -22,6 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -29,8 +33,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests for {@link MutableTomlTable}, through the public API only.
@@ -153,6 +160,85 @@ class MutableTomlTableTest {
     MutableTomlTable table = MutableTomlTable.create();
     Path path = Paths.get(".", "a", "b");
     assertThrows(IllegalArgumentException.class, () -> table.set("p", path));
+  }
+
+  // A String with a lone high surrogate, an OffsetDateTime whose offset has a seconds part, and a LocalDateTime and a
+  // LocalDate with a year TOML cannot write.
+  private static Stream<Object> badValues() {
+    return Stream
+        .of(
+            "bad\uD800value",
+            OffsetDateTime.of(2020, 1, 1, 0, 0, 0, 0, ZoneOffset.ofHoursMinutesSeconds(5, 0, 30)),
+            LocalDateTime.of(10000, 1, 1, 0, 0),
+            LocalDate.of(10000, 1, 1));
+  }
+
+  @ParameterizedTest
+  @MethodSource("badValues")
+  void shouldRejectValuesTomlCannotRepresent(Object value) {
+    MutableTomlTable table = MutableTomlTable.create();
+    assertThrows(IllegalArgumentException.class, () -> table.set("a", value));
+  }
+
+  @Test
+  void shouldAcceptBoundaryValuesTomlCanRepresent() {
+    MutableTomlTable table = MutableTomlTable.create();
+    LocalDate year0 = LocalDate.of(0, 1, 1);
+    LocalDate year9999 = LocalDate.of(9999, 12, 31);
+    OffsetDateTime offset = OffsetDateTime.of(2020, 1, 1, 0, 0, 0, 0, ZoneOffset.ofHoursMinutes(5, 30));
+    String surrogatePair = "surrogate 😀 pair";
+
+    table.set("year0", year0);
+    table.set("year9999", year9999);
+    table.set("offset", offset);
+    table.set("pair", surrogatePair);
+
+    assertEquals(year0, table.get("year0"));
+    assertEquals(year9999, table.get("year9999"));
+    assertEquals(offset, table.get("offset"));
+    assertEquals(surrogatePair, table.get("pair"));
+  }
+
+  @Test
+  void shouldRejectAKeyWithAnUnpairedSurrogateViaSetList() {
+    MutableTomlTable table = MutableTomlTable.create();
+    assertThrows(IllegalArgumentException.class, () -> table.set(List.of("bad\uD800key"), 1L));
+  }
+
+  @Test
+  void shouldRejectAKeyWithAnUnpairedSurrogateViaGetOrCreateTable() {
+    MutableTomlTable table = MutableTomlTable.create();
+    assertThrows(IllegalArgumentException.class, () -> table.getOrCreateTable(List.of("bad\uD800key")));
+  }
+
+  @Test
+  void shouldRejectAKeyWithAnUnpairedSurrogateViaInsertAfter() {
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("a", 1L);
+    assertThrows(IllegalArgumentException.class, () -> table.insertAfter("a", "bad\uD800key", 1L));
+  }
+
+  @Test
+  void shouldRejectABadValueNestedInAMap() {
+    MutableTomlTable table = MutableTomlTable.create();
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("x", "bad\uD800value");
+    assertThrows(IllegalArgumentException.class, () -> table.set("m", map));
+  }
+
+  @Test
+  void shouldRejectABadValueNestedInACollection() {
+    MutableTomlTable table = MutableTomlTable.create();
+    List<Object> list = Arrays.asList("good", "bad\uD800value");
+    assertThrows(IllegalArgumentException.class, () -> table.set("a", list));
+  }
+
+  @Test
+  void shouldCreateNoIntermediateTableWhenSetIsRejected() {
+    MutableTomlTable table = MutableTomlTable.create();
+    assertThrows(IllegalArgumentException.class, () -> table.set("a.b", "bad\uD800value"));
+    assertTrue(table.isEmpty());
+    assertFalse(table.isModified());
   }
 
   @Test
