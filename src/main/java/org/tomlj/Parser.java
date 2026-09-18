@@ -20,13 +20,32 @@ import java.util.List;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.misc.Interval;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 final class Parser {
   private Parser() {}
 
   static TomlParseResult parse(CharStream stream, TomlParseOptions options) {
-    return parseTable(stream, options, new AccumulatingErrorListener());
+    return parse(stream, options, sourceOf(stream, options));
+  }
+
+  /**
+   * Parse a document whose text is already at hand, so that it is kept as it is rather than read back out of the
+   * stream.
+   *
+   * @param input The document.
+   * @param options The parse options.
+   * @return The parse result.
+   */
+  static TomlParseResult parse(String input, TomlParseOptions options) {
+    Source source = options.retainsSource() ? new Source(input) : null;
+    return parse(CharStreams.fromString(input), options, source);
+  }
+
+  private static TomlParseResult parse(CharStream stream, TomlParseOptions options, @Nullable Source source) {
+    return parseTable(stream, options, new AccumulatingErrorListener(), source);
   }
 
   /**
@@ -46,6 +65,14 @@ final class Parser {
       CharStream stream,
       TomlParseOptions options,
       AccumulatingErrorListener errorListener) {
+    return parseTable(stream, options, errorListener, sourceOf(stream, options));
+  }
+
+  private static ParsedTomlTable parseTable(
+      CharStream stream,
+      TomlParseOptions options,
+      AccumulatingErrorListener errorListener,
+      @Nullable Source source) {
     TomlLexer lexer = new TomlLexer(stream);
     CommonTokenStream tokens = new CommonTokenStream(lexer);
     TomlParser parser = new TomlParser(tokens);
@@ -54,11 +81,19 @@ final class Parser {
     parser.addErrorListener(errorListener);
     parser.setMaxNestingDepth(options.maxNestingDepth());
     ParseTree tree = parser.toml();
-    ParsedTomlTable rootTable = new ParsedTomlTable(errorListener);
+    ParsedTomlTable rootTable = new ParsedTomlTable(errorListener, source);
     LineVisitor visitor =
-        new LineVisitor(rootTable, options.version().canonical, errorListener, options.maxNestingDepth());
+        new LineVisitor(rootTable, options.version().canonical, errorListener, options.maxNestingDepth(), tokens);
     tree.accept(visitor);
     return rootTable;
+  }
+
+  @Nullable
+  private static Source sourceOf(CharStream stream, TomlParseOptions options) {
+    if (!options.retainsSource()) {
+      return null;
+    }
+    return new Source(stream.getText(Interval.of(0, stream.size() - 1)));
   }
 
   static List<String> parseDottedKey(String dottedKey) {

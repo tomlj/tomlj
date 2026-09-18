@@ -44,6 +44,26 @@ abstract class Value implements TomlValue {
   }
 
   /**
+   * Wrap a value copied from another entry, keeping the record of where the original was written.
+   *
+   * @param original The value being copied.
+   * @param normalized The value to wrap, as {@link TomlValues#normalize} gives it: a copy for a table or an array, the
+   *        scalar itself otherwise.
+   * @return {@code normalized} itself if it is already a {@link Value}, otherwise a new {@link Scalar} with no
+   *         position, sharing {@code original}'s span if it has one.
+   */
+  static Value copyOf(TomlValue original, Object normalized) {
+    if (normalized instanceof Value) {
+      return (Value) normalized;
+    }
+    Scalar copy = new Scalar(normalized, null);
+    if (original instanceof Scalar) {
+      copy.span = ((Scalar) original).span;
+    }
+    return copy;
+  }
+
+  /**
    * A scalar value: a string, integer, float, boolean or date/time.
    */
   static final class Scalar extends Value {
@@ -52,6 +72,11 @@ abstract class Value implements TomlValue {
 
     // Nullable: a scalar set through the editing API has no input position.
     private final @Nullable TomlPosition position;
+
+    // Where the literal of this scalar was written in the document it was read from. Null for a scalar set through the
+    // editing API, and for one read from a document parsed with no source kept.
+    @Nullable
+    ValueSpan span;
 
     Scalar(Object value, @Nullable TomlPosition position) {
       this.value = value;

@@ -13,21 +13,25 @@
 package org.tomlj;
 
 import org.tomlj.internal.AbstractTomlParser;
+import org.tomlj.internal.TomlLexer;
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
 import java.util.*;
 
+import org.antlr.v4.runtime.BufferedTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.TerminalNode;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
 
   private final TomlVersion version;
   private final ErrorReporter errorReporter;
-  private final LinkedTomlTable rootTable;
+  private final ParsedTomlTable rootTable;
   private LinkedTomlTable currentTable;
   // The comments documenting the expression being visited, which the document rule reads from the tree around it.
   private List<TomlComment> attached = Collections.emptyList();
@@ -38,13 +42,40 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
   // in the document.
   private final int maxNestingDepth;
 
-  LineVisitor(LinkedTomlTable rootTable, TomlVersion version, ErrorReporter errorReporter, int maxNestingDepth) {
+  // The text the document was parsed from, or null when none was kept and nothing is recorded about where each line
+  // was written.
+  private final @Nullable Source source;
+  // The tokens, read to find the newline ending a line and whatever the parser skipped before it.
+  private final BufferedTokenStream tokens;
+
+  // Where the expression being visited was written, read from the tree and the tokens around it before it is visited,
+  // as the comments documenting it are. Each is -1 where the expression has no such part.
+  private int aboveStart = -1;
+  private int aboveStop = -1;
+  private int afterStart = -1;
+  private int afterStop = -1;
+  private int newlineStart = -1;
+  private int newlineStop = -1;
+  // Whether the parser reported and skipped input between the expression and the newline ending its line.
+  private boolean strayInput;
+  // The source the offsets above were read from, or null when they describe nothing: when no source was kept, or when
+  // the expression being visited matched no token to read them from.
+  private @Nullable Source lineSource;
+
+  LineVisitor(
+      ParsedTomlTable rootTable,
+      TomlVersion version,
+      ErrorReporter errorReporter,
+      int maxNestingDepth,
+      BufferedTokenStream tokens) {
     this.version = version;
     this.errorReporter = errorReporter;
     this.rootTable = rootTable;
     this.currentTable = rootTable;
     this.openTables = new HashMap<>();
     this.maxNestingDepth = maxNestingDepth;
+    this.source = rootTable.source();
+    this.tokens = tokens;
   }
 
   /**
@@ -77,10 +108,11 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
           separated = null;
         }
         attached = TomlComment.withoutNulls(Comments.above(previous), Comments.after(next));
+        recordExpressionOffsets((TomlParser.ExpressionContext) child, previous, next);
         child.accept(this);
       } else if (child instanceof TomlParser.CommentRunContext && !(next instanceof TomlParser.ExpressionContext)) {
         // A run directly above an expression is handed to it when it is reached; this one documents nothing.
-        TomlComment comment = Comments.of((TomlParser.CommentRunContext) child, null);
+        TomlComment comment = commentWithSpan((TomlParser.CommentRunContext) child);
         if (Comments.glued(previous, beforePrevious)) {
           currentTable.addParsedComment(comment);
         } else {
@@ -97,7 +129,101 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
     }
     // No header follows the last section to define the tables its dotted keys opened.
     defineOpenTables();
+    rootTable.recordTrailer();
     return rootTable;
+  }
+
+  /**
+   * Read from the tree and the tokens around an expression where it was written, before it is visited.
+   *
+   * <p>
+   * The comment run above the expression and the comment ending its line are the ones {@link Comments} attaches to it,
+   * read here as offsets rather than from the comments themselves, which carry only their text.
+   *
+   * @param ctx The expression.
+   * @param previous The node written before it, or {@code null} if it is the first thing written.
+   * @param next The node written after it.
+   */
+  private void recordExpressionOffsets(
+      TomlParser.ExpressionContext ctx,
+      @Nullable ParseTree previous,
+      @Nullable ParseTree next) {
+    Token stop = ctx.getStop();
+    lineSource = (stop != null && stop.getTokenIndex() >= 0) ? source : null;
+    if (lineSource == null) {
+      return;
+    }
+    aboveStart = -1;
+    aboveStop = -1;
+    if (previous instanceof TomlParser.CommentRunContext) {
+      TomlParser.CommentRunContext run = (TomlParser.CommentRunContext) previous;
+      aboveStart = run.getStart().getStartIndex();
+      aboveStop = run.getStop().getStopIndex();
+    }
+    afterStart = -1;
+    afterStop = -1;
+    if (next instanceof TerminalNode && !(next instanceof ErrorNode)) {
+      Token comment = ((TerminalNode) next).getSymbol();
+      if (comment.getType() == TomlLexer.Comment) {
+        afterStart = comment.getStartIndex();
+        afterStop = comment.getStopIndex();
+      }
+    }
+    if (!recordLineEnd(stop)) {
+      lineSource = null;
+    }
+  }
+
+  /**
+   * Walk the tokens from the end of an expression to the newline ending its line, recording where that newline is and
+   * whether the parser skipped anything else on the way.
+   *
+   * <p>
+   * The lexer ends the last line of a document with a newline where the document has none, so a line of a document the
+   * parser read without error always ends with one. A value the document never closes takes the newline of its own last
+   * line, and the input then ends without one; there is no line to record, and the pair is rejected anyway.
+   *
+   * @param stop The last token of the expression.
+   * @return {@code true} if the line ends with a newline.
+   */
+  private boolean recordLineEnd(Token stop) {
+    strayInput = false;
+    for (int i = stop.getTokenIndex() + 1; i < tokens.size(); ++i) {
+      Token token = tokens.get(i);
+      if (token.getChannel() != Token.DEFAULT_CHANNEL) {
+        continue;
+      }
+      if (token.getType() == TomlLexer.NewLine) {
+        newlineStart = token.getStartIndex();
+        newlineStop = token.getStopIndex();
+        return true;
+      }
+      if (token.getType() == Token.EOF) {
+        return false;
+      }
+      // A comment runs to the end of its line, so it is the only thing that may be written between the expression and
+      // the newline; anything else is input the parser reported and skipped.
+      if (token.getType() != TomlLexer.Comment) {
+        strayInput = true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Record a comment run of the document that documents nothing.
+   *
+   * @param run The run.
+   * @return The comment, with where it and the blank lines above it were written if the source was kept.
+   */
+  private TomlComment commentWithSpan(TomlParser.CommentRunContext run) {
+    TomlComment comment = Comments.of(run, null);
+    if (source == null) {
+      return comment;
+    }
+    int runStart = run.getStart().getStartIndex();
+    int runStop = run.getStop().getStopIndex();
+    return comment.withSpan(SourceSpan.comment(source, source.leadingStart(runStart), runStart, runStop));
   }
 
   @Override
@@ -119,9 +245,11 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
         if ((long) currentDepth + ctx.nesting > maxNestingDepth) {
           throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
         }
+        Value wrapped = Value.of(value, new TomlPosition(valContext));
         currentTable
-            .setParsed(path, Value.of(value, new TomlPosition(valContext)), new TomlPosition(ctx), comments)
+            .setParsed(path, wrapped, new TomlPosition(ctx), comments)
             .forEach(entry -> openTables.putIfAbsent(entry.getKey(), entry.getValue()));
+        recordLine(currentTable, path, keyContext, valContext, wrapped);
       }
       return rootTable;
     } catch (TomlParseError e) {
@@ -153,6 +281,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
         throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
       }
       currentTable = rootTable.createParsedTable(path, new TomlPosition(ctx), comments);
+      recordHeader(currentTable, path, ctx);
       currentDepth = depth + 1;
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
@@ -184,6 +313,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
         throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
       }
       currentTable = rootTable.createParsedTableArray(path, new TomlPosition(ctx), comments);
+      recordHeader(currentTable, path, ctx);
       currentDepth = depth + 2;
     } catch (TomlParseError e) {
       errorReporter.reportError(e);
@@ -224,6 +354,108 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
       }
     }
     return depth;
+  }
+
+  /**
+   * Record where a key/value pair, and the literal of its value, were written.
+   *
+   * @param table The table the pair was set in, which the path is relative to.
+   * @param path The key path the pair was set at.
+   * @param keyContext The key as written.
+   * @param valContext The value as written.
+   * @param value The value stored.
+   */
+  private void recordLine(
+      LinkedTomlTable table,
+      List<String> path,
+      TomlParser.KeyContext keyContext,
+      TomlParser.ValContext valContext,
+      Value value) {
+    Source from = lineSource;
+    if (from == null) {
+      return;
+    }
+    Entry.KeyValue entry = table.entry(path);
+    if (entry == null) {
+      return;
+    }
+    int keyStart = keyContext.getStart().getStartIndex();
+    int keyStop = keyContext.getStop().getStopIndex();
+    int valueStart = valContext.getStart().getStartIndex();
+    int valueStop = valContext.getStop().getStopIndex();
+    entry.span = SourceSpan
+        .line(
+            from,
+            leadingStart(from, keyStart),
+            aboveStart,
+            aboveStop,
+            keyStart,
+            keyStop,
+            path.size(),
+            valueStart,
+            afterStart,
+            afterStop,
+            tailStart(valueStop),
+            newlineStart,
+            newlineStop);
+    if (value instanceof Value.Scalar) {
+      ((Value.Scalar) value).span = ValueSpan.scalar(from, valueStart, valueStop);
+    }
+  }
+
+  /**
+   * Record where the header that defined a table, or opened an element of an array of tables, was written.
+   *
+   * @param table The table the header names.
+   * @param path The header's key path.
+   * @param ctx The header as written, brackets included.
+   */
+  private void recordHeader(LinkedTomlTable table, List<String> path, ParserRuleContext ctx) {
+    Source from = lineSource;
+    if (from == null) {
+      return;
+    }
+    int keyStart = ctx.getStart().getStartIndex();
+    int keyStop = ctx.getStop().getStopIndex();
+    // Input skipped after a header is written where the comment on its line would be, so the two never both appear.
+    assert !strayInput || afterStart == -1 : "a header the parser skipped input after has a comment after it";
+    table.headerSpan = SourceSpan
+        .header(
+            from,
+            leadingStart(from, keyStart),
+            aboveStart,
+            aboveStop,
+            keyStart,
+            keyStop,
+            path.size(),
+            afterStart,
+            afterStop,
+            tailStart(keyStop),
+            newlineStart,
+            newlineStop);
+  }
+
+  /**
+   * The first offset of the leading whitespace of the line being visited: the blank lines above it and the indentation
+   * of its first line.
+   *
+   * @param from The source the line was read from.
+   * @param keyStart The first offset of the key or header.
+   * @return The first offset of that whitespace.
+   */
+  private int leadingStart(Source from, int keyStart) {
+    return from.leadingStart((aboveStart != -1) ? aboveStart : keyStart);
+  }
+
+  /**
+   * The first offset copied after the value or header of the line being visited.
+   *
+   * @param stop The last offset of the value, or of the header where there is no value.
+   * @return {@code stop + 1}, or the start of the newline where the parser skipped input before it, so that the input
+   *         it skipped is not copied.
+   */
+  private int tailStart(int stop) {
+    return strayInput ? newlineStart : (stop + 1);
   }
 
   @Override

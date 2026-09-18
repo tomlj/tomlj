@@ -36,20 +36,22 @@ public final class TomlParseOptions {
 
   private final TomlVersion version;
   private final int maxNestingDepth;
+  private final boolean retainsSource;
 
-  private TomlParseOptions(TomlVersion version, int maxNestingDepth) {
+  private TomlParseOptions(TomlVersion version, int maxNestingDepth, boolean retainsSource) {
     this.version = version;
     this.maxNestingDepth = maxNestingDepth;
+    this.retainsSource = retainsSource;
   }
 
   /**
    * The default parse options: {@link TomlVersion#LATEST}, with a maximum nesting depth of
-   * {@value #DEFAULT_MAX_NESTING_DEPTH}.
+   * {@value #DEFAULT_MAX_NESTING_DEPTH}, keeping the source text of the document parsed.
    *
    * @return The default parse options.
    */
   public static TomlParseOptions defaults() {
-    return new TomlParseOptions(TomlVersion.LATEST, DEFAULT_MAX_NESTING_DEPTH);
+    return new TomlParseOptions(TomlVersion.LATEST, DEFAULT_MAX_NESTING_DEPTH, true);
   }
 
   /**
@@ -60,7 +62,7 @@ public final class TomlParseOptions {
    */
   public TomlParseOptions withVersion(TomlVersion version) {
     requireNonNull(version);
-    return new TomlParseOptions(version, maxNestingDepth);
+    return new TomlParseOptions(version, maxNestingDepth, retainsSource);
   }
 
   /**
@@ -93,7 +95,20 @@ public final class TomlParseOptions {
     if (maxNestingDepth < 0) {
       throw new IllegalArgumentException("maxNestingDepth must not be negative: " + maxNestingDepth);
     }
-    return new TomlParseOptions(version, maxNestingDepth);
+    return new TomlParseOptions(version, maxNestingDepth, retainsSource);
+  }
+
+  /**
+   * Create a copy of these options that keeps no source text.
+   *
+   * <p>
+   * A document parsed with these options records nothing about how it was written, so {@link TomlTable#toToml()} writes
+   * it in the default style, as it writes a document built with the editing API.
+   *
+   * @return A new set of options that keeps no source text.
+   */
+  public TomlParseOptions withoutSource() {
+    return new TomlParseOptions(version, maxNestingDepth, false);
   }
 
   /**
@@ -116,6 +131,16 @@ public final class TomlParseOptions {
     return maxNestingDepth;
   }
 
+  /**
+   * Whether a parse result keeps the source text of the document it was read from.
+   *
+   * @return {@code true} unless these options came from {@link #withoutSource()}.
+   * @see #withoutSource()
+   */
+  public boolean retainsSource() {
+    return retainsSource;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (obj == this) {
@@ -125,16 +150,24 @@ public final class TomlParseOptions {
       return false;
     }
     TomlParseOptions other = (TomlParseOptions) obj;
-    return this.version == other.version && this.maxNestingDepth == other.maxNestingDepth;
+    return this.version == other.version
+        && this.maxNestingDepth == other.maxNestingDepth
+        && this.retainsSource == other.retainsSource;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(version, maxNestingDepth);
+    return Objects.hash(version, maxNestingDepth, retainsSource);
   }
 
   @Override
   public String toString() {
-    return "TomlParseOptions{version=" + version + ", maxNestingDepth=" + maxNestingDepth + '}';
+    return "TomlParseOptions{version="
+        + version
+        + ", maxNestingDepth="
+        + maxNestingDepth
+        + ", retainsSource="
+        + retainsSource
+        + '}';
   }
 }

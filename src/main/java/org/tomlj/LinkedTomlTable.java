@@ -42,6 +42,12 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
 
   private final boolean inline;
 
+  // Where the [a.b] header that defined this table, or the [[a.b]] header that opened this element table, was written
+  // in the document. Null for a table no header names, for one built through the editing API, and for a copy: a header
+  // names an absolute path, which a copy no longer has.
+  @Nullable
+  SourceSpan headerSpan;
+
   LinkedTomlTable(@Nullable TomlPosition position) {
     this(position, false);
   }
@@ -771,6 +777,10 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
    * in their places, copied without their positions. A nested table or array is copied recursively, through
    * {@link TomlValues#normalize}; every other value is shared.
    *
+   * <p>
+   * An entry keeps the record of where it was written, so that a copy of a parsed document can still be written the way
+   * the document was; the copy's own header span stays null, since a header names a path this table no longer has.
+   *
    * @param table The table to copy.
    * @param inline Whether the copy is an inline table.
    * @return A new table with the same entries.
@@ -784,8 +794,13 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
         TomlKeyValue original = (TomlKeyValue) element;
         TomlValues.checkKey(original.key());
         // A fresh wrapper even for a scalar: an entry's position is dropped, and an array entry's is its value's.
-        Value value = Value.of(TomlValues.normalize(original.value().get()), null);
-        copy.putEdited(original.key(), value, TomlComment.copyWithoutPositions(original.comments()));
+        TomlValue originalValue = original.value();
+        Value value = Value.copyOf(originalValue, TomlValues.normalize(originalValue.get()));
+        Entry.KeyValue entry =
+            copy.putEdited(original.key(), value, TomlComment.copyWithoutPositions(original.comments()));
+        if (original instanceof Entry) {
+          entry.span = ((Entry) original).span;
+        }
       }
     }
     return copy;

@@ -52,6 +52,11 @@ public final class TomlComment implements TomlElement {
   private final @Nullable TomlPosition position;
   private final @Nullable Placement placement;
 
+  // Where an unattached comment was written in the document it was read from, including the blank lines above it.
+  // Null for an attached comment, whose offsets are on the span of the entry it documents, for a comment built through
+  // the editing API, and for one read from a document parsed with no source kept.
+  private final @Nullable SourceSpan span;
+
   /**
    * Record a comment from the tokens the lexer matched for it.
    *
@@ -68,7 +73,7 @@ public final class TomlComment implements TomlElement {
     }
     Token first = tokens.get(0);
     TomlPosition position = TomlPosition.positionAt(first.getLine(), first.getCharPositionInLine() + 1);
-    return new TomlComment(rawLines, position, placement);
+    return new TomlComment(rawLines, position, placement, null);
   }
 
   /**
@@ -114,10 +119,15 @@ public final class TomlComment implements TomlElement {
     return withoutNulls(above, after);
   }
 
-  private TomlComment(List<String> rawLines, @Nullable TomlPosition position, @Nullable Placement placement) {
+  private TomlComment(
+      List<String> rawLines,
+      @Nullable TomlPosition position,
+      @Nullable Placement placement,
+      @Nullable SourceSpan span) {
     this.rawLines = rawLines;
     this.position = position;
     this.placement = placement;
+    this.span = span;
   }
 
   /**
@@ -149,7 +159,7 @@ public final class TomlComment implements TomlElement {
       validateLine(line);
       rawLines.add(line.isEmpty() ? "" : (" " + line));
     }
-    return new TomlComment(rawLines, null, placement);
+    return new TomlComment(rawLines, null, placement, null);
   }
 
   // Rejects a character the lexer's comment rule cannot match: a control character other than tab, DEL, or a lone
@@ -173,15 +183,37 @@ public final class TomlComment implements TomlElement {
   }
 
   /**
+   * This comment with a record of where it was written.
+   *
+   * @param span Where the comment, and the blank lines above it, were written.
+   * @return A comment with the same lines, position and placement, reading that span.
+   */
+  TomlComment withSpan(SourceSpan span) {
+    return new TomlComment(rawLines, position, placement, span);
+  }
+
+  /**
    * This comment without its position: itself if it has none, otherwise a copy with the same lines and placement.
    *
    * <p>
-   * The editing API stores a fresh entity, with no position, when it attaches a comment read from a document.
+   * The editing API stores a fresh entity, with no position, when it attaches a comment read from a document. The copy
+   * drops where the comment was written along with its position, since neither describes a comment the API has placed.
    *
-   * @return A comment with the same lines and placement, and no position.
+   * @return A comment with the same lines and placement, no position, and no record of where it was written.
    */
   TomlComment withoutPosition() {
-    return (position == null) ? this : new TomlComment(rawLines, null, placement);
+    return (position == null && span == null) ? this : new TomlComment(rawLines, null, placement, null);
+  }
+
+  /**
+   * Where this comment was written in the document it was read from.
+   *
+   * @return The span, or {@code null} if this comment is attached, was built through the editing API, or was read from
+   *         a document parsed with no source kept.
+   */
+  @Nullable
+  SourceSpan span() {
+    return span;
   }
 
   /**

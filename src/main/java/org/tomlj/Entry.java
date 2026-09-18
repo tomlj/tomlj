@@ -59,6 +59,13 @@ abstract class Entry implements MutableTomlEntry {
   // Whether an attached comment of this entry was set or removed through the editing API.
   private boolean commentsModified;
 
+  // Where this entry was written in the document it was read from: a LINE span for a key/value pair written as a line
+  // of a section, an ELEMENT span for an element of an array or an entry of an inline table. Null for an entry added
+  // through the editing API, and for one read from a document parsed with no source kept. A copy of an entry shares
+  // the span, which names its own source.
+  @Nullable
+  SourceSpan span;
+
   Entry(Value value, List<TomlComment> attachedComments) {
     this.value = value;
     this.attachedComments = attachedComments;

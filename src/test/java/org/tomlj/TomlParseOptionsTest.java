@@ -43,6 +43,36 @@ class TomlParseOptionsTest {
     assertEquals(TomlVersion.LATEST, options.version());
     assertEquals(128, options.maxNestingDepth());
     assertEquals(TomlParseOptions.DEFAULT_MAX_NESTING_DEPTH, options.maxNestingDepth());
+    assertTrue(options.retainsSource());
+  }
+
+  @Test
+  void withoutSourceReturnsANewInstanceLeavingTheOriginalUnchangedAndKeepsTheRest() {
+    TomlParseOptions original = TomlParseOptions.defaults().withVersion(TomlVersion.V1_0_0).withMaxNestingDepth(5);
+    TomlParseOptions updated = original.withoutSource();
+
+    assertFalse(updated.retainsSource());
+    assertEquals(TomlVersion.V1_0_0, updated.version());
+    assertEquals(5, updated.maxNestingDepth());
+    assertTrue(original.retainsSource());
+  }
+
+  @Test
+  void withVersionAndWithMaxNestingDepthKeepWhetherTheSourceIsRetained() {
+    TomlParseOptions original = TomlParseOptions.defaults().withoutSource();
+
+    assertFalse(original.withVersion(TomlVersion.V1_0_0).retainsSource());
+    assertFalse(original.withMaxNestingDepth(5).retainsSource());
+  }
+
+  @Test
+  void optionsDifferingOnlyInWhetherTheSourceIsRetainedAreNotEqual() {
+    TomlParseOptions a = TomlParseOptions.defaults();
+    TomlParseOptions b = TomlParseOptions.defaults().withoutSource();
+
+    assertNotEquals(a, b);
+    assertEquals(b, TomlParseOptions.defaults().withoutSource());
+    assertEquals(b.hashCode(), TomlParseOptions.defaults().withoutSource().hashCode());
   }
 
   @Test
@@ -110,9 +140,12 @@ class TomlParseOptionsTest {
   }
 
   @Test
-  void toStringShowsVersionAndMaxNestingDepth() {
+  void toStringShowsVersionMaxNestingDepthAndWhetherTheSourceIsRetained() {
     TomlParseOptions options = TomlParseOptions.defaults().withVersion(TomlVersion.V1_1_0).withMaxNestingDepth(5);
-    assertEquals("TomlParseOptions{version=V1_1_0, maxNestingDepth=5}", options.toString());
+    assertEquals("TomlParseOptions{version=V1_1_0, maxNestingDepth=5, retainsSource=true}", options.toString());
+    assertEquals(
+        "TomlParseOptions{version=V1_1_0, maxNestingDepth=5, retainsSource=false}",
+        options.withoutSource().toString());
   }
 
   // ---- Toml.parse(..., TomlParseOptions) overloads ----
