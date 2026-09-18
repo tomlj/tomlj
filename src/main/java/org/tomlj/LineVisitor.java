@@ -95,6 +95,8 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
       // No expression follows the runs left at the end of the document, so they belong to the root table.
       separated.forEach(rootTable::addParsedComment);
     }
+    // No header follows the last section to define the tables its dotted keys opened.
+    defineOpenTables();
     return rootTable;
   }
 

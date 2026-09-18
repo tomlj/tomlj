@@ -301,6 +301,44 @@ class LinkedTomlTableTest {
   }
 
   @Test
+  void shouldDefineATableOpenedByDottedKeysInTheLastSection() {
+    LinkedTomlTable table = (LinkedTomlTable) Toml.parse("x.y = 1\n");
+    LinkedTomlTable x = (LinkedTomlTable) table.get("x");
+    assertTrue(x.isDefined());
+  }
+
+  @Test
+  void shouldDefineATableOpenedByDottedKeysBeforeTheNextHeader() {
+    LinkedTomlTable table = (LinkedTomlTable) Toml.parse("x.y = 1\n[t]\n");
+    LinkedTomlTable x = (LinkedTomlTable) table.get("x");
+    assertTrue(x.isDefined());
+  }
+
+  @Test
+  void shouldDefineATableOpenedByDottedKeysInTheSectionThatOpenedThem() {
+    LinkedTomlTable table = (LinkedTomlTable) Toml.parse("[t]\nx.y = 1\n");
+    LinkedTomlTable t = (LinkedTomlTable) table.get("t");
+    LinkedTomlTable x = (LinkedTomlTable) t.get("x");
+    assertTrue(t.isDefined());
+    assertTrue(x.isDefined());
+  }
+
+  @Test
+  void shouldNotDefineAnIntermediateTableOfAHeader() {
+    LinkedTomlTable table = (LinkedTomlTable) Toml.parse("[a.b]\n");
+    LinkedTomlTable a = (LinkedTomlTable) table.get("a");
+    LinkedTomlTable b = (LinkedTomlTable) table.get("a.b");
+    assertFalse(a.isDefined());
+    assertTrue(b.isDefined());
+  }
+
+  @Test
+  void shouldNotChangeTheEntryPositionOfADottedKeyTableInTheLastSection() {
+    TomlParseResult table = Toml.parse("x.y = 1\n");
+    assertEquals(positionAt(1, 1), table.inputPositionOf(List.of("x")));
+  }
+
+  @Test
   void shouldKeepUnattachedCommentsInPlaceOnADeepCopy() {
     LinkedTomlTable table = parse("# first\n\na = 1\n\n# second\n");
 
