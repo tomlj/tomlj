@@ -80,7 +80,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
         child.accept(this);
       } else if (child instanceof TomlParser.CommentRunContext && !(next instanceof TomlParser.ExpressionContext)) {
         // A run directly above an expression is handed to it when it is reached; this one documents nothing.
-        TomlComment comment = Comments.of((TomlParser.CommentRunContext) child, null);
+        TomlComment comment = Comments.of((TomlParser.CommentRunContext) child, TomlComment.Placement.UNATTACHED);
         if (Comments.glued(previous, beforePrevious)) {
           currentTable.addComment(comment);
         } else {

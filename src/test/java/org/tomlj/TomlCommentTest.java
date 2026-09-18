@@ -94,7 +94,7 @@ class TomlCommentTest {
   }
 
   private static void assertUnattached(TomlComment comment, String text) {
-    assertEquals(null, comment.placement());
+    assertEquals(TomlComment.Placement.UNATTACHED, comment.placement());
     assertEquals(text, comment.text());
   }
 
