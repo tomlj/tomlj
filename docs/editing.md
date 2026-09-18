@@ -47,8 +47,8 @@ write (a year from 0 to 9999, and no seconds in the offset). A value that cannot
 throws `IllegalArgumentException`.
 
 Replacing a value keeps the entry's place in `elements()`, its input position and its comments;
-replacing an array element keeps its place and its comments. Removing an entry takes its comments
-with it and leaves the unattached comments around it where they are.
+replacing an array element keeps its place and its comments. Removing an entry also removes its
+attached comments; the unattached comments around it stay in `elements()`.
 
 ## Placing an entry
 

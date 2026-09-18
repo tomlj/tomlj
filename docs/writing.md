@@ -95,11 +95,14 @@ anew, in the place the document gives it:
 * **An array or inline table edited in place** keeps its line and its brackets. Each element that
   was not replaced is written from its own text, with its literal, its comments and the layout
   around it; an element added or replaced is written in the default style, laid out like the
-  elements around it. Where an element is removed, the commas are adjusted: the comma between two
-  elements that no longer have one, and the comma after the last element, which is dropped unless
-  the document wrote one there. The entries of an inline table keep the order they were written in,
-  dotted keys included. An array or inline table left with no element of the document is written
-  anew.
+  elements around it: an element added to a container written on one line goes on that line, and one
+  added to a container written over lines goes on its own line. Whether the container is on one line
+  is read from the text between its elements, so a multi-line string, or an array over lines, as a
+  value does not put the container holding it over lines. Where an element is removed, the commas
+  are adjusted: the comma between two elements that no longer have one, and the comma after the last
+  element, which is dropped unless the document wrote one there. The entries of an inline table keep
+  the order they were written in, dotted keys included. An array or inline table left with no
+  element of the document is written anew.
 * **A comment set in an array or inline table written on one line** lays it out over lines, since a
   comment ends at a line break. TOML 1.0.0 allows no line break inside an inline table, so writing
   one holding a comment for that version throws `IllegalArgumentException`.

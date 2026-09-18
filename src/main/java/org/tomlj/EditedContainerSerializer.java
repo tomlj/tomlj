@@ -38,6 +38,12 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * it was read.
  *
  * <p>
+ * Whether the document wrote the container on one line or over lines is read from the text between its elements and its
+ * brackets, not from the values: a container written as {@code { a = """...""", b = 2 }}, with a multi-line string as a
+ * value, is on one line, and an entry added to it is written on the line its closing bracket is on, as the document
+ * wrote {@code b}.
+ *
+ * <p>
  * A container the document wrote on one line is written over lines when a comment has to be written in it, since a
  * comment ends at a line break. The layout is then not copied from the text between elements; only the spans of the
  * elements themselves are copied. TOML 1.0.0 allows no line break inside an inline table, so an inline table holding a
@@ -284,7 +290,7 @@ final class EditedContainerSerializer {
     for (Item item : items) {
       SourceSpan span = item.span;
       if (span != null) {
-        sourceLines = sourceLines || holdsNewline(source.text(span.start, span.stop));
+        sourceLines = sourceLines || holdsNewline(textAround(span));
         if (indent == null) {
           indent = startingIndent(span);
         }
@@ -301,6 +307,23 @@ final class EditedContainerSerializer {
     copyLayout = (multiLine == sourceLines);
     elementIndent = (indent != null) ? indent : (lineIndent + ELEMENT_INDENT);
     trailingComma = (lastEntry != null) && endsWithComma(source.text(lastEntry.tailStart, brackets.stop - 1));
+  }
+
+  /**
+   * The text of an element's span outside its key and value: the whitespace and comment run before them, and the tail
+   * after them. A line break there is part of the container's layout. One inside the value, as in a multi-line string
+   * or an array written over lines, belongs to the value and is not part of the container's layout. A comment's span
+   * has no value, so all of it is returned.
+   *
+   * @param span The element's span.
+   * @return The text before and after its key and value.
+   */
+  private String textAround(SourceSpan span) {
+    if (span.tailStart < 0) {
+      return source.text(span.start, span.stop);
+    }
+    int ownStart = (span.keyStart >= 0) ? span.keyStart : span.valueStart;
+    return source.text(span.start, ownStart - 1) + source.text(span.tailStart, span.stop);
   }
 
   /**

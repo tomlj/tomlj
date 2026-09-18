@@ -364,6 +364,20 @@ class SourcePreservingSerializerTest {
     TomlAssertions.assertSameComments(result, reparsed);
   }
 
+  @Test
+  void keepsAnEditedInlineTableValidForTheVersionItWasParsedAs() {
+    // TOML 1.0.0 allows a newline inside an inline table only within a value, so the table has to stay on its line
+    String input = "t = { a = \"\"\"\nx\n\"\"\", b = 2 }\n";
+    TomlParseResult result = Toml.parse(input, TomlVersion.V1_0_0);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    requireTable(result, "t").set("c", 3);
+
+    String written = result.toToml(LF);
+    TomlParseResult reparsed = Toml.parse(written, TomlVersion.V1_0_0);
+    assertFalse(reparsed.hasErrors(), () -> written + "\n" + joinErrors(reparsed));
+    assertTrue(Toml.equals(result, reparsed), () -> written);
+  }
+
   static Stream<Arguments> editedDocuments() {
     return Stream
         .of(
@@ -914,6 +928,31 @@ class SourcePreservingSerializerTest {
                 "x = [{ a = [1] }]\n",
                 result -> requireArray(result, "x").getTable(0).getArray("a").add(2),
                 "x = [{ a = [1, 2] }]\n"),
+            edited(
+                "an inline table on one line stays on it when a multi-line string in it spans lines",
+                "t = { a = \"\"\"\nx\n\"\"\", b = 2 }\n",
+                result -> requireTable(result, "t").set("c", 3),
+                "t = { a = \"\"\"\nx\n\"\"\", b = 2, c = 3 }\n"),
+            edited(
+                "an inline table on one line stays on it when an array in it spans lines",
+                "t = { a = [\n  1,\n  2,\n], b = 2 }\n",
+                result -> requireTable(result, "t").set("c", 3),
+                "t = { a = [\n  1,\n  2,\n], b = 2, c = 3 }\n"),
+            edited(
+                "an inline table on one line stays on it when the entry after a multi-line string goes",
+                "t = { a = \"\"\"\nx\n\"\"\", b = 2 }\n",
+                result -> requireTable(result, "t").remove("b"),
+                "t = { a = \"\"\"\nx\n\"\"\" }\n"),
+            edited(
+                "an array on one line stays on it when its multi-line strings span lines",
+                "l = [ \"\"\"\na\n\"\"\", \"\"\"\nb\n\"\"\" ]\n",
+                result -> requireArray(result, "l").add("c"),
+                "l = [ \"\"\"\na\n\"\"\", \"\"\"\nb\n\"\"\", \"c\" ]\n"),
+            edited(
+                "an inline table written over lines keeps its lines when a multi-line string is in it",
+                "t = {\n  a = \"\"\"\nx\n\"\"\",\n  b = 2,\n}\n",
+                result -> requireTable(result, "t").set("c", 3),
+                "t = {\n  a = \"\"\"\nx\n\"\"\",\n  b = 2,\n  c = 3,\n}\n"),
             edited(
                 "an array of a copied table is edited in place, keeping the literals it was read with",
                 "[a.b]\nx = [0x10, 2]  # kept\n",
