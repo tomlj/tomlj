@@ -136,6 +136,7 @@ class TomlTestSuiteTest {
         reparsed.hasErrors(),
         () -> "Unexpected errors after serializing to TOML: " + reparsed.errors() + "\n" + serialized);
     assertMatches(expected, reparsed, "After serializing to TOML: ");
+    TomlAssertions.assertSameComments(result, reparsed);
   }
 
   private static void assertMatches(Object expected, TomlParseResult result, String context) {

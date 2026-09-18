@@ -230,6 +230,19 @@ public final class TomlComment implements TomlElement {
   }
 
   /**
+   * The text of each line as written after the {@code #}, one entry per line of the run, in document order.
+   *
+   * <p>
+   * Unlike {@link #lines()}, no leading space is stripped, so a writer reproduces the line by writing {@code #}
+   * followed by the entry.
+   *
+   * @return The raw text of each line, in document order. Unmodifiable.
+   */
+  List<String> rawLines() {
+    return Collections.unmodifiableList(rawLines);
+  }
+
+  /**
    * The text of each line, one entry per line of the run, in document order.
    *
    * <p>
