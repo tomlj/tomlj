@@ -21,17 +21,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Arrays;
 import java.util.List;
 
-import org.antlr.v4.runtime.CharStreams;
 import org.junit.jupiter.api.Test;
 
 /**
  * Tests for {@link MutableTomlEntry} and {@link MutableTomlKeyValue}, through the public API only.
+ *
+ * <p>
+ * A parsed document is obtained with {@link Toml#parse(String)}: a {@link TomlParseResult} is a
+ * {@link MutableTomlTable}, and its entries are {@link MutableTomlKeyValue}s.
  */
 class MutableTomlEntryTest {
 
-  private static LinkedTomlTable parse(String document) {
-    return Parser
-        .parseTable(CharStreams.fromString(document), TomlParseOptions.defaults(), new AccumulatingErrorListener());
+  private static TomlParseResult parse(String document) {
+    return Toml.parse(document);
   }
 
   @Test
@@ -48,7 +50,7 @@ class MutableTomlEntryTest {
 
   @Test
   void shouldKeepPositionPlaceAndCommentsWhenReplacingAPairsValue() {
-    LinkedTomlTable table = parse("# above\na = 1 # after\nb = 2\n");
+    TomlParseResult table = parse("# above\na = 1 # after\nb = 2\n");
     TomlPosition originalPosition = table.inputPositionOf("a");
     List<TomlComment> originalComments = table.comments("a");
 
@@ -62,7 +64,7 @@ class MutableTomlEntryTest {
 
   @Test
   void shouldHaveNoPositionAfterReplacingAnArrayEntrysValue() {
-    LinkedTomlTable table = parse("a = [\n1 # note\n]\n");
+    TomlParseResult table = parse("a = [\n1 # note\n]\n");
     MutableTomlArray array = (MutableTomlArray) table.get("a");
     List<TomlComment> comments = array.comments(0);
 
@@ -75,7 +77,7 @@ class MutableTomlEntryTest {
 
   @Test
   void shouldDeepCopyATableSetAsAValue() {
-    LinkedTomlTable inner = parse("x = 1\n");
+    TomlParseResult inner = parse("x = 1\n");
     MutableTomlTable table = MutableTomlTable.create();
     table.set("a", 1L);
 
@@ -202,7 +204,7 @@ class MutableTomlEntryTest {
 
   @Test
   void shouldRoundTripCommentTextThroughSetCommentByPlacement() {
-    LinkedTomlTable table = parse("# first\n# second\n# third\na = 1 # tight\n");
+    TomlParseResult table = parse("# first\n# second\n# third\na = 1 # tight\n");
     List<TomlComment> comments = table.comments("a");
     TomlComment above = comments.get(0);
     TomlComment after = comments.get(1);
@@ -277,7 +279,7 @@ class MutableTomlEntryTest {
 
   @Test
   void shouldNotFlagModificationWhenRemovingAnAbsentPlacement() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
     MutableTomlKeyValue entry = table.entry("a");
 
     entry.removeCommentAbove();
@@ -309,8 +311,8 @@ class MutableTomlEntryTest {
 
   @Test
   void shouldCopyACommentAcrossDocumentsKeepingRawText() {
-    LinkedTomlTable source = parse("x = 1 #tight\n");
-    LinkedTomlTable target = parse("y = 2\n");
+    TomlParseResult source = parse("x = 1 #tight\n");
+    TomlParseResult target = parse("y = 2\n");
 
     TomlComment tight = source.comments("x").get(0);
     target.entry("y").setComment(tight);
@@ -323,7 +325,7 @@ class MutableTomlEntryTest {
 
   @Test
   void shouldFlipIsModifiedOnEntryAndContainerWhenACommentChanges() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
     MutableTomlKeyValue entry = table.entry("a");
     assertFalse(entry.isModified());
     assertFalse(table.isModified());
@@ -337,7 +339,7 @@ class MutableTomlEntryTest {
 
   @Test
   void shouldKeepCommentsModifiedSeparateFromValueModified() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
     TomlPosition originalPosition = table.inputPositionOf("a");
 
     table.entry("a").setCommentAbove("note");
@@ -350,13 +352,13 @@ class MutableTomlEntryTest {
 
   @Test
   void shouldReportUnmodifiedBeforeAnyEdit() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
     assertFalse(table.entry("a").isModified());
   }
 
   @Test
   void shouldKeepAttachedCommentsAndReportModifiedOnlyThroughEntriesAfterCopy() {
-    LinkedTomlTable original = parse("# above\na = 1 # after\n");
+    TomlParseResult original = parse("# above\na = 1 # after\n");
 
     MutableTomlTable copy = MutableTomlTable.copyOf(original);
 

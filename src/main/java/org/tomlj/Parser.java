@@ -16,95 +16,33 @@ import org.tomlj.internal.TomlLexer;
 import org.tomlj.internal.TomlParser;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 final class Parser {
   private Parser() {}
 
   static TomlParseResult parse(CharStream stream, TomlParseOptions options) {
-    AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
-    LinkedTomlTable table = parseTable(stream, options, errorListener);
-
-    return new TomlParseResult() {
-      @Override
-      public int size() {
-        return table.size();
-      }
-
-      @Override
-      public boolean isEmpty() {
-        return table.isEmpty();
-      }
-
-      @Override
-      public Set<String> keySet() {
-        return table.keySet();
-      }
-
-      @Override
-      public Set<List<String>> keyPathSet(boolean includeTables) {
-        return table.keyPathSet(includeTables);
-      }
-
-      @Override
-      public Set<Map.Entry<String, Object>> entrySet() {
-        return table.entrySet();
-      }
-
-      @Override
-      public Set<Map.Entry<List<String>, Object>> entryPathSet(boolean includeTables) {
-        return table.entryPathSet(includeTables);
-      }
-
-      @Override
-      @Nullable
-      public TomlPosition inputPositionOf(List<String> path) {
-        return table.inputPositionOf(path);
-      }
-
-      @Override
-      @Nullable
-      public TomlKeyValue entry(List<String> path) {
-        return table.entry(path);
-      }
-
-      @Override
-      public List<TomlElement> elements() {
-        return table.elements();
-      }
-
-      @Override
-      public Map<String, Object> toMap() {
-        return table.toMap();
-      }
-
-      @Override
-      public List<TomlParseError> errors() {
-        return errorListener.errors();
-      }
-    };
+    return parseTable(stream, options, new AccumulatingErrorListener());
   }
 
   /**
-   * Parse a document into the table it describes.
+   * Parse a document into the table it describes, paired with the errors found while reading it.
    *
    * <p>
-   * {@link #parse(CharStream, TomlParseOptions)} pairs the table with the errors reported while reading it. Tests use
-   * this method to reach what {@link TomlParseResult} does not expose.
+   * {@link #parse(CharStream, TomlParseOptions)} does this and nothing more, with an error listener of its own. Tests
+   * use this overload directly to supply their own {@link AccumulatingErrorListener}, and to reach the package-private
+   * methods {@link LinkedTomlTable} adds to {@link TomlTable}, which {@link TomlParseResult} does not expose.
    *
    * @param stream The document.
    * @param options The parse options.
    * @param errorListener Where syntax errors and parse errors are reported.
    * @return The table the document describes, which is incomplete if any error was reported.
    */
-  static LinkedTomlTable parseTable(
+  static ParsedTomlTable parseTable(
       CharStream stream,
       TomlParseOptions options,
       AccumulatingErrorListener errorListener) {
@@ -116,8 +54,11 @@ final class Parser {
     parser.addErrorListener(errorListener);
     parser.setMaxNestingDepth(options.maxNestingDepth());
     ParseTree tree = parser.toml();
-    LineVisitor visitor = new LineVisitor(options.version().canonical, errorListener, options.maxNestingDepth());
-    return tree.accept(visitor);
+    ParsedTomlTable rootTable = new ParsedTomlTable(errorListener);
+    LineVisitor visitor =
+        new LineVisitor(rootTable, options.version().canonical, errorListener, options.maxNestingDepth());
+    tree.accept(visitor);
+    return rootTable;
   }
 
   static List<String> parseDottedKey(String dottedKey) {

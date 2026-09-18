@@ -30,21 +30,19 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
-import org.antlr.v4.runtime.CharStreams;
 import org.junit.jupiter.api.Test;
 
 /**
  * Tests for {@link MutableTomlTable}, through the public API only.
  *
  * <p>
- * A parsed document is obtained by parsing a table directly, with {@link #parse(String)}: a {@link LinkedTomlTable} is
- * a {@link MutableTomlTable}.
+ * A parsed document is obtained with {@link Toml#parse(String)}: a {@link TomlParseResult} is a
+ * {@link MutableTomlTable}.
  */
 class MutableTomlTableTest {
 
-  private static LinkedTomlTable parse(String document) {
-    return Parser
-        .parseTable(CharStreams.fromString(document), TomlParseOptions.defaults(), new AccumulatingErrorListener());
+  private static TomlParseResult parse(String document) {
+    return Toml.parse(document);
   }
 
   // Unattached comments held directly in a table's elements(), filtered out from the entries.
@@ -159,7 +157,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldKeepPositionOrderAndCommentsWhenReplacing() {
-    LinkedTomlTable table = parse("# above\na = 1 # after\nb = 2\n");
+    TomlParseResult table = parse("# above\na = 1 # after\nb = 2\n");
     TomlPosition originalPosition = table.inputPositionOf("a");
     List<TomlComment> originalComments = table.comments("a");
     List<String> keysBefore = new ArrayList<>(table.keySet());
@@ -175,7 +173,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldRejectSettingThroughANonTable() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
     TomlInvalidTypeException e = assertThrows(TomlInvalidTypeException.class, () -> table.set("a.b", 1L));
     assertEquals("Value of 'a' is a integer", e.getMessage());
   }
@@ -236,7 +234,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldRemoveAnEntryTakingItsAttachedCommentsButKeepingUnattachedOnes() {
-    LinkedTomlTable table = parse("# above\na = 1 # after\n\n# footer\n");
+    TomlParseResult table = parse("# above\na = 1 # after\n\n# footer\n");
     assertEquals(1, unattachedComments(table).size());
 
     Object removed = table.remove("a");
@@ -271,7 +269,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldClearATableLeavingUnattachedComments() {
-    LinkedTomlTable table = parse("a = 1\n\n# footer\n");
+    TomlParseResult table = parse("a = 1\n\n# footer\n");
 
     table.clear();
 
@@ -289,7 +287,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldStoreATableAsADeepCopy() {
-    LinkedTomlTable t = parse("x = 1\n");
+    TomlParseResult t = parse("x = 1\n");
     MutableTomlTable root = MutableTomlTable.create();
 
     root.set("a", t);
@@ -309,7 +307,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldCopyAParsedDocumentWhenStored() {
-    LinkedTomlTable original = parse("# above\na = 1 # after\n[b]\nc = 2\n");
+    TomlParseResult original = parse("# above\na = 1 # after\n[b]\nc = 2\n");
     TomlPosition originalPosition = original.inputPositionOf("a");
     List<TomlComment> originalComments = original.comments("a");
 
@@ -353,7 +351,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldTrackModificationOnAParsedDocument() {
-    LinkedTomlTable table = parse("a = 1\n[b]\nc = 2\n");
+    TomlParseResult table = parse("a = 1\n[b]\nc = 2\n");
     assertFalse(table.isModified());
     assertFalse(table.isModified("a"));
     assertFalse(table.isModified("b"));
@@ -370,7 +368,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldKeepPositionOnReplaceAndHaveNoneOnAdd() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
     TomlPosition original = table.inputPositionOf("a");
 
     table.set("a", 2L);
@@ -382,7 +380,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldCopyAParsedTableDroppingPositionsAndMarkingEveryEntryModified() {
-    LinkedTomlTable original = parse("# above\na = 1 # after\n[b]\nc = 2\n");
+    TomlParseResult original = parse("# above\na = 1 # after\n[b]\nc = 2\n");
 
     MutableTomlTable copy = MutableTomlTable.copyOf(original);
 
@@ -403,7 +401,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldCopyCommentsWithoutPositions() {
-    LinkedTomlTable original = parse("# above\na = 1 # after\n\n# footer\n");
+    TomlParseResult original = parse("# above\na = 1 # after\n\n# footer\n");
 
     MutableTomlTable copy = MutableTomlTable.copyOf(original);
 
@@ -447,7 +445,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldNavigateThroughMutableViews() {
-    LinkedTomlTable table = parse("[x]\ny = [ {z = 1} ]\n");
+    TomlParseResult table = parse("[x]\ny = [ {z = 1} ]\n");
 
     table.getTable("x").getArray("y").getTable(0).set("z", 99L);
 
@@ -484,7 +482,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldRemoveTheEntryFromElementsButKeepUnattachedCommentsInPlaceAfterRemove() {
-    LinkedTomlTable table = parse("# first\n\na = 1\n\n# second\n");
+    TomlParseResult table = parse("# first\n\na = 1\n\n# second\n");
 
     table.remove("a");
 
@@ -496,7 +494,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldRemoveOnlyEntriesFromElementsButKeepUnattachedCommentsInPlaceAfterClear() {
-    LinkedTomlTable table = parse("# first\n\na = 1\nb = 2\n\n# second\n");
+    TomlParseResult table = parse("# first\n\na = 1\nb = 2\n\n# second\n");
 
     table.clear();
 
@@ -509,25 +507,32 @@ class MutableTomlTableTest {
   @Test
   void shouldEditAResultWithErrorsAndRoundTripItThroughToml() {
     // "b = @" cannot start a value, so it is the one error; a and c.d still parse and are set.
-    AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
-    LinkedTomlTable result = Parser
-        .parseTable(CharStreams.fromString("a = 1\nb = @\nc.d = 3\n"), TomlParseOptions.defaults(), errorListener);
-    assertEquals(1, errorListener.errors().size());
+    TomlParseResult result = Toml.parse("a = 1\nb = @\nc.d = 3\n");
+    assertEquals(1, result.errors().size());
 
     result.set("c.e", 4L);
     result.remove("a");
     result.getOrCreateTable("f");
 
-    assertEquals(1, errorListener.errors().size());
+    assertEquals(1, result.errors().size());
     assertTrue(result.isModified());
 
-    AccumulatingErrorListener reparsedErrorListener = new AccumulatingErrorListener();
-    LinkedTomlTable reparsed =
-        Parser.parseTable(CharStreams.fromString(result.toToml()), TomlParseOptions.defaults(), reparsedErrorListener);
+    TomlParseResult reparsed = Toml.parse(result.toToml());
 
-    assertTrue(reparsedErrorListener.errors().isEmpty());
+    assertFalse(reparsed.hasErrors());
     assertFalse(reparsed.isModified());
     assertTrue(Toml.equals(reparsed, result));
+  }
+
+  @Test
+  void shouldEditAParseResultThroughItsTablesAndArrays() {
+    TomlParseResult result = Toml.parse("a = 1\n[t]\nb = [2]\n");
+    result.getTable("t").set("c", 3L);
+    result.getArray("t.b").add(4L);
+    assertEquals(3L, result.get("t.c"));
+    assertEquals(4L, result.getArray("t.b").get(1));
+    assertTrue(result.isModified());
+    assertFalse(result.hasErrors());
   }
 
   @Test
@@ -659,7 +664,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldNotFlagModificationWhenShortcutRemovesAnAbsentComment() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
 
     table.removeCommentAbove("a");
 
@@ -733,7 +738,7 @@ class MutableTomlTableTest {
   void shouldCopyAParsedUnattachedCommentWhenAddedToAnotherTable() {
     // A parsed comment has a position, so addComment always copies it, even though it is already unattached; removing
     // the original object from the destination therefore returns false.
-    LinkedTomlTable source = parse("# above\na = 1 # after\n\n# footer\n");
+    TomlParseResult source = parse("# above\na = 1 # after\n\n# footer\n");
     TomlComment parsedComment = unattachedComments(source).get(0);
     MutableTomlTable target = MutableTomlTable.create();
 
@@ -745,7 +750,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldRejectAddingAnAttachedComment() {
-    LinkedTomlTable table = parse("# above\na = 1 # after\n");
+    TomlParseResult table = parse("# above\na = 1 # after\n");
     List<TomlComment> attached = table.comments("a");
     assertEquals(2, attached.size());
     assertThrows(IllegalArgumentException.class, () -> table.addComment(attached.get(0)));
@@ -770,7 +775,7 @@ class MutableTomlTableTest {
   void shouldInsertAfterAnAnchorThatAnUnattachedCommentFollows() {
     // A comment run needs a blank line after it, before the next entry, to be unattached rather than that entry's
     // ABOVE run; see Comments' class documentation.
-    LinkedTomlTable table = parse("a = 1\n# c\n\nb = 2\n");
+    TomlParseResult table = parse("a = 1\n# c\n\nb = 2\n");
     TomlComment comment = (TomlComment) table.elements().get(1);
 
     table.insertAfter("a", "x", 0L);
@@ -793,7 +798,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldInsertBeforeAnAnchorThatAnUnattachedCommentPrecedes() {
-    LinkedTomlTable table = parse("a = 1\n# c\n\nb = 2\n");
+    TomlParseResult table = parse("a = 1\n# c\n\nb = 2\n");
 
     table.insertBefore("b", "y", 0L);
 
@@ -842,7 +847,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldInsertBesideAQuotedAnchorKey() {
-    LinkedTomlTable table = parse("\"a.b\" = 1\nc = 2\n");
+    TomlParseResult table = parse("\"a.b\" = 1\nc = 2\n");
 
     table.insertAfter(List.of("a.b"), "x", 9L);
 
@@ -851,7 +856,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldGiveTheNewEntryNoPositionNoCommentsAndMarkItModified() {
-    LinkedTomlTable table = parse("a = 1\nb = 2\n");
+    TomlParseResult table = parse("a = 1\nb = 2\n");
     assertFalse(table.isModified());
 
     table.insertBefore("b", "x", 9L);
@@ -884,7 +889,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldRejectANullAnchorPathElementOrNullKeyLeavingTheTableUnchanged() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
 
     assertThrows(NullPointerException.class, () -> table.insertBefore(Arrays.asList("a", null), "x", 1L));
     assertThrows(NullPointerException.class, () -> table.insertBefore("a", null, 1L));
@@ -895,7 +900,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldRejectNullAndUnconvertibleValuesWhenInsertingLeavingTheTableUnchanged() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
 
     assertThrows(NullPointerException.class, () -> table.insertBefore("a", "x", null));
     assertThrows(IllegalArgumentException.class, () -> table.insertBefore("a", "x", new Object()));
@@ -919,7 +924,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldRejectInsertingThroughANonTableIntermediate() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
     TomlInvalidTypeException e = assertThrows(TomlInvalidTypeException.class, () -> table.insertBefore("a.b", "x", 1L));
     assertEquals("Value of 'a' is a integer", e.getMessage());
   }
@@ -967,7 +972,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldInsertACommentCopiedFromAnotherDocument() {
-    LinkedTomlTable source = parse("# footer\n");
+    TomlParseResult source = parse("# footer\n");
     TomlComment sourceComment = (TomlComment) source.elements().get(0);
     MutableTomlTable table = MutableTomlTable.create();
     table.set("a", 1L);
@@ -984,7 +989,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldInsertCommentBeforeAnEntryWithAnAboveRunKeepingTheRunAttached() {
-    LinkedTomlTable table = parse("# above\na = 1\n");
+    TomlParseResult table = parse("# above\na = 1\n");
     List<TomlComment> aboveRun = table.comments("a");
 
     table.insertCommentBefore("a", "new");
@@ -1032,7 +1037,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldRejectInsertingAnAttachedComment() {
-    LinkedTomlTable table = parse("# above\na = 1\n");
+    TomlParseResult table = parse("# above\na = 1\n");
     TomlComment attached = table.comments("a").get(0);
     TomlElement anchor = table.entry("a");
 
@@ -1054,7 +1059,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldInsertAnEntryBetweenTwoConsecutiveUnattachedComments() {
-    LinkedTomlTable table = parse("a = 1\n\n# one\n\n# two\n\nb = 2\n");
+    TomlParseResult table = parse("a = 1\n\n# one\n\n# two\n\nb = 2\n");
     TomlComment two = (TomlComment) table.elements().get(2);
 
     table.insertBefore(two, "x", 9L);
@@ -1072,7 +1077,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldInsertACommentBetweenTwoConsecutiveUnattachedCommentsBeforeAndAfterEach() {
-    LinkedTomlTable table = parse("a = 1\n\n# one\n\n# two\n\nb = 2\n");
+    TomlParseResult table = parse("a = 1\n\n# one\n\n# two\n\nb = 2\n");
     TomlComment one = (TomlComment) table.elements().get(1);
     TomlComment two = (TomlComment) table.elements().get(2);
 
@@ -1103,7 +1108,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldInsertBeforeAnEntryThroughItsElementKeepingItsAboveRunAttached() {
-    LinkedTomlTable table = parse("# above\na = 1\n");
+    TomlParseResult table = parse("# above\na = 1\n");
     List<TomlComment> aboveRun = table.comments("a");
     TomlElement anchor = table.elements().get(0);
 
@@ -1193,7 +1198,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldLeaveTheTableUnchangedWhenElementFormInsertionIsRejected() {
-    LinkedTomlTable table = parse("a = 1\nb = 2\n");
+    TomlParseResult table = parse("a = 1\nb = 2\n");
 
     assertThrows(TomlKeyAlreadySetException.class, () -> table.insertBefore(table.entry("a"), "b", 9L));
 
@@ -1203,7 +1208,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldLeaveTheTableUnchangedWhenElementCommentInsertionIsRejected() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
     TomlElement foreignAnchor = MutableTomlTable.create().addComment("x").elements().get(0);
 
     assertThrows(NoSuchElementException.class, () -> table.insertCommentBefore(foreignAnchor, "note"));
@@ -1214,7 +1219,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldMarkOnlyTheInsertedEntryModifiedThroughTheElementForm() {
-    LinkedTomlTable table = parse("a = 1\nb = 2\n");
+    TomlParseResult table = parse("a = 1\nb = 2\n");
     TomlElement anchor = table.entry("b");
 
     table.insertBefore(anchor, "x", 9L);
@@ -1227,7 +1232,7 @@ class MutableTomlTableTest {
 
   @Test
   void shouldMarkTheContainerModifiedWhenInsertingACommentThroughTheElementForm() {
-    LinkedTomlTable table = parse("a = 1\n");
+    TomlParseResult table = parse("a = 1\n");
     assertFalse(table.isModified());
 
     table.insertCommentBefore(table.entry("a"), "note");

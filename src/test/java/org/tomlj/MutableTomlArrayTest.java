@@ -27,21 +27,19 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
-import org.antlr.v4.runtime.CharStreams;
 import org.junit.jupiter.api.Test;
 
 /**
  * Tests for {@link MutableTomlArray}, through the public API only.
  *
  * <p>
- * A parsed document is obtained by parsing a table directly, with {@link #parse(String)}: a {@link LinkedTomlTable} is
- * a {@link MutableTomlTable}, and the {@link ListTomlArray} values inside it are {@link MutableTomlArray}s.
+ * A parsed document is obtained with {@link Toml#parse(String)}: a {@link TomlParseResult} is a
+ * {@link MutableTomlTable}, and the arrays inside it are {@link MutableTomlArray}s.
  */
 class MutableTomlArrayTest {
 
-  private static LinkedTomlTable parse(String document) {
-    return Parser
-        .parseTable(CharStreams.fromString(document), TomlParseOptions.defaults(), new AccumulatingErrorListener());
+  private static TomlParseResult parse(String document) {
+    return Toml.parse(document);
   }
 
   // Unattached comments held directly in an array's elements(), filtered out from the entries.
@@ -200,7 +198,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldClearAnArrayLeavingUnattachedComments() {
-    LinkedTomlTable table = parse("a = [\n1,\n\n# footer\n]\n");
+    TomlParseResult table = parse("a = [\n1,\n\n# footer\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
 
     array.clear();
@@ -219,7 +217,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldStoreAnArrayAsADeepCopy() {
-    LinkedTomlTable table = parse("a = [1]\n");
+    TomlParseResult table = parse("a = [1]\n");
     ListTomlArray a = (ListTomlArray) table.get("a");
     MutableTomlArray root = MutableTomlArray.create();
 
@@ -265,7 +263,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldTrackModificationOnAParsedArray() {
-    LinkedTomlTable table = parse("a = [1, 2]\n");
+    TomlParseResult table = parse("a = [1, 2]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     assertFalse(array.isModified());
     assertFalse(array.isModified(0));
@@ -279,7 +277,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldKeepPlaceAndCommentsWhenReplacingButHaveNoPosition() {
-    LinkedTomlTable table = parse("a = [\n1 # note\n]\n");
+    TomlParseResult table = parse("a = [\n1 # note\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     List<TomlComment> comments = array.comments(0);
     TomlElement beforeReplace = array.elements().get(0);
@@ -298,7 +296,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldCopyAParsedArrayDroppingPositionsAndMarkingEveryEntryModified() {
-    LinkedTomlTable table = parse("a = [\n1, # note\n2\n]\n");
+    TomlParseResult table = parse("a = [\n1, # note\n2\n]\n");
     ListTomlArray original = (ListTomlArray) table.get("a");
 
     MutableTomlArray copy = MutableTomlArray.copyOf(original);
@@ -318,7 +316,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldCopyCommentsWithoutPositions() {
-    LinkedTomlTable table = parse("a = [\n  # above\n  1, # after\n  # trailing\n]\n");
+    TomlParseResult table = parse("a = [\n  # above\n  1, # after\n  # trailing\n]\n");
     ListTomlArray original = (ListTomlArray) table.get("a");
 
     MutableTomlArray copy = MutableTomlArray.copyOf(original);
@@ -348,7 +346,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldNavigateThroughMutableViews() {
-    LinkedTomlTable table = parse("a = [ {x = 1} ]\n");
+    TomlParseResult table = parse("a = [ {x = 1} ]\n");
     MutableTomlArray array = (MutableTomlArray) table.get("a");
 
     array.getTable(0).set("x", 99L);
@@ -370,7 +368,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldRemoveTheEntryFromElementsButKeepUnattachedCommentsInPlaceAfterRemove() {
-    LinkedTomlTable table = parse("a = [\n# first\n\n1,\n\n# second\n]\n");
+    TomlParseResult table = parse("a = [\n# first\n\n1,\n\n# second\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
 
     array.remove(0);
@@ -461,7 +459,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldNotFlagModificationWhenShortcutRemovesAnAbsentComment() {
-    LinkedTomlTable table = parse("a = [1]\n");
+    TomlParseResult table = parse("a = [1]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
 
     array.removeCommentAbove(0);
@@ -549,7 +547,7 @@ class MutableTomlArrayTest {
   void shouldInsertBeforeAnEntryThatAnUnattachedCommentPrecedes() {
     // A comment run needs a blank line after it, before the next entry, to be unattached rather than that entry's
     // ABOVE run; see Comments' class documentation.
-    LinkedTomlTable table = parse("a = [\n  1,\n  # c\n\n  2,\n]\n");
+    TomlParseResult table = parse("a = [\n  1,\n  # c\n\n  2,\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     TomlComment comment = (TomlComment) array.elements().get(1);
     Entry.Indexed entryForTwo = array.entry(1);
@@ -572,7 +570,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldMarkOnlyTheNewEntryModifiedWhenInsertingIntoAParsedArray() {
-    LinkedTomlTable table = parse("a = [1, 2]\n");
+    TomlParseResult table = parse("a = [1, 2]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
 
     array.insertBefore(1, 9L);
@@ -642,7 +640,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertAParsedUnattachedCommentBeforeAnEntryWithoutItsPosition() {
-    LinkedTomlTable table = parse("a = [\n1,\n\n# note\n]\n");
+    TomlParseResult table = parse("a = [\n1,\n\n# note\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     TomlComment parsed = (TomlComment) array.elements().get(1);
     assertNotNull(parsed.position());
@@ -688,7 +686,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertBeforeALeadingUnattachedComment() {
-    LinkedTomlTable table = parse("a = [\n# lead\n\n1,\n2,\n]\n");
+    TomlParseResult table = parse("a = [\n# lead\n\n1,\n2,\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     TomlElement lead = array.elements().get(0);
 
@@ -709,7 +707,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertAfterTheLastEntryWhenATrailingCommentFollowsIt() {
-    LinkedTomlTable table = parse("a = [\n1,\n2,\n\n# trail\n]\n");
+    TomlParseResult table = parse("a = [\n1,\n2,\n\n# trail\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     Entry.Indexed lastEntry = array.entry(1);
 
@@ -730,7 +728,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertBetweenTwoConsecutiveUnattachedComments() {
-    LinkedTomlTable table = parse("a = [\n1,\n\n# one\n\n# two\n\n2,\n]\n");
+    TomlParseResult table = parse("a = [\n1,\n\n# one\n\n# two\n\n2,\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     TomlElement two = array.elements().get(2);
 
@@ -751,7 +749,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertACommentBeforeAndAfterALeadingUnattachedComment() {
-    LinkedTomlTable table = parse("a = [\n# lead\n\n1,\n]\n");
+    TomlParseResult table = parse("a = [\n# lead\n\n1,\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     TomlElement lead = array.elements().get(0);
 
@@ -768,7 +766,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertACommentBeforeAndAfterTheLastEntryWhenATrailingCommentFollowsIt() {
-    LinkedTomlTable table = parse("a = [\n1,\n\n# trail\n]\n");
+    TomlParseResult table = parse("a = [\n1,\n\n# trail\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     Entry.Indexed lastEntry = array.entry(0);
 
@@ -785,7 +783,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertACommentBetweenTwoConsecutiveUnattachedCommentsBeforeAndAfterEach() {
-    LinkedTomlTable table = parse("a = [\n1,\n\n# one\n\n# two\n\n2,\n]\n");
+    TomlParseResult table = parse("a = [\n1,\n\n# one\n\n# two\n\n2,\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     TomlElement one = array.elements().get(1);
     TomlElement two = array.elements().get(2);
@@ -815,7 +813,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldRejectAForeignAnchorFromANestedArrayOrACopy() {
-    LinkedTomlTable table = parse("a = [ [1], 2 ]\n");
+    TomlParseResult table = parse("a = [ [1], 2 ]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     ListTomlArray nested = (ListTomlArray) array.get(0);
     TomlElement nestedAnchor = nested.elements().get(0);
@@ -863,7 +861,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldMarkOnlyTheInsertedEntryModifiedThroughTheElementFormAndNotShiftedEntries() {
-    LinkedTomlTable table = parse("a = [1, 2]\n");
+    TomlParseResult table = parse("a = [1, 2]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     Entry.Indexed anchor = array.entry(0);
 
@@ -877,7 +875,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldMarkTheArrayModifiedWhenInsertingACommentThroughTheElementForm() {
-    LinkedTomlTable table = parse("a = [1]\n");
+    TomlParseResult table = parse("a = [1]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     assertFalse(array.isModified());
 
@@ -908,7 +906,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertBeforeAndAfterEntriesAroundAnUnattachedComment() {
-    LinkedTomlTable table = parse("a = [\n1,\n\n# note\n\n2,\n]\n");
+    TomlParseResult table = parse("a = [\n1,\n\n# note\n\n2,\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
 
     // insertBefore(1, ...) first, so that index 0 still names the entry for 1 when insertAfter(0, ...) runs: an
@@ -932,7 +930,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertAfterTheLastEntryBeforeATrailingCommentUnlikeAdd() {
-    LinkedTomlTable table = parse("a = [\n1,\n\n# trail\n]\n");
+    TomlParseResult table = parse("a = [\n1,\n\n# trail\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
 
     array.insertAfter(array.size() - 1, 9L);
@@ -943,7 +941,7 @@ class MutableTomlArrayTest {
     assertEquals(9L, ((TomlEntry) elements.get(1)).value().get());
     assertEquals("trail", ((TomlComment) elements.get(2)).text());
 
-    LinkedTomlTable freshTable = parse("a = [\n1,\n\n# trail\n]\n");
+    TomlParseResult freshTable = parse("a = [\n1,\n\n# trail\n]\n");
     ListTomlArray fresh = (ListTomlArray) freshTable.get("a");
 
     fresh.add(9L);
@@ -957,7 +955,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldInsertCommentsBeforeAndAfterEntriesAroundAnUnattachedComment() {
-    LinkedTomlTable table = parse("a = [\n1,\n\n# note\n\n2,\n]\n");
+    TomlParseResult table = parse("a = [\n1,\n\n# note\n\n2,\n]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
 
     array.insertCommentAfter(0, "x");
@@ -974,7 +972,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldMarkOnlyTheInsertedEntryModifiedThroughInsertAfterAndNotShiftedEntries() {
-    LinkedTomlTable table = parse("a = [1, 2]\n");
+    TomlParseResult table = parse("a = [1, 2]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
 
     array.insertAfter(0, 9L);
@@ -987,7 +985,7 @@ class MutableTomlArrayTest {
 
   @Test
   void shouldMarkTheArrayModifiedWhenInsertingACommentThroughInsertCommentAfter() {
-    LinkedTomlTable table = parse("a = [1]\n");
+    TomlParseResult table = parse("a = [1]\n");
     ListTomlArray array = (ListTomlArray) table.get("a");
     assertFalse(array.isModified());
 
