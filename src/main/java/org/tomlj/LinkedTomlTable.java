@@ -30,7 +30,7 @@ import java.util.stream.Stream;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
-final class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements MutableTomlTable {
+class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements MutableTomlTable {
 
   private final Map<String, Entry.KeyValue> properties = new LinkedHashMap<>();
 

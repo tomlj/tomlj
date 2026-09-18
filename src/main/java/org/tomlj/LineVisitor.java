@@ -38,10 +38,10 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
   // in the document.
   private final int maxNestingDepth;
 
-  LineVisitor(TomlVersion version, ErrorReporter errorReporter, int maxNestingDepth) {
+  LineVisitor(LinkedTomlTable rootTable, TomlVersion version, ErrorReporter errorReporter, int maxNestingDepth) {
     this.version = version;
     this.errorReporter = errorReporter;
-    this.rootTable = new LinkedTomlTable(TomlPosition.positionAt(1, 1));
+    this.rootTable = rootTable;
     this.currentTable = rootTable;
     this.openTables = new HashMap<>();
     this.maxNestingDepth = maxNestingDepth;
