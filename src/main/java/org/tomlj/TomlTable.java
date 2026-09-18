@@ -54,6 +54,9 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * <p>
  * The comments of a document are kept, and are read from the table or array they were written in; see
  * {@link TomlComment}.
+ *
+ * <p>
+ * A table that can be edited is a {@link MutableTomlTable}; a parse result is one.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})

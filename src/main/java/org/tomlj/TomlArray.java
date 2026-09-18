@@ -27,6 +27,9 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * An array of TOML values.
+ *
+ * <p>
+ * An array that can be edited is a {@link MutableTomlArray}; the arrays of a parse result are.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
