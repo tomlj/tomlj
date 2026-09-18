@@ -317,6 +317,10 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
    * in their places, copied without their positions. A nested table or array is copied recursively, through
    * {@link TomlValues#normalize}; every other value is shared.
    *
+   * <p>
+   * An entry keeps the record of where it was written, so that a copy of a parsed document can still be written the way
+   * the document was.
+   *
    * @param array The array to copy.
    * @param isTableArray Whether the copy holds the tables of a {@code [[x]]} header.
    * @return A new array with the same entries.
@@ -329,8 +333,12 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
       } else {
         TomlEntry original = (TomlEntry) element;
         // A fresh wrapper even for a scalar: the entry's position is its value's, and a copy has none.
-        Value value = Value.of(TomlValues.normalize(original.value().get()), null);
-        copy.appendEdited(value, TomlComment.copyWithoutPositions(original.comments()));
+        TomlValue originalValue = original.value();
+        Value value = Value.copyOf(originalValue, TomlValues.normalize(originalValue.get()));
+        Entry.Indexed entry = copy.appendEdited(value, TomlComment.copyWithoutPositions(original.comments()));
+        if (original instanceof Entry) {
+          entry.span = ((Entry) original).span;
+        }
       }
     }
     return copy;

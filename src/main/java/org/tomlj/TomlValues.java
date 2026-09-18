@@ -71,8 +71,10 @@ final class TomlValues {
       return MutableTomlArray.copyOf((TomlArray) value);
     }
     if (value instanceof TomlValue) {
-      // A scalar TomlValue, such as one read from an entry: what it holds is stored
-      return normalize(((TomlValue) value).get());
+      // A scalar TomlValue, such as one read from an entry: what it holds is stored, with the record of where its
+      // literal was written
+      TomlValue original = (TomlValue) value;
+      return Value.copyOf(original, normalize(original.get()));
     }
     if (value instanceof Integer || value instanceof Short || value instanceof Byte) {
       return ((Number) value).longValue();
