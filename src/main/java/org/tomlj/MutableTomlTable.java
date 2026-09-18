@@ -997,6 +997,24 @@ public interface MutableTomlTable extends TomlTable {
   boolean removeComment(TomlComment comment);
 
   /**
+   * Write this table, and everything in it, in a style of its own the next time the document is written.
+   *
+   * <p>
+   * A parse result is written from the text it was parsed from, so a table keeps its layout until it is changed.
+   * Reformatting it discards that: with {@link TomlOptions.Style#PRETTIFY} its lines keep their order, comments and
+   * literal forms and take the layout the options give, and with {@link TomlOptions.Style#CANONICAL} it is written
+   * entirely in the default style, as a table built with the editing API is, in the place its header had. The style
+   * applies to every table and array nested in this one. It cannot be undone, and a later call keeps the stronger of
+   * the two styles. A copy of this table is reformatted the same way.
+   *
+   * @param style The style: {@link TomlOptions.Style#PRETTIFY} or {@link TomlOptions.Style#CANONICAL}.
+   * @return This table.
+   * @throws NullPointerException If {@code style} is {@code null}.
+   * @throws IllegalArgumentException If {@code style} is {@link TomlOptions.Style#PRESERVE}.
+   */
+  MutableTomlTable reformat(TomlOptions.Style style);
+
+  /**
    * Get the entry for a key, or throw if the key is not set.
    *
    * @param path The key path.

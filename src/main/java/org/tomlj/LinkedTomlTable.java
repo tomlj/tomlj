@@ -760,6 +760,12 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
     return removeElement(comment);
   }
 
+  @Override
+  public MutableTomlTable reformat(TomlOptions.Style style) {
+    reformatAs(style);
+    return this;
+  }
+
   /**
    * Create a deep copy of this table for the editing API; see {@link #copyFrom(TomlTable, boolean)}. Keeps
    * {@link #inline}, since it describes how the table is written, not where its entries came from.
@@ -790,7 +796,8 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
    * <p>
    * An entry keeps the record of where it was written, and so do this table's own brackets if it was written as an
    * inline table, so that a copy of a parsed document can still be written the way the document was; the copy's own
-   * header span stays null, since a header names a path this table no longer has.
+   * header span stays null, since a header names a path this table no longer has. A style asked for through
+   * {@link #reformat(TomlOptions.Style)} is kept as well, since it says how the table is written wherever it is.
    *
    * @param table The table to copy.
    * @param inline Whether the copy is an inline table.
@@ -800,6 +807,7 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
     LinkedTomlTable copy = new LinkedTomlTable(null, inline);
     if (table instanceof ElementContainer) {
       copy.bracketSpan = ((ElementContainer<?>) table).bracketSpan;
+      copy.style = ((ElementContainer<?>) table).style;
     }
     for (TomlElement element : table.elements()) {
       if (element instanceof TomlComment) {

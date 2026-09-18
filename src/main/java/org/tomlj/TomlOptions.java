@@ -30,6 +30,12 @@ public final class TomlOptions {
 
   /**
    * How much of the way a document was written is kept.
+   *
+   * <p>
+   * The constants are declared in the order of how much they keep: {@link #PRESERVE} keeps the most, {@link #PRETTIFY}
+   * keeps what was written but not how, and {@link #CANONICAL} keeps none of it. Where a style is asked for a single
+   * table or array as well as for the document, through {@link MutableTomlTable#reformat(Style)}, the later of the two
+   * in this order is the one it is written in.
    */
   public enum Style {
     /**

@@ -94,7 +94,8 @@ final class TomlSerializer {
     this.maxLineWidth = options.maxLineWidth();
     this.lineSeparator = options.lineSeparator();
     this.keepLiterals = (options.style() == TomlOptions.Style.PRETTIFY);
-    this.copySourceLines = copySourceLines && !this.keepLiterals;
+    // Only a block of a document being written from its source copies lines; the other styles write every line anew
+    this.copySourceLines = copySourceLines && (options.style() == TomlOptions.Style.PRESERVE);
   }
 
   /**
@@ -112,7 +113,7 @@ final class TomlSerializer {
    * A writer of a block of a document being written from the text it was parsed from: the default style, except that a
    * line the document still holds the text of is copied rather than written anew, so that a copied entry keeps the
    * literal and the spacing it was read with. A normalized layout lays every line out anew, so it keeps the literal
-   * forms alone.
+   * forms alone, and the canonical style keeps nothing of how the document was written.
    *
    * @param out The output.
    * @param options The options to write with.
@@ -126,14 +127,17 @@ final class TomlSerializer {
     requireNonNull(table);
     requireNonNull(appendable);
     requireNonNull(options);
-    if (options.style() != TomlOptions.Style.CANONICAL && table instanceof ParsedTomlTable) {
+    // A table reformatted through the editing API is written in the style it was given, or in the options' if that
+    // keeps less of the document
+    TomlOptions tableOptions = ElementContainer.optionsWithin(table, options);
+    if (tableOptions.style() != TomlOptions.Style.CANONICAL && table instanceof ParsedTomlTable) {
       ParsedTomlTable parsed = (ParsedTomlTable) table;
       if (parsed.source() != null) {
         SourcePreservingSerializer.toToml(parsed, appendable, options);
         return;
       }
     }
-    defaultStyle(appendable, options).writeEntries(table, new ArrayList<>());
+    defaultStyle(appendable, tableOptions).writeEntries(table, new ArrayList<>());
   }
 
   static void toToml(TomlArray array, Appendable appendable, TomlOptions options) throws IOException {
@@ -141,7 +145,7 @@ final class TomlSerializer {
     requireNonNull(appendable);
     requireNonNull(options);
     // The array starts at column 0 outside any table, so the indent never applies
-    defaultStyle(appendable, options).writeValue(array, "", 0, 0);
+    defaultStyle(appendable, ElementContainer.optionsWithin(array, options)).writeValue(array, "", 0, 0);
   }
 
   /**
@@ -576,9 +580,10 @@ final class TomlSerializer {
    *
    * @param text The text to append to.
    * @param value The value.
+   * @param literals Whether a value the document it was read from still holds the text of is written with that text.
    */
-  static void appendInlineValue(StringBuilder text, Object value) {
-    appendInline(value, text, Integer.MAX_VALUE, false);
+  static void appendInlineValue(StringBuilder text, Object value, boolean literals) {
+    appendInline(value, text, Integer.MAX_VALUE, literals);
   }
 
   /**

@@ -583,6 +583,26 @@ public interface MutableTomlArray extends TomlArray {
   boolean removeComment(TomlComment comment);
 
   /**
+   * Write this array, and everything in it, in a style of its own the next time the document is written.
+   *
+   * <p>
+   * A parse result is written from the text it was parsed from, so an array keeps its layout until it is changed.
+   * Reformatting it discards that: with {@link TomlOptions.Style#PRETTIFY} its elements keep their order, comments and
+   * literal forms and take the layout the options give, and with {@link TomlOptions.Style#CANONICAL} it is written
+   * entirely in the default style, as an array built with the editing API is. An array of the tables of
+   * {@code [[header]]} sections is written as those sections in that style, in the place the first of them had; any
+   * other array is written anew on the line it is written on. The style applies to every table and array nested in this
+   * one. It cannot be undone, and a later call keeps the stronger of the two styles. A copy of this array is
+   * reformatted the same way.
+   *
+   * @param style The style: {@link TomlOptions.Style#PRETTIFY} or {@link TomlOptions.Style#CANONICAL}.
+   * @return This array.
+   * @throws NullPointerException If {@code style} is {@code null}.
+   * @throws IllegalArgumentException If {@code style} is {@link TomlOptions.Style#PRESERVE}.
+   */
+  MutableTomlArray reformat(TomlOptions.Style style);
+
+  /**
    * Create a deep copy of an array.
    *
    * <p>

@@ -289,6 +289,12 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
     return removeElement(comment);
   }
 
+  @Override
+  public MutableTomlArray reformat(TomlOptions.Style style) {
+    reformatAs(style);
+    return this;
+  }
+
   /**
    * Create a deep copy of this array for the editing API; see {@link #copyFrom(TomlArray, boolean)}. Keeps
    * {@link #isTableArray}, since it describes how the array is written, not where its entries came from.
@@ -318,7 +324,8 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
    *
    * <p>
    * An entry keeps the record of where it was written, and so do this array's own brackets, so that a copy of a parsed
-   * document can still be written the way the document was.
+   * document can still be written the way the document was. A style asked for through
+   * {@link #reformat(TomlOptions.Style)} is kept as well, since it says how the array is written wherever it is.
    *
    * @param array The array to copy.
    * @param isTableArray Whether the copy holds the tables of a {@code [[x]]} header.
@@ -328,6 +335,7 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
     ListTomlArray copy = new ListTomlArray(isTableArray, null);
     if (array instanceof ElementContainer) {
       copy.bracketSpan = ((ElementContainer<?>) array).bracketSpan;
+      copy.style = ((ElementContainer<?>) array).style;
     }
     for (TomlElement element : array.elements()) {
       if (element instanceof TomlComment) {

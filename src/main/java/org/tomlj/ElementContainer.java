@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -42,6 +44,11 @@ abstract class ElementContainer<E extends Entry> extends Value {
   private final List<TomlElement> elements = new ArrayList<>();
 
   private boolean sequenceModified;
+
+  // The style this table or array is written in, whatever style the document around it is written in. PRESERVE until
+  // reformat() asks for another one, which it never lowers. A copy keeps it, since it describes how the table or array
+  // is to be written rather than where it came from.
+  TomlOptions.Style style = TomlOptions.Style.PRESERVE;
 
   // Where the brackets of this table or array were written in the document, and where the whitespace before the
   // closing one starts. Null for a table or array built through the editing API, for one read from a document parsed
@@ -185,16 +192,82 @@ abstract class ElementContainer<E extends Entry> extends Value {
   }
 
   /**
+   * Write this table or array in a style of its own; see {@link MutableTomlTable#reformat(TomlOptions.Style)}.
+   *
+   * @param style The style.
+   * @throws IllegalArgumentException If {@code style} is {@link TomlOptions.Style#PRESERVE}.
+   */
+  void reformatAs(TomlOptions.Style style) {
+    requireNonNull(style);
+    if (style == TomlOptions.Style.PRESERVE) {
+      throw new IllegalArgumentException("style must be PRETTIFY or CANONICAL");
+    }
+    // A style is never lowered, so that a table reformatted twice keeps the one that writes the most of it anew
+    if (style.compareTo(this.style) > 0) {
+      this.style = style;
+    }
+  }
+
+  /**
+   * The style this table or array is written in within a document being written in a style: the stronger of that style
+   * and the one asked for here, since a style keeps less of how the document was written than the one before it.
+   *
+   * @param inherited The style the document, or the table or array holding this one, is written in.
+   * @return The style this table or array is written in.
+   */
+  TomlOptions.Style styleWithin(TomlOptions.Style inherited) {
+    return (style.compareTo(inherited) > 0) ? style : inherited;
+  }
+
+  /**
+   * The options a value nested in a document is written with: the options of the table or array holding it, with the
+   * style the value itself is written in.
+   *
+   * @param value The value.
+   * @param enclosing The options the table or array holding it is written with.
+   * @return Those options, or a copy of them with the value's own style.
+   */
+  static TomlOptions optionsWithin(Object value, TomlOptions enclosing) {
+    if (!(value instanceof ElementContainer)) {
+      return enclosing;
+    }
+    TomlOptions.Style style = ((ElementContainer<?>) value).styleWithin(enclosing.style());
+    return (style == enclosing.style()) ? enclosing : enclosing.withStyle(style);
+  }
+
+  /**
+   * Whether this table or array, or one written inside it, is written in a style of its own, in which case the text it
+   * was read in no longer says how it is to be written.
+   *
+   * @return {@code true} if a style was asked for here or anywhere within.
+   */
+  private boolean reformatted() {
+    if (style != TomlOptions.Style.PRESERVE) {
+      return true;
+    }
+    for (TomlElement element : elements) {
+      if (!(element instanceof Entry)) {
+        continue;
+      }
+      Value value = ((Entry) element).value;
+      if (value instanceof ElementContainer && ((ElementContainer<?>) value).reformatted()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * {@inheritDoc}
    *
    * <p>
    * The brackets this table or array was written in describe what it held when it was read, so they no longer describe
-   * it once anything in it has been edited.
+   * it once anything in it has been edited, or once it is to be written in a style of its own.
    */
   @Override
   @Nullable
   ValueSpan writtenSpan() {
-    return isModified() ? null : bracketSpan;
+    return (isModified() || reformatted()) ? null : bracketSpan;
   }
 
   /**

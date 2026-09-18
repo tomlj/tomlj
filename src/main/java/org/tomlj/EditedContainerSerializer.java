@@ -103,7 +103,14 @@ final class EditedContainerSerializer {
       ValueSpan brackets,
       Context context,
       TomlOptions options) throws IOException {
-    new EditedContainerSerializer(text, brackets, options).write(container, context);
+    EditedContainerSerializer writer = new EditedContainerSerializer(text, brackets, options);
+    TomlOptions containerOptions = ElementContainer.optionsWithin(container, options);
+    if (containerOptions.style() != options.style()) {
+      // The container is written in a style of its own, which keeps none of the text it was read in
+      writer.appendValue(container, context, containerOptions);
+      return;
+    }
+    writer.write(container, context);
   }
 
   private EditedContainerSerializer(StringBuilder out, ValueSpan brackets, TomlOptions options) {
@@ -128,7 +135,7 @@ final class EditedContainerSerializer {
     order(items);
     if (!anySpanned(items)) {
       // Nothing the document wrote between the brackets is still here, so there is nothing to write it from
-      appendValue(container, context);
+      appendValue(container, context, options);
       return;
     }
     layout(items);
@@ -335,10 +342,11 @@ final class EditedContainerSerializer {
   private void appendEntry(Item item, Context context) throws IOException {
     Entry entry = item.entry();
     SourceSpan span = item.span;
+    TomlOptions valueOptions = ElementContainer.optionsWithin(entry.value, options);
     if (span == null) {
       appendCommentAbove(entry);
       appendKey(item.keyPath);
-      appendValue(entry.value.get(), context);
+      appendValue(entry.value.get(), context, valueOptions);
       return;
     }
     int from;
@@ -356,9 +364,9 @@ final class EditedContainerSerializer {
     out.append(source.text(from, span.valueStart - 1));
     ValueSpan nested = span.writtenBrackets(entry.value);
     if (nested != null) {
-      new EditedContainerSerializer(out, nested, options).write((ElementContainer<?>) entry.value, context);
+      append(out, (ElementContainer<?>) entry.value, nested, context, options);
     } else {
-      appendValue(entry.value.get(), context);
+      appendValue(entry.value.get(), context, valueOptions);
     }
   }
 
@@ -502,17 +510,19 @@ final class EditedContainerSerializer {
    *
    * @param value The value.
    * @param context Where the value sits.
+   * @param valueOptions The options the value is written with, which are these options unless it is written in a style
+   *        of its own.
    */
-  private void appendValue(Object value, Context context) throws IOException {
+  private void appendValue(Object value, Context context, TomlOptions valueOptions) throws IOException {
     if (context == Context.ENTRY && !TomlSerializer.holdsComments(value)) {
       // Everything inside an inline table stays on the one line, whatever the maximum line width is
-      TomlSerializer.appendInlineValue(out, value);
+      TomlSerializer.appendInlineValue(out, value, valueOptions.style() == TomlOptions.Style.PRETTIFY);
       return;
     }
     int lineStart = lastLineStart(out);
     String indent = indentOfLastLine(out);
     int column = out.codePointCount(lineStart, out.length());
-    TomlSerializer serializer = TomlSerializer.defaultStyle(out, options);
+    TomlSerializer serializer = TomlSerializer.defaultStyle(out, valueOptions);
     if (context == Context.LINE) {
       serializer.writeLineValue(value, indent, column);
     } else {
