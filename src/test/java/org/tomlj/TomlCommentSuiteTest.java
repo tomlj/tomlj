@@ -171,7 +171,7 @@ class TomlCommentSuiteTest {
       for (TomlComment comment : comments) {
         TomlComment.Placement placement = comment.placement();
         TomlPosition at = comment.position();
-        if (placement == null) {
+        if (placement == TomlComment.Placement.UNATTACHED) {
           failures.add(entry + " has an unattached comment among the comments attached to it");
         } else if (placement == previous) {
           failures.add(entry + " has two " + placement + " comments");
@@ -199,7 +199,7 @@ class TomlCommentSuiteTest {
     private void unattached(List<TomlComment> comments, String container) {
       int previousLine = 0;
       for (TomlComment comment : comments) {
-        if (comment.placement() != null) {
+        if (comment.placement() != TomlComment.Placement.UNATTACHED) {
           failures.add(container + " holds a comment placed " + comment.placement() + " among its unattached ones");
         }
         TomlPosition at = comment.position();

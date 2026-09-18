@@ -124,7 +124,7 @@ final class Comments {
     TomlParser.LineBreakContext lineBreak = (TomlParser.LineBreakContext) nodes.get(index);
     TerminalNode comment = lineEndComment(lineBreak);
     if (comment != null && !endsElementLine(nodes, index)) {
-      container.addComment(of(comment, null));
+      container.addComment(of(comment, TomlComment.Placement.UNATTACHED));
     }
     List<TomlParser.CommentRunContext> runs = lineBreak.commentRun();
     int count = runs.size();
@@ -133,7 +133,7 @@ final class Comments {
       count--;
     }
     for (int i = 0; i < count; ++i) {
-      container.addComment(of(runs.get(i), null));
+      container.addComment(of(runs.get(i), TomlComment.Placement.UNATTACHED));
     }
   }
 
@@ -183,10 +183,11 @@ final class Comments {
    * Record a comment run.
    *
    * @param run The run.
-   * @param placement Where it sits relative to what it documents, or {@code null} if it documents nothing.
+   * @param placement Where it sits relative to what it documents, or {@link TomlComment.Placement#UNATTACHED} if it
+   *        documents nothing.
    * @return The comment.
    */
-  static TomlComment of(TomlParser.CommentRunContext run, TomlComment.@Nullable Placement placement) {
+  static TomlComment of(TomlParser.CommentRunContext run, TomlComment.Placement placement) {
     List<TerminalNode> comments = run.Comment();
     List<Token> tokens = new ArrayList<>(comments.size());
     for (TerminalNode comment : comments) {
@@ -199,10 +200,11 @@ final class Comments {
    * Record a comment written on one line.
    *
    * @param comment The comment.
-   * @param placement Where it sits relative to what it documents, or {@code null} if it documents nothing.
+   * @param placement Where it sits relative to what it documents, or {@link TomlComment.Placement#UNATTACHED} if it
+   *        documents nothing.
    * @return The comment.
    */
-  static TomlComment of(TerminalNode comment, TomlComment.@Nullable Placement placement) {
+  static TomlComment of(TerminalNode comment, TomlComment.Placement placement) {
     return TomlComment.of(Collections.singletonList(comment.getSymbol()), placement);
   }
 

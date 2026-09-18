@@ -15,6 +15,7 @@ package org.tomlj;
 import java.util.List;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.framework.qual.DefaultQualifier;
 import org.checkerframework.framework.qual.TypeUseLocation;
 
@@ -47,4 +48,25 @@ public interface TomlEntry extends TomlElement {
    * @return The attached comments, in document order. Unmodifiable.
    */
   List<TomlComment> comments();
+
+  /**
+   * The comment attached to this entry at a placement.
+   *
+   * @param placement {@link TomlComment.Placement#ABOVE} for the run written directly above this entry, or
+   *        {@link TomlComment.Placement#AFTER} for the comment on its line.
+   * @return The comment at that placement, or {@code null} if this entry has none there.
+   * @throws NullPointerException If {@code placement} is {@code null}.
+   * @throws IllegalArgumentException If {@code placement} is {@link TomlComment.Placement#UNATTACHED}, since no entry
+   *         holds an unattached comment.
+   */
+  @Nullable
+  default TomlComment comment(TomlComment.Placement placement) {
+    TomlComment.requireAttached(placement);
+    for (TomlComment comment : comments()) {
+      if (comment.placement() == placement) {
+        return comment;
+      }
+    }
+    return null;
+  }
 }

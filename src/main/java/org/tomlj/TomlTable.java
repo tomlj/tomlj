@@ -1308,6 +1308,56 @@ public interface TomlTable {
   }
 
   /**
+   * Get the comment attached to a key at a placement.
+   *
+   * <p>
+   * Returns {@code null} if the key was not set in the document or has no comment at that placement; use
+   * {@link #contains(String)} to tell those apart.
+   *
+   * @param dottedKey A dotted key (e.g. {@code "server.address.port"}).
+   * @param placement {@link TomlComment.Placement#ABOVE} for the run directly above the key, or
+   *        {@link TomlComment.Placement#AFTER} for the comment on its line.
+   * @return The comment at that placement, or {@code null} if there is none.
+   * @throws NullPointerException If {@code dottedKey} or {@code placement} is {@code null}.
+   * @throws IllegalArgumentException If the key cannot be parsed, or {@code placement} is
+   *         {@link TomlComment.Placement#UNATTACHED}.
+   * @throws TomlInvalidTypeException If any element of the path preceding the final key is not a table.
+   */
+  @Nullable
+  default TomlComment comment(String dottedKey, TomlComment.Placement placement) {
+    requireNonNull(dottedKey);
+    return comment(Parser.parseDottedKey(dottedKey), placement);
+  }
+
+  /**
+   * Get the comment attached to a key at a placement.
+   *
+   * <p>
+   * Returns {@code null} if the key was not set in the document or has no comment at that placement; use
+   * {@link #contains(List)} to tell those apart.
+   *
+   * <p>
+   * This is a shortcut for {@link #entry(List)}, returning {@link TomlEntry#comment(TomlComment.Placement)}.
+   *
+   * @param path The key path.
+   * @param placement {@link TomlComment.Placement#ABOVE} for the run directly above the key, or
+   *        {@link TomlComment.Placement#AFTER} for the comment on its line.
+   * @return The comment at that placement, or {@code null} if there is none.
+   * @throws NullPointerException If {@code placement} is {@code null}.
+   * @throws IllegalArgumentException If {@code placement} is {@link TomlComment.Placement#UNATTACHED}.
+   * @throws TomlInvalidTypeException If any element of the path preceding the final key is not a table.
+   */
+  @Nullable
+  default TomlComment comment(List<String> path, TomlComment.Placement placement) {
+    TomlComment.requireAttached(placement);
+    if (path.isEmpty()) {
+      return null;
+    }
+    TomlKeyValue entry = entry(path);
+    return (entry != null) ? entry.comment(placement) : null;
+  }
+
+  /**
    * Get the entry for a key.
    *
    * <p>

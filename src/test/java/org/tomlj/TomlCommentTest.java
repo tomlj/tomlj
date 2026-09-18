@@ -94,7 +94,7 @@ class TomlCommentTest {
   }
 
   private static void assertUnattached(TomlComment comment, String text) {
-    assertEquals(null, comment.placement());
+    assertEquals(TomlComment.Placement.UNATTACHED, comment.placement());
     assertEquals(text, comment.text());
   }
 
@@ -523,6 +523,39 @@ class TomlCommentTest {
   // ---------------------------------------------------------------------------------------------------------------
   // No comments at all
   // ---------------------------------------------------------------------------------------------------------------
+
+  @Test
+  void shouldReadTheCommentAtAPlacement() {
+    LinkedTomlTable table =
+        parse("# above a\na = 1 # after a\nb = 2 # after b\n[t]\nl = [\n  # above 1\n  1, # after 1\n  2\n]\n");
+
+    assertComment(table.comment("a", TomlComment.Placement.ABOVE), TomlComment.Placement.ABOVE, "above a");
+    assertComment(table.comment(List.of("a"), TomlComment.Placement.AFTER), TomlComment.Placement.AFTER, "after a");
+    assertSame(table.comments("a").get(1), table.entry(List.of("a")).comment(TomlComment.Placement.AFTER));
+    assertNull(table.comment("b", TomlComment.Placement.ABOVE));
+    assertNull(table.comment("missing", TomlComment.Placement.ABOVE));
+    assertNull(table.comment(List.of(), TomlComment.Placement.ABOVE));
+
+    TomlArray l = table.getArray("t.l");
+    assertComment(l.comment(0, TomlComment.Placement.ABOVE), TomlComment.Placement.ABOVE, "above 1");
+    assertComment(l.comment(0, TomlComment.Placement.AFTER), TomlComment.Placement.AFTER, "after 1");
+    assertNull(l.comment(1, TomlComment.Placement.ABOVE));
+    assertNull(l.entry(1).comment(TomlComment.Placement.AFTER));
+  }
+
+  @Test
+  void shouldRejectAnUnattachedOrNullPlacementWhenReadingAComment() {
+    LinkedTomlTable table = parse("a = 1\nl = [1]\n");
+    TomlArray l = table.getArray("l");
+
+    assertThrows(IllegalArgumentException.class, () -> table.comment("a", TomlComment.Placement.UNATTACHED));
+    assertThrows(IllegalArgumentException.class, () -> table.comment("missing", TomlComment.Placement.UNATTACHED));
+    assertThrows(IllegalArgumentException.class, () -> l.comment(0, TomlComment.Placement.UNATTACHED));
+    assertThrows(IllegalArgumentException.class, () -> l.entry(0).comment(TomlComment.Placement.UNATTACHED));
+    assertThrows(NullPointerException.class, () -> table.comment("a", null));
+    assertThrows(NullPointerException.class, () -> l.comment(0, null));
+    assertThrows(IndexOutOfBoundsException.class, () -> l.comment(1, TomlComment.Placement.ABOVE));
+  }
 
   @Test
   void shouldReturnEmptyListsWhenTheDocumentHasNoComments() {

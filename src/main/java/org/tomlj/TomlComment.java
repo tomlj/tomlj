@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,23 +43,29 @@ public final class TomlComment implements TomlElement {
     /**
      * The comment written on the same line as the entry, after it.
      */
-    AFTER
+    AFTER,
+    /**
+     * A comment that documents no entry: a run that is not directly above one, or a comment on a line with none. It
+     * belongs to the table or array it was written in.
+     */
+    UNATTACHED
   }
 
   // Each line as written after the '#', kept verbatim so that a writer can reproduce it; lines() strips one leading
   // space.
   private final List<String> rawLines;
   private final TomlPosition position;
-  private final @Nullable Placement placement;
+  private final Placement placement;
 
   /**
    * Record a comment from the tokens the lexer matched for it.
    *
    * @param tokens The comment tokens, one per line, on consecutive lines of the document.
-   * @param placement Where the comment sits relative to what it documents, or {@code null} if it documents nothing.
+   * @param placement Where the comment sits relative to what it documents, or {@link Placement#UNATTACHED} if it
+   *        documents nothing.
    * @return A comment.
    */
-  static TomlComment of(List<Token> tokens, @Nullable Placement placement) {
+  static TomlComment of(List<Token> tokens, Placement placement) {
     assert !tokens.isEmpty();
     List<String> rawLines = new ArrayList<>(tokens.size());
     for (Token token : tokens) {
@@ -89,10 +97,26 @@ public final class TomlComment implements TomlElement {
     return Collections.unmodifiableList(Arrays.asList(first, second));
   }
 
-  private TomlComment(List<String> rawLines, TomlPosition position, @Nullable Placement placement) {
+  /**
+   * Check that a placement is one an entry holds a comment at.
+   *
+   * @param placement The placement.
+   * @return {@code placement}.
+   * @throws NullPointerException If {@code placement} is {@code null}.
+   * @throws IllegalArgumentException If {@code placement} is {@link Placement#UNATTACHED}.
+   */
+  static Placement requireAttached(Placement placement) {
+    requireNonNull(placement);
+    if (placement == Placement.UNATTACHED) {
+      throw new IllegalArgumentException("placement must be ABOVE or AFTER");
+    }
+    return placement;
+  }
+
+  private TomlComment(List<String> rawLines, TomlPosition position, Placement placement) {
     this.rawLines = rawLines;
     this.position = position;
-    this.placement = placement;
+    this.placement = requireNonNull(placement);
   }
 
   /**
@@ -143,10 +167,9 @@ public final class TomlComment implements TomlElement {
   /**
    * Where this comment sits relative to the entry it documents.
    *
-   * @return {@link Placement#ABOVE} or {@link Placement#AFTER} for an attached comment, or {@code null} for an
-   *         unattached one.
+   * @return {@link Placement#ABOVE} or {@link Placement#AFTER} for an attached comment, or {@link Placement#UNATTACHED}
+   *         for one that documents no entry.
    */
-  @Nullable
   public Placement placement() {
     return placement;
   }
