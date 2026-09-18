@@ -46,6 +46,11 @@ class TomlOptionsTest {
   }
 
   @Test
+  void prettifyWritesInANormalizedLayout() {
+    assertEquals(TomlOptions.Style.PRETTIFY, TomlOptions.defaults().prettify().style());
+  }
+
+  @Test
   void canonicalWritesInTheDefaultStyle() {
     assertEquals(TomlOptions.Style.CANONICAL, TomlOptions.defaults().canonical().style());
   }
@@ -153,6 +158,7 @@ class TomlOptionsTest {
   @Test
   void optionsDifferingOnlyInStyleAreNotEqual() {
     assertDifferent(TomlOptions.defaults(), TomlOptions.defaults().canonical());
+    assertDifferent(TomlOptions.defaults().prettify(), TomlOptions.defaults().canonical());
   }
 
   @Test

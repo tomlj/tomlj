@@ -49,6 +49,13 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * cannot stay on a line, so the line goes and the value is written as a section. An array or inline table edited in
  * place keeps its line and its brackets, and is written from the parts of it the document still holds the text of
  * ({@link EditedContainerSerializer}).
+ *
+ * <p>
+ * A normalized layout ({@link TomlOptions.Style#PRETTIFY}) walks the document the same way and writes its lines,
+ * headers and comments in the same order, but writes each of them from its parts rather than from the text around them:
+ * the indentation of its section, the comments of the model, the key and the literal each value was written with, and
+ * an array or inline table laid out anew. A line keeps one blank line above it where the document wrote any, a header
+ * always gets one, and the blank lines a document ends with are dropped.
  */
 final class SourcePreservingSerializer {
 
@@ -68,6 +75,9 @@ final class SourcePreservingSerializer {
   // the caller asked for a separator.
   private final TomlOptions options;
   private final String lineSeparator;
+
+  // Whether every line is written from its parts in the layout the options ask for, rather than from the text around it
+  private final boolean prettify;
 
   private final List<Chunk> chunks = new ArrayList<>();
   private int sequence;
@@ -98,6 +108,7 @@ final class SourcePreservingSerializer {
     this.out = out;
     this.options = documentOptions(source, options);
     this.lineSeparator = this.options.lineSeparator();
+    this.prettify = (options.style() == TomlOptions.Style.PRETTIFY);
   }
 
   /**
@@ -123,7 +134,8 @@ final class SourcePreservingSerializer {
     for (Chunk chunk : chunks) {
       chunk.write();
     }
-    if (root.trailerStart() >= 0) {
+    // A normalized layout ends the document with the last line it writes, so the blank lines below it are dropped
+    if (!prettify && root.trailerStart() >= 0) {
       startLine();
       // The blank lines the document ends with are its own, so a blank line owed to the output is not written as well
       blankLineOwed = false;
@@ -158,6 +170,13 @@ final class SourcePreservingSerializer {
     Group[] subtrees = new Group[count];
     List<Integer> pending = new ArrayList<>();
     Contribution contributed = new Contribution();
+    // The last line this table writes, which an unattached run after it is written directly under
+    int lastLine = prettify ? lastLineIndex(elements) : -1;
+    // A normalized layout writes the lines of this table at the indentation the options give the section around it,
+    // and the header of a table written in it at the indentation of the lines it is written among
+    String lineIndent = prettify ? spaces(sectionPath.size() * options.indent()) : "";
+    String headerIndent = prettify ? spaces((sectionPath.size() + relative.size()) * options.indent()) : "";
+    boolean sawSection = false;
 
     for (int i = 0; i < count; i++) {
       TomlElement element = elements.get(i);
@@ -165,9 +184,11 @@ final class SourcePreservingSerializer {
       parts[i] = part;
 
       if (element instanceof TomlComment) {
-        SourceSpan span = ((TomlComment) element).span();
+        TomlComment comment = (TomlComment) element;
+        SourceSpan span = comment.span();
         if (span != null && usable(span, SourceSpan.Kind.COMMENT)) {
-          addLine(span, null, section, part);
+          // A run written after a section of the root belongs to the root only if a blank line separates it from it
+          addComment(span, comment, section, part, lineIndent, (i < lastLine) || (rootTable && sawSection));
         } else {
           pending.add(i);
         }
@@ -180,7 +201,7 @@ final class SourcePreservingSerializer {
       if (writtenOnALine(pair)) {
         SourceSpan span = pair.span;
         if (span != null && usable(span, SourceSpan.Kind.LINE) && span.keyParts == (relative.size() + 1)) {
-          addLine(span, pair, section, part);
+          addLine(span, pair, section, part, path(relative, key), lineIndent);
         } else {
           pending.add(i);
         }
@@ -195,7 +216,7 @@ final class SourcePreservingSerializer {
         if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
           Group group = new Group(section);
           subtrees[i] = group;
-          addHeader(header, pair, group);
+          addHeader(header, pair, group, headerIndent);
           collectTable(subTable, path(sectionPath, relative, key), Collections.emptyList(), group, header.stop, false);
         } else if (!pair.valueModified && !pair.commentsModified() && writtenAsDottedKeys(subTable)) {
           // A table the document opened with a dotted key, or on the way to a header of its own: its lines belong to
@@ -220,7 +241,7 @@ final class SourcePreservingSerializer {
           }
           if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
             Group group = new Group(arrayGroup);
-            addHeader(header, indexed, group);
+            addHeader(header, indexed, group, headerIndent);
             collectTable(
                 (LinkedTomlTable) indexed.value,
                 arrayPath,
@@ -235,6 +256,7 @@ final class SourcePreservingSerializer {
           }
         }
       }
+      sawSection = sawSection || sections[i];
       contributed.merge(part);
     }
 
@@ -319,7 +341,8 @@ final class SourcePreservingSerializer {
         }
       }
 
-      String lineIndent = (indent != null) ? indent : spaces(sectionPath.size() * options.indent());
+      // A normalized layout indents every line of a section alike, whatever the line beside this one was indented by
+      String lineIndent = (indent != null && !prettify) ? indent : spaces(sectionPath.size() * options.indent());
       if (isComment) {
         chunks.add(new CommentChunk((TomlComment) element, lineIndent, anchor, rank, blankAbove));
       } else {
@@ -329,14 +352,39 @@ final class SourcePreservingSerializer {
     }
   }
 
-  private void addLine(SourceSpan span, @Nullable Entry entry, Group section, Contribution part) {
-    chunks.add(new LineChunk(span, entry));
+  private void addLine(
+      SourceSpan span,
+      Entry entry,
+      Group section,
+      Contribution part,
+      List<String> keyPath,
+      String lineIndent) {
+    chunks.add(new LineChunk(span, entry, keyPath, lineIndent));
     section.addLine(span.stop);
     part.add(span.start, span.stop, indentOf(span));
   }
 
-  private void addHeader(SourceSpan header, Entry entry, Group group) {
-    chunks.add(new LineChunk(header, entry));
+  /**
+   * Collect an unattached comment the document wrote. A normalized layout writes it from the model, as it writes one
+   * the editing API added, since where the blank lines around it go is part of the layout.
+   */
+  private void addComment(
+      SourceSpan span,
+      TomlComment comment,
+      Group section,
+      Contribution part,
+      String lineIndent,
+      boolean blankAbove) {
+    chunks
+        .add(
+            prettify ? new CommentChunk(comment, lineIndent, span.start, SOURCE_LINE, blankAbove)
+                : new LineChunk(span, null, Collections.<String>emptyList(), lineIndent));
+    section.addLine(span.stop);
+    part.add(span.start, span.stop, indentOf(span));
+  }
+
+  private void addHeader(SourceSpan header, Entry entry, Group group, String headerIndent) {
+    chunks.add(new LineChunk(header, entry, Collections.emptyList(), headerIndent));
     group.addLine(header.stop);
   }
 
@@ -678,10 +726,18 @@ final class SourcePreservingSerializer {
     @Nullable
     private final Entry entry;
 
-    LineChunk(SourceSpan span, @Nullable Entry entry) {
+    /** The key the line is written with, relative to the section it is written in. Empty for a header. */
+    private final List<String> keyPath;
+
+    /** The indentation a normalized layout writes this line at. */
+    private final String lineIndent;
+
+    LineChunk(SourceSpan span, @Nullable Entry entry, List<String> keyPath, String lineIndent) {
       super(SOURCE_LINE);
       this.span = span;
       this.entry = entry;
+      this.keyPath = keyPath;
+      this.lineIndent = lineIndent;
     }
 
     @Override
@@ -691,6 +747,10 @@ final class SourcePreservingSerializer {
 
     @Override
     void write() throws IOException {
+      if (prettify) {
+        writeNormalized();
+        return;
+      }
       startLine();
       String leading = source.text(span.start, firstToken(span) - 1);
       if (afterComment && leading.indexOf('\n') < 0) {
@@ -725,6 +785,32 @@ final class SourcePreservingSerializer {
       }
       // Input the parser skipped between the value or header and the newline lies before the tail, so it is not written
       line.append(modelComments ? tailWithCommentAfter(lineEntry) : source.text(span.tailStart, span.stop));
+      append(line);
+      afterComment = false;
+    }
+
+    /**
+     * Write the line from its parts, in the layout the options ask for: the indentation of its section, the comments
+     * the model holds, the key and, for a header, the text the document wrote them as, and the value laid out anew
+     * around the literal each scalar was written with. A line keeps one blank line above it where the document wrote
+     * any, and a header is always separated from what precedes it.
+     */
+    private void writeNormalized() throws IOException {
+      Entry lineEntry = entry;
+      assert lineEntry != null : "an unattached comment is written from the model";
+      boolean header = (span.kind == SourceSpan.Kind.HEADER);
+      if (header || source.text(span.start, firstToken(span) - 1).indexOf('\n') >= 0) {
+        requestBlankLine();
+      }
+      startLine();
+      flushBlankLine();
+      StringBuilder line = new StringBuilder();
+      TomlSerializer writer = TomlSerializer.defaultStyle(line, options);
+      if (header) {
+        writer.writeHeaderText(lineIndent, source.text(span.keyStart, span.keyStop), lineEntry.comments());
+      } else {
+        writer.writeKeyValue(lineIndent, keyPath, lineEntry);
+      }
       append(line);
       afterComment = false;
     }

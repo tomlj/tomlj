@@ -141,6 +141,14 @@ class TomlTestSuiteTest {
         () -> "Unexpected errors after serializing to TOML: " + reparsed.errors() + "\n" + serialized);
     assertMatches(expected, reparsed, "After serializing to TOML: ");
     TomlAssertions.assertSameComments(result, reparsed);
+
+    String prettified = result.toToml(TomlOptions.defaults().prettify());
+    TomlParseResult reprettified = Toml.parse(prettified, version);
+    assertFalse(
+        reprettified.hasErrors(),
+        () -> "Unexpected errors after prettifying: " + reprettified.errors() + "\n" + prettified);
+    assertMatches(expected, reprettified, "After prettifying: ");
+    TomlAssertions.assertSameComments(result, reprettified);
   }
 
   private static void assertMatches(Object expected, TomlParseResult result, String context) {

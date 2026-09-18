@@ -129,6 +129,170 @@ class SourcePreservingSerializerTest {
   }
 
   @ParameterizedTest(name = "{0}")
+  @MethodSource("prettifiedDocuments")
+  void writesADocumentInANormalizedLayout(
+      String description,
+      String input,
+      Consumer<TomlParseResult> edit,
+      TomlOptions options,
+      String expected) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    edit.accept(result);
+
+    String written = result.toToml(options);
+    assertEquals(expected, written);
+
+    TomlParseResult reparsed = Toml.parse(written);
+    assertFalse(reparsed.hasErrors(), () -> written + "\n" + joinErrors(reparsed));
+    assertTrue(Toml.equals(result, reparsed), () -> written);
+    TomlAssertions.assertSameComments(result, reparsed);
+  }
+
+  static Stream<Arguments> prettifiedDocuments() {
+    TomlOptions prettify = TomlOptions.defaults().prettify().withLineSeparator("\n");
+    return Stream
+        .of(
+            prettified("the spacing around the equals is normalized", "a   =    1\n", prettify, "a = 1\n"),
+            prettified("blank lines never double up", "a = 1\n\n\n\nb = 2\n", prettify, "a = 1\n\nb = 2\n"),
+            prettified("the blank lines a document opens with go", "\n\na = 1\n", prettify, "a = 1\n"),
+            prettified("the blank lines a document ends with go", "a = 1\n\n\n", prettify, "a = 1\n"),
+            prettified("a document with no newline at its end gets one", "a = 1", prettify, "a = 1\n"),
+            prettified("the whitespace a line ends with goes", "a = 1   \nb = 2\t\n", prettify, "a = 1\nb = 2\n"),
+            prettified(
+                "a header is separated from the line above it",
+                "a = 1\n[t]\nb = 2\n[u]\nc = 3\n",
+                prettify,
+                "a = 1\n\n[t]\nb = 2\n\n[u]\nc = 3\n"),
+            prettified(
+                "each table of an array of tables is separated from the one above it",
+                "[[t]]\nx = 1\n[[t]]\nx = 2\n",
+                prettify,
+                "[[t]]\nx = 1\n\n[[t]]\nx = 2\n"),
+            prettified(
+                "the indentation of a document goes",
+                "[t]\n    a = 1\n    [t.u]\n        b = 2\n",
+                prettify,
+                "[t]\na = 1\n\n[t.u]\nb = 2\n"),
+            prettified(
+                "the indentation of a document is the one the options ask for",
+                "[t]\na = 1\n[t.u]\nb = 2\n[[q]]\nz = 1\n",
+                prettify.withIndent(2),
+                "[t]\n  a = 1\n\n  [t.u]\n    b = 2\n\n[[q]]\n  z = 1\n"),
+            prettified(
+                "the literal of every value is kept",
+                "a = 0xff\nb = 1_000\nc = 'literal'\nd = \"\"\"multi\nline\"\"\"\n"
+                    + "e = 1979-05-27 07:32:00\nf = +1.0e3\n",
+                prettify,
+                "a = 0xff\nb = 1_000\nc = 'literal'\nd = \"\"\"multi\nline\"\"\"\n"
+                    + "e = 1979-05-27 07:32:00\nf = +1.0e3\n"),
+            prettified(
+                "a key keeps the form it was written in",
+                "'a b'   =   1\n\"c d\" = 2\nt = { 'e f' = 3 }\n",
+                prettify,
+                "'a b' = 1\n\"c d\" = 2\nt = { 'e f' = 3 }\n"),
+            prettified(
+                "a dotted key stays dotted",
+                "a.b.c = 1\nq = { p.r = 2, s = 3 }\n",
+                prettify,
+                "a.b.c = 1\nq = { p.r = 2, s = 3 }\n"),
+            prettified(
+                "the entries of an inline table keep the order they were written in",
+                "q = { a.b = 1, c = 2, a.d = 3 }\n",
+                prettify,
+                "q = { a.b = 1, c = 2, a.d = 3 }\n"),
+            prettified(
+                "an inline table stays inline and is laid out anew",
+                "t = {p=1,q=2}\n",
+                prettify,
+                "t = { p = 1, q = 2 }\n"),
+            prettified(
+                "an array written over lines is packed onto one that fits",
+                "a = [\n  1,\n  0x2,\n]\n",
+                prettify,
+                "a = [1, 0x2]\n"),
+            prettified(
+                "an array written on one line that does not fit is written over lines",
+                "a = [\"aaaaaaaaaaaaaaaaaaaaaaaaa\", \"bbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"cccccccccccccccccccc\"]\n",
+                prettify,
+                "a = [\n  \"aaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"bbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\n"
+                    + "  \"cccccccccccccccccccc\",\n]\n"),
+            prettified(
+                "an array holding a comment is written over lines",
+                "a = [\n  1, # one\n  2,\n]\n",
+                prettify,
+                "a = [\n  1,  # one\n  2,\n]\n"),
+            prettified(
+                "the comment after a value is separated from it by two spaces",
+                "a = 1 #c\nb = 2      # spaced\n",
+                prettify,
+                "a = 1  #c\nb = 2  # spaced\n"),
+            prettified(
+                "the comment run above a line is indented like the line",
+                "[t]\n      # about x\n  x = 1\n",
+                prettify.withIndent(2),
+                "[t]\n  # about x\n  x = 1\n"),
+            prettified(
+                "an unattached comment is given a blank line above it",
+                "x = 1\n# note\n\ny = 2\n",
+                prettify,
+                "x = 1\n\n# note\n\ny = 2\n"),
+            prettified(
+                "the trailing comment of a table keeps its place under the line above it",
+                "[t]\nx = 1\n# tail\n\n[u]\ny = 2\n",
+                prettify,
+                "[t]\nx = 1\n# tail\n\n[u]\ny = 2\n"),
+            prettified(
+                "a comment of the root written after a section keeps its blank line",
+                "[t]\nx = 1\n\n# root note\n",
+                prettify,
+                "[t]\nx = 1\n\n# root note\n"),
+            prettified(
+                "a document is written with the separator its own lines end with",
+                "a = 1\r\n[t]\r\nb = 2\r\n",
+                TomlOptions.defaults().prettify(),
+                "a = 1\r\n\r\n[t]\r\nb = 2\r\n"),
+            prettified(
+                "an edited document is written in the same layout",
+                "a = 0x10  # note\nb = 2\nc = 3\n",
+                result -> {
+                  result.set("a", 5);
+                  result.remove("b");
+                  result.set("d", 4);
+                },
+                prettify,
+                "a = 5  # note\nc = 3\nd = 4\n"),
+            prettified(
+                "a table copied into the document keeps the literals it was read with",
+                "[a.b]\n  x = 0x10  # kept\n",
+                result -> result.set("z", requireTable(result, "a.b")),
+                prettify,
+                "[a.b]\nx = 0x10  # kept\n\n[z]\nx = 0x10  # kept\n"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.tomlj.SourceSpanTest#allDocuments")
+  void writesANormalizedLayoutThatParsesBackToTheSameDocument(String input) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+
+    String written = result.toToml(TomlOptions.defaults().prettify().withIndent(2));
+    TomlParseResult reparsed = Toml.parse(written);
+    assertFalse(reparsed.hasErrors(), () -> written + "\n" + joinErrors(reparsed));
+    assertTrue(Toml.equals(result, reparsed), () -> written);
+    TomlAssertions.assertSameComments(result, reparsed);
+  }
+
+  @Test
+  void writesADocumentWithNoRetainedSourceInTheDefaultStyleWhenTheOptionsAskForANormalizedLayout() {
+    String input = "# a run\n[a]\n  x = 0x10  # note\n\n[[b]]\n  y = [ 1,2 ]\n";
+    TomlParseResult withoutSource = Toml.parse(input, TomlParseOptions.defaults().withoutSource());
+    assertFalse(withoutSource.hasErrors(), () -> joinErrors(withoutSource));
+
+    assertEquals(withoutSource.toToml(LF), withoutSource.toToml(LF.prettify()));
+  }
+
+  @ParameterizedTest(name = "{0}")
   @MethodSource("editedDocuments")
   void writesAnEditIntoTheDocument(String description, String input, Consumer<TomlParseResult> edit, String expected) {
     TomlParseResult result = Toml.parse(input);
@@ -658,6 +822,20 @@ class SourcePreservingSerializerTest {
 
   private static Arguments edited(String description, String input, Consumer<TomlParseResult> edit, String expected) {
     return Arguments.of(description, input, edit, expected);
+  }
+
+  private static Arguments prettified(String description, String input, TomlOptions options, String expected) {
+    return prettified(description, input, result -> {
+    }, options, expected);
+  }
+
+  private static Arguments prettified(
+      String description,
+      String input,
+      Consumer<TomlParseResult> edit,
+      TomlOptions options,
+      String expected) {
+    return Arguments.of(description, input, edit, options, expected);
   }
 
   private static MutableTomlTable requireTable(MutableTomlTable table, String dottedKey) {

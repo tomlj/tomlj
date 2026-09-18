@@ -44,6 +44,16 @@ public final class TomlOptions {
     PRESERVE,
 
     /**
+     * Write a parsed document in a normalized layout: the order of its lines, its comments, its table structure
+     * (headers, dotted keys, inline tables) and the literal form of each key and value are kept, while whitespace,
+     * indentation, blank lines and the layout of arrays and inline tables follow the options.
+     *
+     * <p>
+     * A document with no text to read is written as {@link #PRESERVE} writes it, in the default style.
+     */
+    PRETTIFY,
+
+    /**
      * Write everything in the default style, ignoring how the document was written.
      */
     CANONICAL
@@ -91,6 +101,18 @@ public final class TomlOptions {
   public TomlOptions withStyle(Style style) {
     requireNonNull(style);
     return new TomlOptions(style, indent, maxLineWidth, lineSeparator);
+  }
+
+  /**
+   * Create a copy of these options that writes a parsed document in a normalized layout: the order of its lines, its
+   * comments, its table structure (headers, dotted keys, inline tables) and the literal form of each key and value are
+   * kept, while whitespace, indentation, blank lines and the layout of arrays and inline tables follow these options. A
+   * document with no retained source is written as it would be anyway.
+   *
+   * @return A new set of options writing in the prettified style.
+   */
+  public TomlOptions prettify() {
+    return withStyle(Style.PRETTIFY);
   }
 
   /**
