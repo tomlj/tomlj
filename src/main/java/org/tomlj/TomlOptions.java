@@ -29,12 +29,34 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 public final class TomlOptions {
 
   /**
+   * How much of the way a document was written is kept.
+   */
+  public enum Style {
+    /**
+     * Write a parsed document from the text it was parsed from, so that every line, header and comment the parser
+     * accepted is written back as it was read, and only what the editing API changed is written anew.
+     *
+     * <p>
+     * Anything with no such text to read - a table built through the editing API, a document parsed with
+     * {@link TomlParseOptions#withoutSource()}, a table of a parse result rather than the result itself - is written in
+     * the default style, which is what {@link #CANONICAL} writes everything in.
+     */
+    PRESERVE,
+
+    /**
+     * Write everything in the default style, ignoring how the document was written.
+     */
+    CANONICAL
+  }
+
+  /**
    * The default maximum line width: {@value}.
    *
    * @see #withMaxLineWidth(int)
    */
   public static final int DEFAULT_MAX_LINE_WIDTH = 80;
 
+  private final Style style;
   private final int indent;
   private final int maxLineWidth;
 
@@ -42,20 +64,42 @@ public final class TomlOptions {
   @Nullable
   private final String lineSeparator;
 
-  private TomlOptions(int indent, int maxLineWidth, @Nullable String lineSeparator) {
+  private TomlOptions(Style style, int indent, int maxLineWidth, @Nullable String lineSeparator) {
+    this.style = style;
     this.indent = indent;
     this.maxLineWidth = maxLineWidth;
     this.lineSeparator = lineSeparator;
   }
 
   /**
-   * The default options: no indentation, a maximum line width of {@value #DEFAULT_MAX_LINE_WIDTH}, and no line
-   * separator of their own, so that lines end with the platform's, {@link System#lineSeparator()}.
+   * The default options: {@link Style#PRESERVE}, no indentation, a maximum line width of
+   * {@value #DEFAULT_MAX_LINE_WIDTH}, and no line separator of their own, so that lines end with the platform's,
+   * {@link System#lineSeparator()}.
    *
    * @return The default options.
    */
   public static TomlOptions defaults() {
-    return new TomlOptions(0, DEFAULT_MAX_LINE_WIDTH, null);
+    return new TomlOptions(Style.PRESERVE, 0, DEFAULT_MAX_LINE_WIDTH, null);
+  }
+
+  /**
+   * Create a copy of these options that writes in a different style.
+   *
+   * @param style The style to write in.
+   * @return A new set of options with the given style.
+   */
+  public TomlOptions withStyle(Style style) {
+    requireNonNull(style);
+    return new TomlOptions(style, indent, maxLineWidth, lineSeparator);
+  }
+
+  /**
+   * Create a copy of these options that writes everything in the default style; see {@link Style#CANONICAL}.
+   *
+   * @return A new set of options writing in the canonical style.
+   */
+  public TomlOptions canonical() {
+    return withStyle(Style.CANONICAL);
   }
 
   /**
@@ -91,7 +135,7 @@ public final class TomlOptions {
     if (spaces < 0) {
       throw new IllegalArgumentException("indent must not be negative: " + spaces);
     }
-    return new TomlOptions(spaces, maxLineWidth, lineSeparator);
+    return new TomlOptions(style, spaces, maxLineWidth, lineSeparator);
   }
 
   /**
@@ -110,7 +154,7 @@ public final class TomlOptions {
     if (!separator.equals("\n") && !separator.equals("\r\n")) {
       throw new IllegalArgumentException("lineSeparator must be \"\\n\" or \"\\r\\n\"");
     }
-    return new TomlOptions(indent, maxLineWidth, separator);
+    return new TomlOptions(style, indent, maxLineWidth, separator);
   }
 
   /**
@@ -135,7 +179,17 @@ public final class TomlOptions {
     if (columns < 0) {
       throw new IllegalArgumentException("maxLineWidth must not be negative: " + columns);
     }
-    return new TomlOptions(indent, columns, lineSeparator);
+    return new TomlOptions(style, indent, columns, lineSeparator);
+  }
+
+  /**
+   * The style these options write in.
+   *
+   * @return The style.
+   * @see #withStyle(Style)
+   */
+  public Style style() {
+    return style;
   }
 
   /**
@@ -187,19 +241,22 @@ public final class TomlOptions {
       return false;
     }
     TomlOptions other = (TomlOptions) obj;
-    return this.indent == other.indent
+    return this.style == other.style
+        && this.indent == other.indent
         && this.maxLineWidth == other.maxLineWidth
         && Objects.equals(this.lineSeparator, other.lineSeparator);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(indent, maxLineWidth, lineSeparator);
+    return Objects.hash(style, indent, maxLineWidth, lineSeparator);
   }
 
   @Override
   public String toString() {
-    return "TomlOptions{indent="
+    return "TomlOptions{style="
+        + style
+        + ", indent="
         + indent
         + ", maxLineWidth="
         + maxLineWidth

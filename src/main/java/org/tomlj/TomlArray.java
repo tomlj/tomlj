@@ -459,6 +459,9 @@ public interface TomlArray {
   /**
    * Return a representation of this array using TOML, written with the default options.
    *
+   * <p>
+   * An array is always written in the default style, whatever document it came from.
+   *
    * @return A TOML representation of this array.
    * @see TomlOptions#defaults()
    */

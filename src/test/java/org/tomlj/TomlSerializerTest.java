@@ -760,8 +760,11 @@ class TomlSerializerTest {
     return doc;
   }
 
+  // Parsed with no source kept, since the default style is what a document with no text to read is written in; a
+  // document parsed with its source is written from that text instead, which SourcePreservingSerializerTest covers.
   private static TomlParseResult parse(String toml) {
-    TomlParseResult result = Toml.parse(toml, TomlVersion.LATEST);
+    TomlParseResult result =
+        Toml.parse(toml, TomlParseOptions.defaults().withVersion(TomlVersion.LATEST).withoutSource());
     assertFalse(result.hasErrors(), () -> toml + "\n" + result.errors());
     return result;
   }

@@ -133,6 +133,16 @@ abstract class Entry implements MutableTomlEntry {
     return (attachedComment(placement) == null) ? this : updateAttachedComment(placement, null);
   }
 
+  /**
+   * Whether an attached comment of this entry was set or removed through the editing API, so that the comments the
+   * document was read with no longer describe it.
+   *
+   * @return {@code true} if a comment of this entry was set or removed through the editing API.
+   */
+  boolean commentsModified() {
+    return commentsModified;
+  }
+
   @Nullable
   private TomlComment attachedComment(TomlComment.Placement placement) {
     for (TomlComment comment : attachedComments) {

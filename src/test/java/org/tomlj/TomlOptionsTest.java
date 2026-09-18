@@ -26,10 +26,33 @@ class TomlOptionsTest {
   @Test
   void defaultsAreNoIndentDefaultMaxLineWidthAndThePlatformLineSeparator() {
     TomlOptions options = TomlOptions.defaults();
+    assertEquals(TomlOptions.Style.PRESERVE, options.style());
     assertEquals(0, options.indent());
     assertEquals(80, options.maxLineWidth());
     assertEquals(TomlOptions.DEFAULT_MAX_LINE_WIDTH, options.maxLineWidth());
     assertEquals(System.lineSeparator(), options.lineSeparator());
+  }
+
+  @Test
+  void withStyleReturnsANewInstanceLeavingTheOriginalUnchangedAndKeepsTheOtherOptions() {
+    TomlOptions original = TomlOptions.defaults().withIndent(2).withMaxLineWidth(100).withLineSeparator("\r\n");
+    TomlOptions updated = original.withStyle(TomlOptions.Style.CANONICAL);
+
+    assertEquals(TomlOptions.Style.CANONICAL, updated.style());
+    assertEquals(2, updated.indent());
+    assertEquals(100, updated.maxLineWidth());
+    assertEquals("\r\n", updated.lineSeparator());
+    assertEquals(TomlOptions.Style.PRESERVE, original.style());
+  }
+
+  @Test
+  void canonicalWritesInTheDefaultStyle() {
+    assertEquals(TomlOptions.Style.CANONICAL, TomlOptions.defaults().canonical().style());
+  }
+
+  @Test
+  void withStyleRejectsNull() {
+    assertThrows(NullPointerException.class, () -> TomlOptions.defaults().withStyle(null));
   }
 
   @Test
@@ -128,12 +151,19 @@ class TomlOptionsTest {
   }
 
   @Test
+  void optionsDifferingOnlyInStyleAreNotEqual() {
+    assertDifferent(TomlOptions.defaults(), TomlOptions.defaults().canonical());
+  }
+
+  @Test
   void toStringShowsEveryOption() {
     TomlOptions options = TomlOptions.defaults().withIndent(2).withMaxLineWidth(100).withLineSeparator("\r\n");
-    assertEquals("TomlOptions{indent=2, maxLineWidth=100, lineSeparator=\"\\r\\n\"}", options.toString());
     assertEquals(
-        "TomlOptions{indent=0, maxLineWidth=80, lineSeparator=\"\\n\"}",
-        TomlOptions.defaults().withLineSeparator("\n").toString());
+        "TomlOptions{style=PRESERVE, indent=2, maxLineWidth=100, lineSeparator=\"\\r\\n\"}",
+        options.toString());
+    assertEquals(
+        "TomlOptions{style=CANONICAL, indent=0, maxLineWidth=80, lineSeparator=\"\\n\"}",
+        TomlOptions.defaults().canonical().withLineSeparator("\n").toString());
   }
 
   private static void assertDifferent(TomlOptions a, TomlOptions b) {

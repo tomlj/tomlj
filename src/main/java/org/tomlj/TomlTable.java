@@ -1421,6 +1421,11 @@ public interface TomlTable {
   /**
    * Return a representation of this table using TOML, written with the default options.
    *
+   * <p>
+   * A {@link TomlParseResult} is written as the document it was parsed from, with only what the editing API changed
+   * written anew; see {@link TomlOptions.Style#PRESERVE}. Any other table, including a table of a parse result rather
+   * than the result itself, is written in the default style.
+   *
    * @return A TOML representation of this table.
    * @see TomlOptions#defaults()
    */
@@ -1430,6 +1435,10 @@ public interface TomlTable {
 
   /**
    * Return a representation of this table using TOML.
+   *
+   * <p>
+   * A {@link TomlParseResult} is written as the document it was parsed from unless the options ask for
+   * {@link TomlOptions.Style#CANONICAL}; see {@link #toToml()}.
    *
    * @param options Options for the TOML encoder.
    * @return A TOML representation of this table.
