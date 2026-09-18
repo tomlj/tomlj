@@ -457,14 +457,25 @@ public interface TomlArray {
   }
 
   /**
-   * Return a representation of this array using TOML.
+   * Return a representation of this array using TOML, written with the default options.
    *
    * @return A TOML representation of this array.
+   * @see TomlOptions#defaults()
    */
   default String toToml() {
+    return toToml(TomlOptions.defaults());
+  }
+
+  /**
+   * Return a representation of this array using TOML.
+   *
+   * @param options Options for the TOML encoder.
+   * @return A TOML representation of this array.
+   */
+  default String toToml(TomlOptions options) {
     StringBuilder builder = new StringBuilder();
     try {
-      toToml(builder);
+      toToml(builder, options);
     } catch (IOException e) {
       // not reachable
       throw new UncheckedIOException(e);
@@ -473,12 +484,24 @@ public interface TomlArray {
   }
 
   /**
-   * Append a TOML representation of this array to the appendable output.
+   * Append a TOML representation of this array to the appendable output, written with the default options.
    *
    * @param appendable The appendable output.
    * @throws IOException If an IO error occurs.
+   * @see TomlOptions#defaults()
    */
   default void toToml(Appendable appendable) throws IOException {
-    TomlSerializer.toToml(this, appendable);
+    toToml(appendable, TomlOptions.defaults());
+  }
+
+  /**
+   * Append a TOML representation of this array to the appendable output.
+   *
+   * @param appendable The appendable output.
+   * @param options Options for the TOML encoder.
+   * @throws IOException If an IO error occurs.
+   */
+  default void toToml(Appendable appendable, TomlOptions options) throws IOException {
+    TomlSerializer.toToml(this, appendable, options);
   }
 }

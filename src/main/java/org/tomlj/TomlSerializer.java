@@ -59,8 +59,6 @@ final class TomlSerializer {
   private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
   // The indentation of the elements of a multi-line array, relative to the line the array starts on
   private static final int ARRAY_ELEMENT_INDENT = 2;
-  private static final int DEFAULT_INDENT = 0;
-  private static final int DEFAULT_MAX_LINE_WIDTH = 80;
 
   private final Appendable out;
   // The spaces to indent per level of table nesting
@@ -79,21 +77,23 @@ final class TomlSerializer {
     this.lineSeparator = lineSeparator;
   }
 
-  static void toToml(TomlTable table, Appendable appendable) throws IOException {
+  static void toToml(TomlTable table, Appendable appendable, TomlOptions options) throws IOException {
     requireNonNull(table);
     requireNonNull(appendable);
-    defaultStyle(appendable).writeEntries(table, new ArrayList<>());
+    requireNonNull(options);
+    serializer(appendable, options).writeEntries(table, new ArrayList<>());
   }
 
-  static void toToml(TomlArray array, Appendable appendable) throws IOException {
+  static void toToml(TomlArray array, Appendable appendable, TomlOptions options) throws IOException {
     requireNonNull(array);
     requireNonNull(appendable);
+    requireNonNull(options);
     // The array starts at column 0 outside any table, so the indent never applies
-    defaultStyle(appendable).writeValue(array, 0, 0, 0);
+    serializer(appendable, options).writeValue(array, 0, 0, 0);
   }
 
-  private static TomlSerializer defaultStyle(Appendable appendable) {
-    return new TomlSerializer(appendable, DEFAULT_INDENT, DEFAULT_MAX_LINE_WIDTH, System.lineSeparator());
+  private static TomlSerializer serializer(Appendable appendable, TomlOptions options) {
+    return new TomlSerializer(appendable, options.indent(), options.maxLineWidth(), options.lineSeparator());
   }
 
   /**

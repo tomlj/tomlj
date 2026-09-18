@@ -14,14 +14,19 @@ package org.tomlj;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.io.StringWriter;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -280,6 +285,150 @@ class TomlSerializerTest {
   }
 
   @ParameterizedTest(name = "{0}")
+  @MethodSource("tableWithOptionsSupplier")
+  void shouldSerializeTableWithOptions(String description, TomlTable table, TomlOptions options, String expected) {
+    assertSerializes(table, options, expected.replace("\n", options.lineSeparator()));
+  }
+
+  static Stream<Arguments> tableWithOptionsSupplier() {
+    // @formatter:off
+    String document = """
+        title = "Example"
+
+        [a.b.c]
+        d = 1
+
+        [server]
+        host = "localhost"
+
+        [server.tls]
+        enabled = true
+
+        [[products]]
+        sku = 1
+
+        [products.size]
+        width = 2
+
+        [[products]]
+        sku = 2
+        """;
+    String longArray = "a = [" + String.join(", ", Collections.nCopies(1000, "[\"xxxxxxxxxx\", 1]")) + "]\n";
+    return Stream.of(
+        parsed("an indent of 2", document, TomlOptions.defaults().withIndent(2), """
+            title = "Example"
+
+                [a.b.c]
+                  d = 1
+
+            [server]
+              host = "localhost"
+
+              [server.tls]
+                enabled = true
+
+            [[products]]
+              sku = 1
+
+              [products.size]
+                width = 2
+
+            [[products]]
+              sku = 2
+            """),
+        parsed("an indent of 4", document, TomlOptions.defaults().withIndent(4), """
+            title = "Example"
+
+                    [a.b.c]
+                        d = 1
+
+            [server]
+                host = "localhost"
+
+                [server.tls]
+                    enabled = true
+
+            [[products]]
+                sku = 1
+
+                [products.size]
+                    width = 2
+
+            [[products]]
+                sku = 2
+            """),
+        parsed("comments indented like the entries around them", """
+            [a]
+            # unattached
+
+            # above
+            b = 1  # after
+            """, TomlOptions.defaults().withIndent(2), """
+            [a]
+
+              # unattached
+
+              # above
+              b = 1  # after
+            """),
+        parsed("a multi-line array under an indented key", """
+            [t]
+            list = ["%s", ["%s"]]
+            """.formatted("x".repeat(74), "y".repeat(80)), TomlOptions.defaults().withIndent(2), """
+            [t]
+              list = [
+                "%s",
+                [
+                  "%s",
+                ],
+              ]
+            """.formatted("x".repeat(74), "y".repeat(80))),
+        parsed(
+            "a multi-line string under an indented key, with content lines unindented",
+            "[t]\ns = \"a\\nb\"\n",
+            TomlOptions.defaults().withIndent(2),
+            "[t]\n  s = \"\"\"\na\nb\"\"\"\n"),
+        parsed("an array at the width limit without indentation", """
+            [t]
+            list = ["%s"]
+            """.formatted("x".repeat(69)), TomlOptions.defaults(), """
+            [t]
+            list = ["%s"]
+            """.formatted("x".repeat(69))),
+        parsed("the same array over the width limit with indentation", """
+            [t]
+            list = ["%s"]
+            """.formatted("x".repeat(69)), TomlOptions.defaults().withIndent(2), """
+            [t]
+              list = [
+                "%s",
+              ]
+            """.formatted("x".repeat(69))),
+        parsed("a maximum line width of 0", """
+            a = [1, [2], []]
+            b = []
+            c = [3, { d = [4, 5], e = [] }]
+            """, TomlOptions.defaults().withMaxLineWidth(0), """
+            a = [
+              1,
+              [
+                2,
+              ],
+              [],
+            ]
+            b = []
+            c = [
+              3,
+              { d = [4, 5], e = [] },
+            ]
+            """),
+        parsed("a maximum line width of Integer.MAX_VALUE", longArray,
+            TomlOptions.defaults().withMaxLineWidth(Integer.MAX_VALUE), longArray)
+    );
+    // @formatter:on
+  }
+
+  @ParameterizedTest(name = "{0}")
   @MethodSource("commentSupplier")
   void shouldSerializeComments(String description, TomlTable table, String expected) {
     assertSerializes(table, expected.replace("\n", System.lineSeparator()));
@@ -487,11 +636,13 @@ class TomlSerializerTest {
     MutableTomlTable table = MutableTomlTable.create();
     table.set("s", value);
 
-    String toml = table.toToml();
-    for (TomlVersion version : List.of(TomlVersion.V1_0_0, TomlVersion.LATEST)) {
-      TomlParseResult result = Toml.parse(toml, version);
-      assertFalse(result.hasErrors(), () -> toml + "\n" + result.errors());
-      assertEquals(value, result.getString("s"), () -> toml);
+    for (TomlOptions options : List.of(TomlOptions.defaults(), TomlOptions.defaults().withLineSeparator("\r\n"))) {
+      String toml = table.toToml(options);
+      for (TomlVersion version : List.of(TomlVersion.V1_0_0, TomlVersion.LATEST)) {
+        TomlParseResult result = Toml.parse(toml, version);
+        assertFalse(result.hasErrors(), () -> toml + "\n" + result.errors());
+        assertEquals(value, result.getString("s"), () -> toml);
+      }
     }
   }
 
@@ -503,12 +654,86 @@ class TomlSerializerTest {
     // @formatter:on
   }
 
+  @Test
+  void shouldWriteCrlfLineSeparatorsInTables() {
+    TomlOptions options = TomlOptions.defaults().withLineSeparator("\r\n");
+    String x = "x".repeat(80);
+    TomlTable table = parse("a = 1\n[b]\nc = [\"" + x + "\", 2]\n[b.d]\ne = true\n");
+
+    String toml = table.toToml(options);
+    assertSerializes(
+        table,
+        options,
+        "a = 1\r\n\r\n[b]\r\nc = [\r\n  \"" + x + "\",\r\n  2,\r\n]\r\n\r\n[b.d]\r\ne = true\r\n");
+    assertFalse(toml.replace("\r\n", "").contains("\n"), toml);
+  }
+
+  @Test
+  void shouldWriteCrlfLineSeparatorsInArrays() {
+    TomlOptions options = TomlOptions.defaults().withLineSeparator("\r\n");
+    String x = "x".repeat(80);
+    TomlArray array = MutableTomlArray.of(x, List.of(2));
+
+    String toml = array.toToml(options);
+    assertSerializes(array, options, "[\r\n  \"" + x + "\",\r\n  [2],\r\n]");
+    assertFalse(toml.replace("\r\n", "").contains("\n"), toml);
+  }
+
+  @Test
+  void shouldWriteCrlfLineSeparatorsInMultilineStrings() {
+    TomlOptions options = TomlOptions.defaults().withLineSeparator("\r\n");
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("s", "a\nb");
+
+    String toml = table.toToml(options);
+    assertSerializes(table, options, "s = \"\"\"\r\na\r\nb\"\"\"\r\n");
+    assertFalse(toml.replace("\r\n", "").contains("\n"), toml);
+  }
+
+  @Test
+  void shouldApplyTheWidthButNotTheIndentToArrays() {
+    TomlOptions options = TomlOptions.defaults().withIndent(4).withMaxLineWidth(9);
+    TomlArray array = MutableTomlArray.of(1, List.of(2, 3));
+    assertSerializes(array, options, "[\n  1,\n  [2, 3],\n]".replace("\n", System.lineSeparator()));
+  }
+
+  @Test
+  void shouldAppendTheSameTextAsToTomlWithOptions() throws IOException {
+    TomlOptions options = TomlOptions.defaults().withIndent(2).withMaxLineWidth(10).withLineSeparator("\r\n");
+
+    TomlTable table = parse("a = [1, 2, 3]\n[b]\nc = [4, 5]\n");
+    StringWriter tableOut = new StringWriter();
+    table.toToml(tableOut, options);
+    assertEquals(table.toToml(options), tableOut.toString());
+    assertNotEquals(table.toToml(), tableOut.toString());
+
+    TomlArray array = MutableTomlArray.of(1, 2, List.of(3, 4));
+    StringWriter arrayOut = new StringWriter();
+    array.toToml(arrayOut, options);
+    assertEquals(array.toToml(options), arrayOut.toString());
+    assertNotEquals(array.toToml(), arrayOut.toString());
+  }
+
+  @Test
+  void shouldRejectNullOptions() {
+    TomlTable table = MutableTomlTable.create();
+    TomlArray array = MutableTomlArray.create();
+    assertThrows(NullPointerException.class, () -> table.toToml((TomlOptions) null));
+    assertThrows(NullPointerException.class, () -> table.toToml(new StringBuilder(), null));
+    assertThrows(NullPointerException.class, () -> array.toToml((TomlOptions) null));
+    assertThrows(NullPointerException.class, () -> array.toToml(new StringBuilder(), null));
+  }
+
   private static Arguments unchanged(String description, String toml) {
     return Arguments.of(description, parse(toml), toml);
   }
 
   private static Arguments parsed(String description, String toml, String expected) {
     return Arguments.of(description, parse(toml), expected);
+  }
+
+  private static Arguments parsed(String description, String toml, TomlOptions options, String expected) {
+    return Arguments.of(description, parse(toml), options, expected);
   }
 
   private static TomlTable datesAndTimes() {
@@ -546,7 +771,15 @@ class TomlSerializerTest {
   }
 
   private static void assertSerializes(TomlTable table, String expected, TomlVersion version) {
-    String toml = table.toToml();
+    assertSerializes(table, TomlOptions.defaults(), expected, version);
+  }
+
+  private static void assertSerializes(TomlTable table, TomlOptions options, String expected) {
+    assertSerializes(table, options, expected, TomlVersion.V1_0_0);
+  }
+
+  private static void assertSerializes(TomlTable table, TomlOptions options, String expected, TomlVersion version) {
+    String toml = table.toToml(options);
     assertEquals(expected, toml);
 
     TomlParseResult reparsed = Toml.parse(toml, version);
@@ -556,7 +789,11 @@ class TomlSerializerTest {
   }
 
   private static void assertSerializes(TomlArray array, String expected) {
-    String toml = array.toToml();
+    assertSerializes(array, TomlOptions.defaults(), expected);
+  }
+
+  private static void assertSerializes(TomlArray array, TomlOptions options, String expected) {
+    String toml = array.toToml(options);
     assertEquals(expected, toml);
 
     TomlParseResult reparsed = Toml.parse("a = " + toml, TomlVersion.V1_0_0);
