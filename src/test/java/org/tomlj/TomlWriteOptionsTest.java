@@ -26,7 +26,7 @@ class TomlWriteOptionsTest {
   @Test
   void defaultsAreNoIndentDefaultMaxLineWidthThePlatformLineSeparatorAndTheLatestVersion() {
     TomlWriteOptions options = TomlWriteOptions.defaults();
-    assertEquals(TomlWriteOptions.Keep.NOTATION, options.keep());
+    assertEquals(TomlWriteOptions.Keep.LAYOUT, options.keep());
     assertEquals(0, options.indent());
     assertEquals(80, options.maxLineWidth());
     assertEquals(TomlWriteOptions.DEFAULT_MAX_LINE_WIDTH, options.maxLineWidth());
@@ -44,7 +44,7 @@ class TomlWriteOptionsTest {
     assertEquals(2, updated.indent());
     assertEquals(100, updated.maxLineWidth());
     assertEquals("\r\n", updated.lineSeparator());
-    assertEquals(TomlWriteOptions.Keep.NOTATION, original.keep());
+    assertEquals(TomlWriteOptions.Keep.LAYOUT, original.keep());
   }
 
   @Test
@@ -211,6 +211,9 @@ class TomlWriteOptionsTest {
   @Test
   void optionsDifferingOnlyInWhatTheyKeepAreNotEqual() {
     assertDifferent(TomlWriteOptions.defaults(), TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING));
+    assertDifferent(
+        TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTATION),
+        TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING));
   }
 
   @Test
@@ -222,7 +225,7 @@ class TomlWriteOptionsTest {
         .withLineSeparator("\r\n")
         .withVersion(TomlVersion.V1_0_0);
     assertEquals(
-        "TomlWriteOptions{keep=NOTATION, indent=2, maxLineWidth=100, lineSeparator=\"\\r\\n\", version=V1_0_0}",
+        "TomlWriteOptions{keep=LAYOUT, indent=2, maxLineWidth=100, lineSeparator=\"\\r\\n\", version=V1_0_0}",
         options.toString());
     assertEquals(
         "TomlWriteOptions{keep=NOTHING, indent=0, maxLineWidth=80, lineSeparator=\"\\n\", version=LATEST}",

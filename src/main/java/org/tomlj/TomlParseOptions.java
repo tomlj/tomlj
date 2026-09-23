@@ -104,7 +104,7 @@ public final class TomlParseOptions {
    *
    * <p>
    * By default a parse result keeps the text it was parsed from, and records where each line it accepted sits in that
-   * text, so that {@link TomlTable#toToml()} can write the document keeping its notation. The text and the record take
+   * text, so that {@link TomlTable#toToml()} can write the document back as it was read. The text and the record take
    * memory that an application which only reads a document never uses, and such an application can parse with these
    * options instead. A document parsed with them records nothing about how it was written, so {@code toToml()} writes
    * it in the default style, as it writes a document built with the editing API.

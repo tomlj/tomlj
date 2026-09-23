@@ -80,19 +80,24 @@ final class Serializer {
   private final String lineSeparator;
   // The version of TOML written for, which decides whether an inline table may be written over several lines
   private final TomlVersion version;
-  // Whether the notation is kept: a key or scalar that has a span is written with the text of that span
+  // Whether a line that has a span is copied rather than written anew. Set only for a block of a document being written
+  // from its source, where a copied entry keeps the literal it was read as.
+  private final boolean copySourceLines;
+  // Whether the notation is kept: a key or scalar that has a span is written with the text of that span. Set unless the
+  // options ask for NOTHING, so that a line LAYOUT writes anew is written as NOTATION writes it.
   private final boolean keepNotation;
   private boolean written = false;
   // A pending blank line, written only once something follows it, so that the document never ends with one
   private boolean blankLineOwed = false;
 
-  private Serializer(Appendable out, TomlWriteOptions options) {
+  private Serializer(Appendable out, TomlWriteOptions options, boolean copySourceLines) {
     this.out = out;
     this.indent = options.indent();
     this.maxLineWidth = options.maxLineWidth();
     this.lineSeparator = options.lineSeparator();
     this.version = options.version();
     this.keepNotation = (options.keep() != TomlWriteOptions.Keep.NOTHING);
+    this.copySourceLines = copySourceLines && (options.keep() == TomlWriteOptions.Keep.LAYOUT);
   }
 
   /**
@@ -103,7 +108,20 @@ final class Serializer {
    * @return A writer.
    */
   static Serializer defaultStyle(Appendable out, TomlWriteOptions options) {
-    return new Serializer(out, options);
+    return new Serializer(out, options, false);
+  }
+
+  /**
+   * A writer of a block of a document written keeping its layout: the default style, except that a line that has a span
+   * is copied rather than written anew, so that a copied entry keeps the literal and the spacing it was read with. When
+   * the options keep only the notation, every line is written anew and only the literal forms are kept.
+   *
+   * @param out The output.
+   * @param options The options to write with.
+   * @return A writer.
+   */
+  static Serializer blockStyle(Appendable out, TomlWriteOptions options) {
+    return new Serializer(out, options, true);
   }
 
   static void toToml(TomlTable table, Appendable appendable, TomlWriteOptions options) throws IOException {
@@ -245,6 +263,9 @@ final class Serializer {
    * @param entry The entry the line holds.
    */
   void writeKeyValue(String lineIndent, List<String> keyPath, TomlEntry entry) throws IOException {
+    if (copySourceLines && writeSourceLine(lineIndent, keyPath, entry)) {
+      return;
+    }
     List<TomlComment> comments = entry.comments();
     writeCommentAbove(comments, lineIndent);
     beginLine(lineIndent);
@@ -255,6 +276,61 @@ final class Serializer {
     writeEntryValue(entry.value(), lineIndent, width(lineIndent) + prefix.codePointCount(0, prefix.length()));
     writeCommentAfter(comments);
     endLine();
+  }
+
+  /**
+   * Write a line from its span: its key, the spacing around the {@code =}, its value and the comment after it, as they
+   * were written. The key is written anew when the line was written with a dotted key of a different number of parts
+   * than the key it is written with here, and the line ends with the line separator from the options.
+   *
+   * @param lineIndent The indentation of the line.
+   * @param keyPath The key, as the keys of a dotted key.
+   * @param entry The entry the line holds.
+   * @return {@code false} if the line has no span, its comments were edited, or its value has no span or was edited.
+   */
+  private boolean writeSourceLine(String lineIndent, List<String> keyPath, TomlEntry entry) throws IOException {
+    if (!(entry instanceof Entry)) {
+      return false;
+    }
+    Entry parsed = (Entry) entry;
+    SourceSpan span = parsed.span;
+    if (span == null || span.kind != SourceSpan.Kind.LINE || parsed.commentsModified()) {
+      return false;
+    }
+    int valueStop = writtenValueStop(parsed.value);
+    if (valueStop < 0) {
+      return false;
+    }
+    writeCommentAbove(entry.comments(), lineIndent);
+    beginLine(lineIndent);
+    StringBuilder text = new StringBuilder();
+    if (span.keyParts == keyPath.size()) {
+      text.append(span.source.text(span.keyStart, span.keyStop));
+    } else {
+      appendKeyPath(text, keyPath);
+    }
+    text.append(span.source.text(span.keyStop + 1, valueStop));
+    text.append(span.source.text(span.tailStart, span.newlineStart - 1));
+    out.append(text);
+    endLine();
+    return true;
+  }
+
+  /**
+   * The last offset of a value as the document it was read from wrote it.
+   *
+   * @param value The value.
+   * @return The last offset of its literal, or of the closing bracket of a table or array that has not been edited
+   *         since, or {@code -1} if the value has no span or was edited.
+   */
+  private static int writtenValueStop(Value value) {
+    if (value instanceof Value.Scalar) {
+      ValueSpan span = ((Value.Scalar) value).span;
+      return (span != null) ? span.stop : -1;
+    }
+    ElementContainer<?> container = (ElementContainer<?>) value;
+    ValueSpan brackets = container.bracketSpan;
+    return (brackets != null && !container.isModified()) ? brackets.stop : -1;
   }
 
   /**

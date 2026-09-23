@@ -29,13 +29,24 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Checks what a parse result is written as: the document it was parsed from, keeping its notation, with what the
- * editing API changed written where it belongs.
+ * Checks what a parse result is written as: the document it was parsed from, with what the editing API changed written
+ * anew where it belongs.
  */
 class SourcePreservingSerializerTest {
 
-  // Every line is written with the separator these options ask for
+  // New lines are written with the separator these options ask for; the lines of the document keep the one they had
   private static final TomlWriteOptions LF = TomlWriteOptions.defaults().withLineSeparator("\n");
+
+  @ParameterizedTest
+  @MethodSource("org.tomlj.SourceSpanTest#allDocuments")
+  void writesAnUneditedDocumentBackUnchanged(String input) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+
+    assertEquals(input, result.toToml());
+    // The options shape only what is written anew, never what comes from the document
+    assertEquals(input, result.toToml(TomlWriteOptions.defaults().withIndent(4).withMaxLineWidth(0)));
+  }
 
   @ParameterizedTest
   @MethodSource("org.tomlj.SourceSpanTest#skippedLineDocuments")
@@ -84,9 +95,9 @@ class SourcePreservingSerializerTest {
     result.set("c", 3);
 
     assertEquals(
-        "a = 1\r\nc = 3\r\n\r\n[t]\r\nb = 2\r\n",
+        "a = 1\r\nc = 3\r\n[t]\r\nb = 2\r\n",
         result.toToml(TomlWriteOptions.defaults().withLineSeparator("\r\n")));
-    assertEquals("a = 1\nc = 3\n\n[t]\nb = 2\n", result.toToml(LF));
+    assertEquals("a = 1\r\nc = 3\n[t]\r\nb = 2\r\n", result.toToml(LF));
   }
 
   @Test
@@ -96,7 +107,7 @@ class SourcePreservingSerializerTest {
     result.set("c", 3);
     result.getOrCreateTable("u").set("d", 4);
 
-    assertEquals("a = 1\r\nc = 3\r\n\r\n[t]\r\nb = 2\r\n\r\n[u]\r\nd = 4\r\n", result.toToml());
+    assertEquals("a = 1\r\nc = 3\r\n[t]\r\nb = 2\r\n\r\n[u]\r\nd = 4\r\n", result.toToml());
   }
 
   @ParameterizedTest(name = "{0}")
@@ -271,9 +282,7 @@ class SourcePreservingSerializerTest {
     TomlParseResult withoutSource = Toml.parse(input, TomlParseOptions.defaults().withoutSource());
     assertFalse(withoutSource.hasErrors(), () -> joinErrors(withoutSource));
 
-    assertEquals(
-        withoutSource.toToml(LF.keep(TomlWriteOptions.Keep.NOTHING)),
-        withoutSource.toToml(LF.keep(TomlWriteOptions.Keep.NOTATION)));
+    assertEquals(withoutSource.toToml(LF), withoutSource.toToml(LF.keep(TomlWriteOptions.Keep.NOTATION)));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -304,17 +313,27 @@ class SourcePreservingSerializerTest {
                 "a new entry goes after the last line of its table's section",
                 "[t]\nb = 2\n[u]\nc = 3\n",
                 result -> requireTable(result, "t").set("z", 9),
-                "[t]\nb = 2\nz = 9\n\n[u]\nc = 3\n"),
+                "[t]\nb = 2\nz = 9\n[u]\nc = 3\n"),
+            edited(
+                "a new entry is indented like the entries of its section",
+                "[t]\n  a = 1\n[u]\nc = 3\n",
+                result -> requireTable(result, "t").set("b", 2),
+                "[t]\n  a = 1\n  b = 2\n[u]\nc = 3\n"),
+            edited(
+                "a new entry is indented with the tabs the entries of its section use",
+                "[t]\n\ta = 1\n",
+                result -> requireTable(result, "t").set("b", 2),
+                "[t]\n\ta = 1\n\tb = 2\n"),
             edited(
                 "a new entry of a table a dotted key opened is written with that key",
                 "[t]\n  a.b = 1\n",
                 result -> requireTable(result, "t.a").set("z", 2),
-                "[t]\na.b = 1\na.z = 2\n"),
+                "[t]\n  a.b = 1\n  a.z = 2\n"),
             edited(
                 "a new entry of a table with no header of its own is written as a dotted key",
                 "[a.b]\nx = 1\n",
                 result -> requireTable(result, "a").set("y", 2),
-                "a.y = 2\n\n[a.b]\nx = 1\n"),
+                "a.y = 2\n[a.b]\nx = 1\n"),
             edited(
                 "a new entry inserted before the only entry of a section goes above its line",
                 "[t]\na = 1\n",
@@ -339,17 +358,17 @@ class SourcePreservingSerializerTest {
                 "a new table goes after the last line of its parent's subtree",
                 "[t]\nb = 2\n[u]\nc = 3\n",
                 result -> requireTable(result, "t").getOrCreateTable("s").set("k", 1),
-                "[t]\nb = 2\n\n[t.s]\nk = 1\n\n[u]\nc = 3\n"),
+                "[t]\nb = 2\n\n[t.s]\nk = 1\n[u]\nc = 3\n"),
             edited(
                 "a new table of the root goes at the end of the document",
                 "a = 1\n[t]\nb = 2\n",
                 result -> result.getOrCreateTable("new").set("k", 1),
-                "a = 1\n\n[t]\nb = 2\n\n[new]\nk = 1\n"),
+                "a = 1\n[t]\nb = 2\n\n[new]\nk = 1\n"),
             edited(
                 "a new table of an array of tables follows the last one",
                 "[[t]]\nx = 1\n[q]\ny = 2\n",
                 result -> requireArray(result, "t").add(MutableTomlTable.create().set("x", 2)),
-                "[[t]]\nx = 1\n\n[[t]]\nx = 2\n\n[q]\ny = 2\n"),
+                "[[t]]\nx = 1\n\n[[t]]\nx = 2\n[q]\ny = 2\n"),
             edited(
                 "an entry that is removed takes the comment above it",
                 "a = 1\n# about b\nb = 2\nc = 3\n",
@@ -389,12 +408,12 @@ class SourcePreservingSerializerTest {
                 "an unattached comment added to the root of a document with sections goes after the last of them",
                 "a = 1\n[t]\nb = 2\n",
                 result -> result.addComment("note"),
-                "a = 1\n\n[t]\nb = 2\n\n# note\n"),
+                "a = 1\n[t]\nb = 2\n\n# note\n"),
             edited(
                 "a new entry of the root goes before the first header, comments written between sections aside",
                 "[fruit]\nx = 1\n\n# a note about the header below\n\n[fruit.apple]\ny = 2\n",
                 result -> result.set("z", 3),
-                "z = 3\n\n[fruit]\nx = 1\n\n# a note about the header below\n\n[fruit.apple]\ny = 2\n"),
+                "z = 3\n[fruit]\nx = 1\n\n# a note about the header below\n\n[fruit.apple]\ny = 2\n"),
             edited(
                 "an unattached comment inserted before a section of the root goes before its header",
                 "[fruit]\nx = 1\n\n# a note about the header below\n\n[fruit.apple]\ny = 2\n",

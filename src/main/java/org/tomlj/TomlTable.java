@@ -1472,10 +1472,10 @@ public interface TomlTable {
    * Return a representation of this table using TOML, written with the default options.
    *
    * <p>
-   * A {@link TomlParseResult} is written keeping its notation: the order of its lines, its comments, its table
-   * structure and the literal form of each key and value are kept; see {@link TomlWriteOptions.Keep#NOTATION}. Any
-   * other table, including a table of a parse result rather than the result itself, is written in the default style,
-   * keeping the literal form each of its values was parsed with.
+   * A {@link TomlParseResult} is written keeping its layout: the document it was parsed from is written back, with only
+   * what the editing API changed written anew; see {@link TomlWriteOptions.Keep#LAYOUT}. Any other table, including a
+   * table of a parse result rather than the result itself, is written in the default style, keeping the literal form
+   * each of its values was parsed with.
    *
    * @return A TOML representation of this table.
    * @see TomlWriteOptions#defaults()
@@ -1488,9 +1488,9 @@ public interface TomlTable {
    * Return a representation of this table using TOML.
    *
    * <p>
-   * A {@link TomlParseResult} is written keeping its notation unless the options ask for
-   * {@link TomlWriteOptions.Keep#NOTHING}, which writes everything in the default style and drops the literal forms;
-   * see {@link #toToml()}.
+   * A {@link TomlParseResult} keeps as much of its existing structure and format as the options ask for; see
+   * {@link TomlWriteOptions.Keep}. {@link TomlWriteOptions.Keep#NOTHING} writes everything in the default style and
+   * drops the literal forms; see {@link #toToml()}.
    *
    * @param options The options to write with.
    * @return A TOML representation of this table.

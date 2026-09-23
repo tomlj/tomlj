@@ -13,6 +13,7 @@
 package org.tomlj;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -49,9 +50,9 @@ import org.junit.jupiter.api.TestFactory;
  * passed in the {@code org.tomlj.tomlTestDir} system property. Each {@code files-toml-<version>} list names the cases
  * that apply to a TOML specification version. Valid cases must parse without errors and match the expected tagged JSON
  * document, compared using the same rules as the official {@code toml-test} runner: floats numerically, date/times as
- * instants, everything else as strings. A valid case written keeping nothing, and written keeping its notation, must
- * also parse without errors at the same version and match the same expected document and comments. Invalid cases must
- * produce at least one error.
+ * instants, everything else as strings. A valid case must also be written back byte for byte by {@code toToml()}, since
+ * nothing has edited it, and written keeping its notation or keeping nothing it must parse without errors at the same
+ * version and match the same expected document and comments. Invalid cases must produce at least one error.
  */
 class TomlTestSuiteTest {
 
@@ -129,6 +130,9 @@ class TomlTestSuiteTest {
     assertFalse(result.hasErrors(), () -> "Unexpected errors: " + result.errors());
     Object expected = new JsonReader(Files.readString(json, UTF_8)).read();
     assertMatches(expected, result, "");
+
+    // An unedited document is written back as it was read, byte for byte
+    assertEquals(new String(Files.readAllBytes(toml), UTF_8), result.toToml(), () -> "Not written back unchanged");
 
     String serialized =
         result.toToml(TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING).withVersion(version));

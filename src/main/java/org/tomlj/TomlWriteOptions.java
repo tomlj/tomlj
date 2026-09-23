@@ -37,6 +37,17 @@ public final class TomlWriteOptions {
    */
   public enum Keep {
     /**
+     * Keep the layout of a parsed document: every line, header and comment the parser accepted is written back as it
+     * was read, with its spacing, indentation and blank lines, and only what the editing API changed is written anew.
+     *
+     * <p>
+     * Anything with no layout to keep - a line written anew, a table built with the editing API, a document parsed with
+     * {@link TomlParseOptions#withoutSource()}, a table of a parse result rather than the result itself - is written as
+     * {@link #NOTATION} writes it.
+     */
+    LAYOUT,
+
+    /**
      * Keep the notation of a parsed document: the form each key, value and table was written in, whether {@code 0x10}
      * or {@code 16}, a bare or quoted key, a basic or literal string, a header, dotted keys or an inline table. The
      * order of its lines and sections and its comments are kept too, while whitespace, indentation, blank lines and the
@@ -84,14 +95,14 @@ public final class TomlWriteOptions {
   }
 
   /**
-   * The default options: {@link Keep#NOTATION}, no indentation, a maximum line width of
-   * {@value #DEFAULT_MAX_LINE_WIDTH}, no line separator of their own, so that lines end with the platform's,
-   * {@link System#lineSeparator()}, and output written for {@link TomlVersion#LATEST}.
+   * The default options: {@link Keep#LAYOUT}, no indentation, a maximum line width of {@value #DEFAULT_MAX_LINE_WIDTH},
+   * no line separator of their own, so that lines end with the platform's, {@link System#lineSeparator()}, and output
+   * written for {@link TomlVersion#LATEST}.
    *
    * @return The default options.
    */
   public static TomlWriteOptions defaults() {
-    return new TomlWriteOptions(Keep.NOTATION, 0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST);
+    return new TomlWriteOptions(Keep.LAYOUT, 0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST);
   }
 
   /**
