@@ -1,0 +1,809 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file
+ * to You under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+package org.tomlj;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+import org.checkerframework.checker.nullness.qual.Nullable;
+
+/**
+ * Writes a parsed document keeping its notation ({@link TomlWriteOptions.Keep#NOTATION}), in the document's order, and
+ * places what the editing API added.
+ *
+ * <p>
+ * Every line, header and unattached comment the parser accepted recorded where it was written ({@link SourceSpan}).
+ * Writing walks the model, collects a chunk for each of those, and writes them in the order of the offsets they were
+ * read at, which keeps the document's order: the order of its lines and comments, and the order of its sections,
+ * including sections the document interleaves ({@code [a]}, {@code [b]}, {@code [a.c]}). A line the parser rejected
+ * recorded nothing, so it is not written; the comments above it were carried to the next accepted line as the document
+ * was read, so they are written above that line.
+ *
+ * <p>
+ * Each chunk is written from its parts rather than from the text around it: the indentation of its section, the
+ * comments of the model, the key and the literal each value was written with ({@link Serializer}, which keeps the
+ * literal of each key and scalar that has a span), and an array or inline table laid out anew. A line keeps one blank
+ * line above it where the document wrote any, a header always gets one, an unattached comment gets the blank lines that
+ * decide which table a re-parse reads it in, and the blank lines a document ends with are dropped.
+ *
+ * <p>
+ * A span is used only where the parse itself put the element the walk finds. The walk stops reading spans as soon as it
+ * passes through an entry the editing API added or replaced, since a table stored under a new key keeps the span of the
+ * header that named its old path, and a table copied in from another document keeps spans that read that document's
+ * text. Everything else is written where it belongs: a new entry after the nearest line of its table, named by a key
+ * relative to the section that line is in; a new unattached comment likewise, with a blank line above and below; a new
+ * table, or one of a copy, as a section after the last line of its parent's subtree. A line whose value or comments
+ * changed is written at the place a new entry would take.
+ */
+final class SourcePreservingSerializer {
+
+  // Chunks are written in the order of the offsets they are anchored at, and these ranks order the ones anchored at
+  // the same offset: content anchored before a line of the document, then that line, then content anchored after it,
+  // then a new section, so that a new entry never lands under a header written at the same anchor.
+  private static final int BEFORE_LINE = -1;
+  private static final int SOURCE_LINE = 0;
+  private static final int AFTER_LINE = 1;
+  private static final int NEW_SECTION = 2;
+
+  private final ParsedTomlTable root;
+  private final Source source;
+  private final Appendable out;
+
+  // The options anything written anew is written with, which end a new line the way the document ends its own unless
+  // the caller asked for a separator.
+  private final TomlWriteOptions options;
+  private final String lineSeparator;
+
+  private final List<Chunk> chunks = new ArrayList<>();
+  private int sequence;
+
+  // Whether anything has been written at all
+  private boolean written;
+  // Whether the output ends with a newline
+  private boolean atLineStart = true;
+  // Whether what has been written since the last newline is only whitespace
+  private boolean currentLineBlank = true;
+  // Whether the line before that one held only whitespace
+  private boolean previousLineBlank;
+  // A pending blank line, written only once a line follows it, so that the document never ends with one
+  private boolean blankLineOwed;
+
+  static void toToml(ParsedTomlTable table, Appendable appendable, TomlWriteOptions options) throws IOException {
+    new SourcePreservingSerializer(table, appendable, options).write();
+  }
+
+  private SourcePreservingSerializer(ParsedTomlTable root, Appendable out, TomlWriteOptions options) {
+    Source source = root.source();
+    assert source != null : "a document with no source is written in the default style";
+    this.root = root;
+    this.source = source;
+    this.out = out;
+    this.options = documentOptions(source, options);
+    this.lineSeparator = this.options.lineSeparator();
+  }
+
+  /**
+   * The options anything written anew is written with: unless the caller set a line separator, the lines added to a
+   * document use the document's line separator.
+   */
+  private static TomlWriteOptions documentOptions(Source source, TomlWriteOptions options) {
+    if (options.askedLineSeparator() != null) {
+      return options;
+    }
+    String separator = source.lineSeparator();
+    return (separator != null) ? options.withLineSeparator(separator) : options;
+  }
+
+  private void write() throws IOException {
+    collectTable(root, Collections.emptyList(), Collections.emptyList(), new Group(null), -1, true);
+    chunks
+        .sort(
+            Comparator
+                .comparingInt((Chunk chunk) -> chunk.anchor())
+                .thenComparingInt(chunk -> chunk.rank)
+                .thenComparingInt(chunk -> chunk.order));
+    // The document ends with the last line written, so the blank lines the document ends with are dropped
+    for (Chunk chunk : chunks) {
+      chunk.write();
+    }
+  }
+
+  /**
+   * Walk a table, collecting a chunk for each line, header and comment it contributes to the document.
+   *
+   * @param table The table to walk.
+   * @param sectionPath The keys from the root to the table of the section the walk is in.
+   * @param relative The keys from that section's table to this table, empty for the section's own table.
+   * @param section The section, which the lines collected here belong to.
+   * @param sectionAnchor Where an element of this table with no line of the document beside it goes: after the
+   *        section's header, or {@code -1} for the root, which puts it before everything.
+   * @param rootTable Whether this table is the document root.
+   * @return The lines this table contributes to {@code section}, which are the lines of the table itself and of any
+   *         table the document opened with a dotted key within it.
+   */
+  private Contribution collectTable(
+      LinkedTomlTable table,
+      List<String> sectionPath,
+      List<String> relative,
+      Group section,
+      int sectionAnchor,
+      boolean rootTable) {
+    List<TomlElement> elements = table.elements();
+    int count = elements.size();
+    Contribution[] parts = new Contribution[count];
+    boolean[] sections = new boolean[count];
+    Group[] subtrees = new Group[count];
+    List<Integer> pending = new ArrayList<>();
+    Contribution contributed = new Contribution();
+    // The last line this table writes, which an unattached run after it is written directly under
+    int lastLine = lastLineIndex(elements);
+    // The lines of this table are written at the indentation the options give the section around it, and the header of
+    // a table written in it at the indentation of the lines it is written among
+    String lineIndent = spaces(sectionPath.size() * options.indent());
+    String headerIndent = spaces((sectionPath.size() + relative.size()) * options.indent());
+    boolean sawSection = false;
+
+    for (int i = 0; i < count; i++) {
+      TomlElement element = elements.get(i);
+      Contribution part = new Contribution();
+      parts[i] = part;
+
+      if (element instanceof TomlComment) {
+        TomlComment comment = (TomlComment) element;
+        SourceSpan span = comment.span();
+        if (span != null && usable(span, SourceSpan.Kind.COMMENT)) {
+          // A run written after a section of the root belongs to the root only if a blank line separates it from it
+          addComment(span, comment, section, part, lineIndent, (i < lastLine) || (rootTable && sawSection));
+        } else {
+          pending.add(i);
+        }
+        contributed.merge(part);
+        continue;
+      }
+
+      Entry.KeyValue pair = (Entry.KeyValue) element;
+      String key = pair.key();
+      if (writtenOnALine(pair)) {
+        SourceSpan span = pair.span;
+        if (!pair.isModified()
+            && span != null
+            && usable(span, SourceSpan.Kind.LINE)
+            && span.keyParts == (relative.size() + 1)) {
+          addLine(span, pair, section, part, path(relative, key), lineIndent);
+        } else {
+          pending.add(i);
+        }
+        contributed.merge(part);
+        continue;
+      }
+
+      sections[i] = true;
+      if (pair.value instanceof LinkedTomlTable) {
+        LinkedTomlTable subTable = (LinkedTomlTable) pair.value;
+        SourceSpan header = headerOf(pair, subTable);
+        if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
+          Group group = new Group(section);
+          subtrees[i] = group;
+          addHeader(header, pair, group, headerIndent);
+          collectTable(subTable, path(sectionPath, relative, key), Collections.emptyList(), group, header.stop, false);
+        } else if (!pair.valueModified && !pair.commentsModified() && writtenAsDottedKeys(subTable)) {
+          // A table the document opened with a dotted key, or implicitly as a parent of a header: its lines belong to
+          // this section, written with the dotted keys the document wrote them with.
+          sections[i] = false;
+          part.merge(collectTable(subTable, sectionPath, path(relative, key), section, sectionAnchor, false));
+        } else {
+          // A table a dotted key can no longer name gets a header of its own
+          addSection(pair, path(sectionPath, relative, key), section);
+        }
+      } else {
+        ListTomlArray array = (ListTomlArray) pair.value;
+        List<String> arrayPath = path(sectionPath, relative, key);
+        Group arrayGroup = new Group(section);
+        subtrees[i] = arrayGroup;
+        List<Group> preceding = new ArrayList<>();
+        for (TomlElement tableElement : array.elements()) {
+          Entry.Indexed indexed = (Entry.Indexed) tableElement;
+          SourceSpan header = null;
+          if (!pair.valueModified && indexed.value instanceof LinkedTomlTable) {
+            header = headerOf(indexed, (LinkedTomlTable) indexed.value);
+          }
+          if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
+            Group group = new Group(arrayGroup);
+            addHeader(header, indexed, group, headerIndent);
+            collectTable(
+                (LinkedTomlTable) indexed.value,
+                arrayPath,
+                Collections.emptyList(),
+                group,
+                header.stop,
+                false);
+            preceding.add(group);
+          } else {
+            // A table the editing API added to the array follows the one before it, which the walk has already read
+            chunks.add(new SectionChunk(indexed, arrayPath, true, section, stopOf(preceding)));
+          }
+        }
+      }
+      sawSection = sawSection || sections[i];
+      contributed.merge(part);
+    }
+
+    anchorNewElements(elements, parts, sections, subtrees, pending, sectionPath, relative, sectionAnchor, rootTable);
+    return contributed;
+  }
+
+  /**
+   * Collect a chunk for each element of a table that has no usable span: an entry or an unattached comment the editing
+   * API added, or one whose span was read from another document or with a key of a different number of parts.
+   *
+   * <p>
+   * Such an element is written beside its neighbours in the table's sequence: after the nearest element before it that
+   * is written as a line of this section, or, where there is none, before the nearest one after it, or, where there is
+   * neither, at the section's own anchor. It is written at the indentation the options give the section, and with a key
+   * relative to the section the neighbour's line is in, so a new entry of a table written as dotted keys is written as
+   * a dotted key.
+   */
+  private void anchorNewElements(
+      List<TomlElement> elements,
+      Contribution[] parts,
+      boolean[] sections,
+      Group[] subtrees,
+      List<Integer> pending,
+      List<String> sectionPath,
+      List<String> relative,
+      int sectionAnchor,
+      boolean rootTable) {
+    if (pending.isEmpty()) {
+      return;
+    }
+    int lastLine = lastLineIndex(elements);
+    // A new entry must be written before the first section of this table, since a re-parse reads a line written after a
+    // header into the table that header opens. A comment is placed by the rules below.
+    int firstSection = firstSectionIndex(sections);
+    for (int index : pending) {
+      TomlElement element = elements.get(index);
+      boolean isComment = element instanceof TomlComment;
+      int anchor = sectionAnchor;
+      int rank = AFTER_LINE;
+      // A run with no line of its table after it in the sequence is written directly under the line above it, so that
+      // a re-parse reads it in this table rather than in whatever follows.
+      boolean blankAbove = isComment && (index < lastLine);
+      int limit = (isComment || firstSection < 0) ? parts.length : firstSection;
+
+      boolean found = false;
+      boolean afterSubtree = false;
+      for (int j = Math.min(index, limit) - 1; j >= 0 && !found; j--) {
+        Contribution part = parts[j];
+        if (part.hasLines()) {
+          anchor = part.lastStop;
+          found = true;
+        } else if (isComment && rootTable && subtrees[j] != null && subtrees[j].subtreeStop >= 0) {
+          // The root's own comments are written after the last section, since a run written under a header belongs to
+          // the table that header opened.
+          anchor = subtrees[j].subtreeStop;
+          blankAbove = true;
+          found = true;
+          afterSubtree = true;
+        }
+      }
+      if (!found || afterSubtree) {
+        for (int j = index + 1; j < limit; j++) {
+          if (sections[j]) {
+            // A line written under a header belongs to the table that header opened, so an element written before a
+            // section of this table cannot be written beside anything past that section: it goes at the section's
+            // anchor
+            break;
+          }
+          if (parts[j].hasLines()) {
+            // The line of this table nearest after the element. A comment written after a section goes before that line
+            // when the line starts before the section's text ends, which happens only for an unattached comment of the
+            // root that the document wrote between two headers within the section's text.
+            if (!found || parts[j].firstStart <= anchor) {
+              anchor = parts[j].firstStart;
+              rank = BEFORE_LINE;
+            }
+            break;
+          }
+        }
+      }
+
+      String lineIndent = spaces(sectionPath.size() * options.indent());
+      if (isComment) {
+        chunks.add(new CommentChunk((TomlComment) element, lineIndent, anchor, rank, blankAbove));
+      } else {
+        Entry.KeyValue pair = (Entry.KeyValue) element;
+        chunks.add(new EntryChunk(pair, path(relative, pair.key()), lineIndent, anchor, rank, blankAbove));
+      }
+    }
+  }
+
+  private void addLine(
+      SourceSpan span,
+      Entry entry,
+      Group section,
+      Contribution part,
+      List<String> keyPath,
+      String lineIndent) {
+    chunks.add(new LineChunk(span, entry, keyPath, lineIndent));
+    section.addLine(span.stop);
+    part.add(span.start, span.stop);
+  }
+
+  /**
+   * Collect an unattached comment the document wrote. It is written from the model, as one the editing API added is,
+   * since where the blank lines around it go is part of the layout.
+   */
+  private void addComment(
+      SourceSpan span,
+      TomlComment comment,
+      Group section,
+      Contribution part,
+      String lineIndent,
+      boolean blankAbove) {
+    chunks.add(new CommentChunk(comment, lineIndent, span.start, SOURCE_LINE, blankAbove));
+    section.addLine(span.stop);
+    part.add(span.start, span.stop);
+  }
+
+  private void addHeader(SourceSpan header, Entry entry, Group group, String headerIndent) {
+    chunks.add(new LineChunk(header, entry, Collections.emptyList(), headerIndent));
+    group.addLine(header.stop);
+  }
+
+  private void addSection(TomlEntry entry, List<String> path, Group section) {
+    chunks.add(new SectionChunk(entry, path, false, section, -1));
+  }
+
+  /**
+   * Whether a table with no header of its own can be written as the dotted keys of the section around it.
+   *
+   * <p>
+   * A dotted key writes one entry, so a table with no entries cannot be written as dotted keys, and a comment written
+   * among those keys would be read in the section rather than in this table, so such a table needs a header.
+   *
+   * @param table The table.
+   * @return {@code true} if the table holds an entry and no unattached comment.
+   */
+  private static boolean writtenAsDottedKeys(LinkedTomlTable table) {
+    boolean hasEntry = false;
+    for (TomlElement element : table.elements()) {
+      if (element instanceof TomlComment) {
+        return false;
+      }
+      hasEntry = true;
+    }
+    return hasEntry;
+  }
+
+  /**
+   * The span of the header line a table was opened by, where the table is still at the path that header names.
+   *
+   * @param entry The entry holding the table, whose comments are written on the header.
+   * @param table The table.
+   * @return The header's span, or {@code null} if the table was stored through the editing API, or the comments on its
+   *         header were, in which case the table is written as a section at the place a new table would take.
+   */
+  @Nullable
+  private static SourceSpan headerOf(Entry entry, LinkedTomlTable table) {
+    return (entry.valueModified || entry.commentsModified()) ? null : table.headerSpan;
+  }
+
+  /**
+   * Whether a span's source is this document and its kind is the one expected. A span from another document gives no
+   * offset in this one.
+   */
+  @SuppressWarnings("ReferenceEquality") // compares the span's source by identity
+  private boolean usable(SourceSpan span, SourceSpan.Kind kind) {
+    return span.kind == kind && span.source == source;
+  }
+
+  /**
+   * Whether an entry is written as a {@code key = value} line, rather than under a header of its own.
+   *
+   * <p>
+   * Unlike every other table, an inline table is written on the line of the entry holding it, and an array written as a
+   * literal stays a literal however it is filled, unlike the array of the tables of {@code [[x]]} headers.
+   */
+  private static boolean writtenOnALine(TomlEntry entry) {
+    Object value = entry.value().get();
+    if (value instanceof LinkedTomlTable) {
+      return ((LinkedTomlTable) value).isInline();
+    }
+    if (value instanceof ListTomlArray && ((ListTomlArray) value).isTableArray()) {
+      return Serializer.isLine(entry, true);
+    }
+    return true;
+  }
+
+  private static int firstSectionIndex(boolean[] sections) {
+    for (int i = 0; i < sections.length; i++) {
+      if (sections[i]) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private static int lastLineIndex(List<TomlElement> elements) {
+    for (int i = elements.size() - 1; i >= 0; i--) {
+      TomlElement element = elements.get(i);
+      if (element instanceof TomlEntry && writtenOnALine((TomlEntry) element)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private static int stopOf(List<Group> groups) {
+    int stop = -1;
+    for (Group group : groups) {
+      if (group.subtreeStop > stop) {
+        stop = group.subtreeStop;
+      }
+    }
+    return stop;
+  }
+
+  /** The first offset of a span's own text, after the blank lines above it and the indentation of its first line. */
+  private static int firstToken(SourceSpan span) {
+    return (span.aboveStart >= 0) ? span.aboveStart : span.keyStart;
+  }
+
+  private static String spaces(int width) {
+    StringBuilder text = new StringBuilder(width);
+    for (int i = 0; i < width; i++) {
+      text.append(' ');
+    }
+    return text.toString();
+  }
+
+  private static List<String> path(List<String> sectionPath, List<String> relative, String key) {
+    List<String> path = new ArrayList<>(sectionPath.size() + relative.size() + 1);
+    path.addAll(sectionPath);
+    path.addAll(relative);
+    path.add(key);
+    return path;
+  }
+
+  private static List<String> path(List<String> relative, String key) {
+    List<String> path = new ArrayList<>(relative.size() + 1);
+    path.addAll(relative);
+    path.add(key);
+    return path;
+  }
+
+  /**
+   * Write text, noting where the output now stands: whether it is at the start of a line, and whether the line before
+   * that one was blank.
+   */
+  private void append(CharSequence text) throws IOException {
+    if (text.length() == 0) {
+      return;
+    }
+    out.append(text);
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (c == '\n') {
+        previousLineBlank = currentLineBlank;
+        currentLineBlank = true;
+        atLineStart = true;
+      } else {
+        if (c != ' ' && c != '\t' && c != '\r') {
+          currentLineBlank = false;
+        }
+        atLineStart = false;
+      }
+    }
+    written = true;
+  }
+
+  /**
+   * End the line the output is on, if it is not already at the start of one. Only the last line of a document can lack
+   * its own newline, so this writes one only where something follows such a line.
+   */
+  private void startLine() throws IOException {
+    if (written && !atLineStart) {
+      append(lineSeparator);
+    }
+  }
+
+  /**
+   * Request a blank line, unless the output is empty or already ends with one, so that blank lines neither open the
+   * document nor double up.
+   */
+  private void requestBlankLine() {
+    if (written && !(atLineStart && previousLineBlank)) {
+      blankLineOwed = true;
+    }
+  }
+
+  /**
+   * Write the pending blank line, if there is one.
+   */
+  private void flushBlankLine() throws IOException {
+    if (blankLineOwed) {
+      blankLineOwed = false;
+      append(lineSeparator);
+    }
+  }
+
+  /**
+   * The lines this table contributes to its section, whose offsets anchor the elements the editing API added next to
+   * them.
+   */
+  private static final class Contribution {
+
+    /** Where the first of those lines starts, or {@code -1} if there are none. */
+    private int firstStart = -1;
+
+    /** Where the last of them ends, or {@code -1} if there are none. */
+    private int lastStop = -1;
+
+    boolean hasLines() {
+      return firstStart >= 0;
+    }
+
+    void add(int start, int stop) {
+      if (firstStart < 0 || start < firstStart) {
+        firstStart = start;
+      }
+      if (stop > lastStop) {
+        lastStop = stop;
+      }
+    }
+
+    void merge(Contribution other) {
+      if (other.firstStart >= 0 && (firstStart < 0 || other.firstStart < firstStart)) {
+        firstStart = other.firstStart;
+      }
+      if (other.lastStop > lastStop) {
+        lastStop = other.lastStop;
+      }
+    }
+  }
+
+  /**
+   * A section - a table written under a header, or the root - or an array of tables, whose end offset anchors the
+   * sections added to it that have no span.
+   */
+  private static final class Group {
+
+    @Nullable
+    private final Group parent;
+
+    /** The end of the last line anywhere in this group, the groups nested in it included, or {@code -1}. */
+    private int subtreeStop = -1;
+
+    Group(@Nullable Group parent) {
+      this.parent = parent;
+    }
+
+    void addLine(int stop) {
+      for (Group group = this; group != null; group = group.parent) {
+        if (stop > group.subtreeStop) {
+          group.subtreeStop = stop;
+        }
+      }
+    }
+
+    /**
+     * Where a new section of this group goes: after everything in it, or after everything in the nearest enclosing
+     * group that holds anything.
+     */
+    int sectionAnchor() {
+      for (Group group = this; group != null; group = group.parent) {
+        if (group.subtreeStop >= 0) {
+          return group.subtreeStop;
+        }
+      }
+      return -1;
+    }
+  }
+
+  /**
+   * One line, or one run of lines, of the output, together with where it sorts in the document.
+   */
+  private abstract class Chunk {
+
+    final int rank;
+
+    /**
+     * The order this chunk was collected in, which orders the chunks anchored at the same offset with the same rank.
+     */
+    final int order;
+
+    Chunk(int rank) {
+      this.rank = rank;
+      this.order = sequence++;
+    }
+
+    /** The offset this chunk sorts at: where it was read, or where the line it is anchored to ends. */
+    abstract int anchor();
+
+    abstract void write() throws IOException;
+  }
+
+  /**
+   * A key/value line or a table header the document wrote, written from its parts in the layout the options set: the
+   * indentation of its section, the comments the model holds, the key and, for a header, the text the document wrote
+   * them as, and the value laid out anew around the literal each scalar was written with. A line keeps one blank line
+   * above it where the document wrote any, and a header is always separated from what precedes it.
+   */
+  private final class LineChunk extends Chunk {
+
+    private final SourceSpan span;
+
+    /** The entry the line or header holds. */
+    private final Entry entry;
+
+    /** The key the line is written with, relative to the section it is written in. Empty for a header. */
+    private final List<String> keyPath;
+
+    /** The indentation this line is written at. */
+    private final String lineIndent;
+
+    LineChunk(SourceSpan span, Entry entry, List<String> keyPath, String lineIndent) {
+      super(SOURCE_LINE);
+      this.span = span;
+      this.entry = entry;
+      this.keyPath = keyPath;
+      this.lineIndent = lineIndent;
+    }
+
+    @Override
+    int anchor() {
+      return span.start;
+    }
+
+    @Override
+    void write() throws IOException {
+      boolean header = (span.kind == SourceSpan.Kind.HEADER);
+      if (header || source.text(span.start, firstToken(span) - 1).indexOf('\n') >= 0) {
+        requestBlankLine();
+      }
+      startLine();
+      flushBlankLine();
+      StringBuilder line = new StringBuilder();
+      Serializer writer = Serializer.defaultStyle(line, options);
+      if (header) {
+        writer.writeHeaderText(lineIndent, source.text(span.keyStart, span.keyStop), entry.comments());
+      } else {
+        writer.writeKeyValue(lineIndent, keyPath, entry);
+      }
+      append(line);
+    }
+  }
+
+  /**
+   * A {@code key = value} line with no usable span, written in the layout the options set beside the lines around it.
+   */
+  private final class EntryChunk extends Chunk {
+
+    private final TomlEntry entry;
+    private final List<String> keyPath;
+    private final String lineIndent;
+    private final int anchor;
+    private final boolean blankAbove;
+
+    EntryChunk(TomlEntry entry, List<String> keyPath, String lineIndent, int anchor, int rank, boolean blankAbove) {
+      super(rank);
+      this.entry = entry;
+      this.keyPath = keyPath;
+      this.lineIndent = lineIndent;
+      this.anchor = anchor;
+      this.blankAbove = blankAbove;
+    }
+
+    @Override
+    int anchor() {
+      return anchor;
+    }
+
+    @Override
+    void write() throws IOException {
+      startLine();
+      if (blankAbove) {
+        requestBlankLine();
+      }
+      flushBlankLine();
+      StringBuilder text = new StringBuilder();
+      Serializer.defaultStyle(text, options).writeKeyValue(lineIndent, keyPath, entry);
+      append(text);
+    }
+  }
+
+  /**
+   * An unattached comment, written from the model with a blank line below it, and one above it unless it belongs under
+   * the line above it, so that a re-parse reads it in its table and as the comment above nothing.
+   */
+  private final class CommentChunk extends Chunk {
+
+    private final TomlComment comment;
+    private final String lineIndent;
+    private final int anchor;
+    private final boolean blankAbove;
+
+    CommentChunk(TomlComment comment, String lineIndent, int anchor, int rank, boolean blankAbove) {
+      super(rank);
+      this.comment = comment;
+      this.lineIndent = lineIndent;
+      this.anchor = anchor;
+      this.blankAbove = blankAbove;
+    }
+
+    @Override
+    int anchor() {
+      return anchor;
+    }
+
+    @Override
+    void write() throws IOException {
+      startLine();
+      if (blankAbove) {
+        requestBlankLine();
+      }
+      flushBlankLine();
+      StringBuilder text = new StringBuilder();
+      Serializer.defaultStyle(text, options).writeCommentLines(comment, lineIndent);
+      append(text);
+      requestBlankLine();
+    }
+  }
+
+  /**
+   * A table, or one table of an array of tables, that has no usable header span, written under a header in the layout
+   * the options set, after the last line of the subtree it belongs to.
+   */
+  private final class SectionChunk extends Chunk {
+
+    private final TomlEntry entry;
+    private final List<String> path;
+    private final boolean arrayTable;
+    private final Group group;
+
+    /** Where this section goes, or {@code -1} to take the group's own anchor once the whole document is walked. */
+    private final int after;
+
+    SectionChunk(TomlEntry entry, List<String> path, boolean arrayTable, Group group, int after) {
+      super(NEW_SECTION);
+      this.entry = entry;
+      this.path = path;
+      this.arrayTable = arrayTable;
+      this.group = group;
+      this.after = after;
+    }
+
+    @Override
+    int anchor() {
+      return (after >= 0) ? after : group.sectionAnchor();
+    }
+
+    @Override
+    void write() throws IOException {
+      startLine();
+      requestBlankLine();
+      flushBlankLine();
+      StringBuilder text = new StringBuilder();
+      Serializer block = Serializer.defaultStyle(text, options);
+      if (arrayTable) {
+        block.writeArrayTableSection(entry, new ArrayList<>(path));
+      } else {
+        block.writeSections(entry, new ArrayList<>(path));
+      }
+      append(text);
+    }
+  }
+}

@@ -30,12 +30,38 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 public final class TomlWriteOptions {
 
   /**
+   * How much of the existing document structure and format is kept.
+   *
+   * <p>
+   * Each value keeps less than the one before it, and where a value has nothing to keep, the next value applies.
+   */
+  public enum Keep {
+    /**
+     * Keep the notation of a parsed document: the form each key, value and table was written in, whether {@code 0x10}
+     * or {@code 16}, a bare or quoted key, a basic or literal string, a header, dotted keys or an inline table. The
+     * order of its lines and sections and its comments are kept too, while whitespace, indentation, blank lines and the
+     * layout of arrays and inline tables come from the options.
+     *
+     * <p>
+     * Anything with no notation to keep, such as a document parsed without its source, is written as {@link #NOTHING}
+     * writes it.
+     */
+    NOTATION,
+
+    /**
+     * Keep nothing: everything is written in the default style.
+     */
+    NOTHING
+  }
+
+  /**
    * The default maximum line width: {@value}.
    *
    * @see #withMaxLineWidth(int)
    */
   public static final int DEFAULT_MAX_LINE_WIDTH = 80;
 
+  private final Keep keep;
   private final int indent;
   private final int maxLineWidth;
 
@@ -44,7 +70,13 @@ public final class TomlWriteOptions {
   private final String lineSeparator;
   private final TomlVersion version;
 
-  private TomlWriteOptions(int indent, int maxLineWidth, @Nullable String lineSeparator, TomlVersion version) {
+  private TomlWriteOptions(
+      Keep keep,
+      int indent,
+      int maxLineWidth,
+      @Nullable String lineSeparator,
+      TomlVersion version) {
+    this.keep = keep;
     this.indent = indent;
     this.maxLineWidth = maxLineWidth;
     this.lineSeparator = lineSeparator;
@@ -52,14 +84,25 @@ public final class TomlWriteOptions {
   }
 
   /**
-   * The default options: no indentation, a maximum line width of {@value #DEFAULT_MAX_LINE_WIDTH}, no line separator of
-   * their own, so that lines end with the platform's, {@link System#lineSeparator()}, and output written for
-   * {@link TomlVersion#LATEST}.
+   * The default options: {@link Keep#NOTATION}, no indentation, a maximum line width of
+   * {@value #DEFAULT_MAX_LINE_WIDTH}, no line separator of their own, so that lines end with the platform's,
+   * {@link System#lineSeparator()}, and output written for {@link TomlVersion#LATEST}.
    *
    * @return The default options.
    */
   public static TomlWriteOptions defaults() {
-    return new TomlWriteOptions(0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST);
+    return new TomlWriteOptions(Keep.NOTATION, 0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST);
+  }
+
+  /**
+   * Create a copy of these options that keeps a different amount of the existing document structure and format.
+   *
+   * @param keep How much of the existing document structure and format to keep.
+   * @return A new set of options with the given amount to keep.
+   */
+  public TomlWriteOptions keep(Keep keep) {
+    requireNonNull(keep);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version);
   }
 
   /**
@@ -95,7 +138,7 @@ public final class TomlWriteOptions {
     if (spaces < 0) {
       throw new IllegalArgumentException("indent must not be negative: " + spaces);
     }
-    return new TomlWriteOptions(spaces, maxLineWidth, lineSeparator, version);
+    return new TomlWriteOptions(keep, spaces, maxLineWidth, lineSeparator, version);
   }
 
   /**
@@ -114,7 +157,7 @@ public final class TomlWriteOptions {
     if (!separator.equals("\n") && !separator.equals("\r\n")) {
       throw new IllegalArgumentException("lineSeparator must be \"\\n\" or \"\\r\\n\"");
     }
-    return new TomlWriteOptions(indent, maxLineWidth, separator, version);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, separator, version);
   }
 
   /**
@@ -144,7 +187,17 @@ public final class TomlWriteOptions {
     if (columns < 0) {
       throw new IllegalArgumentException("maxLineWidth must not be negative: " + columns);
     }
-    return new TomlWriteOptions(indent, columns, lineSeparator, version);
+    return new TomlWriteOptions(keep, indent, columns, lineSeparator, version);
+  }
+
+  /**
+   * How much of the existing document structure and format is kept.
+   *
+   * @return How much of the existing document structure and format is kept.
+   * @see #keep(Keep)
+   */
+  public Keep keep() {
+    return keep;
   }
 
   /**
@@ -166,7 +219,7 @@ public final class TomlWriteOptions {
    */
   public TomlWriteOptions withVersion(TomlVersion version) {
     requireNonNull(version);
-    return new TomlWriteOptions(indent, maxLineWidth, lineSeparator, version);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version);
   }
 
   /**
@@ -228,7 +281,8 @@ public final class TomlWriteOptions {
       return false;
     }
     TomlWriteOptions other = (TomlWriteOptions) obj;
-    return this.indent == other.indent
+    return this.keep == other.keep
+        && this.indent == other.indent
         && this.maxLineWidth == other.maxLineWidth
         && Objects.equals(this.lineSeparator, other.lineSeparator)
         && this.version == other.version;
@@ -236,12 +290,14 @@ public final class TomlWriteOptions {
 
   @Override
   public int hashCode() {
-    return Objects.hash(indent, maxLineWidth, lineSeparator, version);
+    return Objects.hash(keep, indent, maxLineWidth, lineSeparator, version);
   }
 
   @Override
   public String toString() {
-    return "TomlWriteOptions{indent="
+    return "TomlWriteOptions{keep="
+        + keep
+        + ", indent="
         + indent
         + ", maxLineWidth="
         + maxLineWidth

@@ -79,6 +79,27 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
   }
 
   /**
+   * Whether this table is written with braces, on the line of the entry holding it, rather than under a header of its
+   * own.
+   *
+   * @return {@code true} if this table is an inline table.
+   */
+  boolean isInline() {
+    return inline;
+  }
+
+  /**
+   * Whether the inline form of this table is written where the notation is kept: it was read between braces from a
+   * document whose source was kept. A table read from a document parsed with no source is inline, but records nothing
+   * of how it was written.
+   *
+   * @return {@code true} if a writer keeping the notation writes this table with braces.
+   */
+  boolean hasInlineForm() {
+    return bracketSpan != null;
+  }
+
+  /**
    * Define this table at a header's position, once {@code [a]} or {@code [[a]]} is reached for it.
    *
    * @param position The header's position.

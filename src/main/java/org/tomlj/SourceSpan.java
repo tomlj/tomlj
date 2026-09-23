@@ -32,9 +32,8 @@ import org.antlr.v4.runtime.Token;
  * </ul>
  *
  * <p>
- * A span is immutable, and names the source it reads, so a span copied into another document still resolves. A comment
- * that was edited is written from the model, and one that was not may be copied from the source. The offsets of a
- * comment run also serve as the boundaries of the whitespace around it.
+ * A span is immutable, and names the source it reads, so a span copied into another document still resolves. The
+ * offsets of a comment run also serve as the boundaries of the whitespace around it.
  */
 final class SourceSpan {
 

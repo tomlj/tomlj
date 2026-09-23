@@ -478,6 +478,10 @@ public interface TomlArray {
   /**
    * Return a representation of this array using TOML, written with the default options.
    *
+   * <p>
+   * An array is always written in the default style, whether or not it was parsed, keeping the literal form each of its
+   * values was parsed with.
+   *
    * @return A TOML representation of this array.
    * @see TomlWriteOptions#defaults()
    */

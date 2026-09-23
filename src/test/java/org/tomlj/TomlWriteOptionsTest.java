@@ -26,11 +26,44 @@ class TomlWriteOptionsTest {
   @Test
   void defaultsAreNoIndentDefaultMaxLineWidthThePlatformLineSeparatorAndTheLatestVersion() {
     TomlWriteOptions options = TomlWriteOptions.defaults();
+    assertEquals(TomlWriteOptions.Keep.NOTATION, options.keep());
     assertEquals(0, options.indent());
     assertEquals(80, options.maxLineWidth());
     assertEquals(TomlWriteOptions.DEFAULT_MAX_LINE_WIDTH, options.maxLineWidth());
     assertEquals(System.lineSeparator(), options.lineSeparator());
     assertEquals(TomlVersion.LATEST, options.version());
+  }
+
+  @Test
+  void keepReturnsANewInstanceLeavingTheOriginalUnchangedAndKeepsTheOtherOptions() {
+    TomlWriteOptions original =
+        TomlWriteOptions.defaults().withIndent(2).withMaxLineWidth(100).withLineSeparator("\r\n");
+    TomlWriteOptions updated = original.keep(TomlWriteOptions.Keep.NOTHING);
+
+    assertEquals(TomlWriteOptions.Keep.NOTHING, updated.keep());
+    assertEquals(2, updated.indent());
+    assertEquals(100, updated.maxLineWidth());
+    assertEquals("\r\n", updated.lineSeparator());
+    assertEquals(TomlWriteOptions.Keep.NOTATION, original.keep());
+  }
+
+  @Test
+  void keepGivesOptionsThatKeepTheAmountAskedFor() {
+    for (TomlWriteOptions.Keep keep : TomlWriteOptions.Keep.values()) {
+      assertEquals(keep, TomlWriteOptions.defaults().keep(keep).keep());
+    }
+  }
+
+  @Test
+  void keepReplacesTheAmountAskedForEarlier() {
+    assertEquals(
+        TomlWriteOptions.Keep.NOTATION,
+        TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING).keep(TomlWriteOptions.Keep.NOTATION).keep());
+  }
+
+  @Test
+  void keepRejectsNull() {
+    assertThrows(NullPointerException.class, () -> TomlWriteOptions.defaults().keep(null));
   }
 
   @Test
@@ -176,6 +209,11 @@ class TomlWriteOptionsTest {
   }
 
   @Test
+  void optionsDifferingOnlyInWhatTheyKeepAreNotEqual() {
+    assertDifferent(TomlWriteOptions.defaults(), TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING));
+  }
+
+  @Test
   void toStringShowsEveryOption() {
     TomlWriteOptions options = TomlWriteOptions
         .defaults()
@@ -184,11 +222,11 @@ class TomlWriteOptionsTest {
         .withLineSeparator("\r\n")
         .withVersion(TomlVersion.V1_0_0);
     assertEquals(
-        "TomlWriteOptions{indent=2, maxLineWidth=100, lineSeparator=\"\\r\\n\", version=V1_0_0}",
+        "TomlWriteOptions{keep=NOTATION, indent=2, maxLineWidth=100, lineSeparator=\"\\r\\n\", version=V1_0_0}",
         options.toString());
     assertEquals(
-        "TomlWriteOptions{indent=0, maxLineWidth=80, lineSeparator=\"\\n\", version=LATEST}",
-        TomlWriteOptions.defaults().withLineSeparator("\n").toString());
+        "TomlWriteOptions{keep=NOTHING, indent=0, maxLineWidth=80, lineSeparator=\"\\n\", version=LATEST}",
+        TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING).withLineSeparator("\n").toString());
   }
 
   private static void assertDifferent(TomlWriteOptions a, TomlWriteOptions b) {

@@ -130,6 +130,16 @@ abstract class Entry implements MutableTomlEntry {
     return (comment(placement) == null) ? this : updateAttachedComment(placement, null);
   }
 
+  /**
+   * Whether an attached comment of this entry was set or removed through the editing API, so that its comments are
+   * written from the model rather than copied from the source.
+   *
+   * @return {@code true} if a comment of this entry was set or removed through the editing API.
+   */
+  boolean commentsModified() {
+    return commentsModified;
+  }
+
   // Replace the attached comment at a placement with comment, or remove it for null, keeping the other one.
   private MutableTomlEntry updateAttachedComment(TomlComment.Placement placement, @Nullable TomlComment comment) {
     TomlComment above = (placement == TomlComment.Placement.ABOVE) ? comment : comment(TomlComment.Placement.ABOVE);

@@ -679,6 +679,23 @@ class SerializerTest {
   }
 
   @Test
+  void shouldWriteValuesReadFromADocumentInTheFormTheyWereRead() {
+    TomlParseResult result = Toml.parse("mask = 0xFF\nt = { a = 0x1 }\naot = [ { a = 1 } ]\n");
+    assertFalse(result.hasErrors(), () -> result.errors().toString());
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("mask", result.entry("mask").value());
+    table.set("t", result.get("t"));
+    table.set("aot", result.get("aot"));
+
+    TomlWriteOptions options = TomlWriteOptions.defaults().withLineSeparator("\n");
+    assertSerializes(table, options, "mask = 0xFF\nt = { a = 0x1 }\naot = [{ a = 1 }]\n");
+    assertSerializes(
+        table,
+        options.keep(TomlWriteOptions.Keep.NOTHING),
+        "mask = 255\n\n[t]\na = 1\n\n[[aot]]\na = 1\n");
+  }
+
+  @Test
   void shouldWriteAnInlineTableHoldingCommentsAsASection() {
     TomlTable table = parse("a = {\n  # unattached\n\n  b = 1,  # after\n}\n");
     assertSerializes(
@@ -932,8 +949,11 @@ class SerializerTest {
     return doc;
   }
 
+  // Parsed with no source kept, since the default style is what a document with no text to read is written in; a
+  // document parsed with its source is written from that text instead, which SourcePreservingSerializerTest covers.
   private static TomlParseResult parse(String toml) {
-    TomlParseResult result = Toml.parse(toml, TomlVersion.LATEST);
+    TomlParseResult result =
+        Toml.parse(toml, TomlParseOptions.defaults().withVersion(TomlVersion.LATEST).withoutSource());
     assertFalse(result.hasErrors(), () -> toml + "\n" + result.errors());
     return result;
   }

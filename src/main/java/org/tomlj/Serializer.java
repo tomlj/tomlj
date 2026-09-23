@@ -23,9 +23,12 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
+
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Writes tables and arrays as TOML.
@@ -57,12 +60,17 @@ import java.util.regex.Pattern;
  * blank line separates an unattached comment from the element it would otherwise be attached to: a run separated by a
  * blank line from what follows it belongs to the container of the next expression, and a run written directly under a
  * line belongs to the container open where it was written.
+ *
+ * <p>
+ * Unless the options ask for {@link TomlWriteOptions.Keep#NOTHING}, a key or a scalar that has a span is written with
+ * the text of that span rather than in the form this writer would give it, and the dotted keys of an inline table are
+ * written as the document wrote them. The layout, the spacing and the indentation around them come from the options.
  */
 final class Serializer {
   private static final Pattern BARE_KEY = Pattern.compile("[A-Za-z0-9_-]+");
   private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
-  // The indentation of the elements of a multi-line array or inline table, relative to the line it starts on
-  private static final int ARRAY_ELEMENT_INDENT = 2;
+  // The indentation of the elements of a multi-line array, relative to the line the array starts on
+  private static final String ARRAY_ELEMENT_INDENT = "  ";
 
   private final Appendable out;
   // The spaces to indent per level of table nesting
@@ -72,23 +80,44 @@ final class Serializer {
   private final String lineSeparator;
   // The version of TOML written for, which decides whether an inline table may be written over several lines
   private final TomlVersion version;
+  // Whether the notation is kept: a key or scalar that has a span is written with the text of that span
+  private final boolean keepNotation;
   private boolean written = false;
-  // A blank line owed to the output, written only once something follows it, so that the document never ends with one
+  // A pending blank line, written only once something follows it, so that the document never ends with one
   private boolean blankLineOwed = false;
 
-  Serializer(Appendable out, int indent, int maxLineWidth, String lineSeparator, TomlVersion version) {
+  private Serializer(Appendable out, TomlWriteOptions options) {
     this.out = out;
-    this.indent = indent;
-    this.maxLineWidth = maxLineWidth;
-    this.lineSeparator = lineSeparator;
-    this.version = version;
+    this.indent = options.indent();
+    this.maxLineWidth = options.maxLineWidth();
+    this.lineSeparator = options.lineSeparator();
+    this.version = options.version();
+    this.keepNotation = (options.keep() != TomlWriteOptions.Keep.NOTHING);
+  }
+
+  /**
+   * A writer of the default style.
+   *
+   * @param out The output.
+   * @param options The options to write with.
+   * @return A writer.
+   */
+  static Serializer defaultStyle(Appendable out, TomlWriteOptions options) {
+    return new Serializer(out, options);
   }
 
   static void toToml(TomlTable table, Appendable appendable, TomlWriteOptions options) throws IOException {
     requireNonNull(table);
     requireNonNull(appendable);
     requireNonNull(options);
-    serializer(appendable, options).writeEntries(table, new ArrayList<>());
+    if (options.keep() != TomlWriteOptions.Keep.NOTHING && table instanceof ParsedTomlTable) {
+      ParsedTomlTable parsed = (ParsedTomlTable) table;
+      if (parsed.source() != null) {
+        SourcePreservingSerializer.toToml(parsed, appendable, options);
+        return;
+      }
+    }
+    defaultStyle(appendable, options).writeEntries(table, new ArrayList<>());
   }
 
   static void toToml(TomlArray array, Appendable appendable, TomlWriteOptions options) throws IOException {
@@ -96,16 +125,7 @@ final class Serializer {
     requireNonNull(appendable);
     requireNonNull(options);
     // The array starts at column 0 outside any table, so the indent never applies
-    serializer(appendable, options).writeValue(array, 0, 0, 0);
-  }
-
-  private static Serializer serializer(Appendable appendable, TomlWriteOptions options) {
-    return new Serializer(
-        appendable,
-        options.indent(),
-        options.maxLineWidth(),
-        options.lineSeparator(),
-        options.version());
+    defaultStyle(appendable, options).writeValue(array, "", 0, 0);
   }
 
   /**
@@ -122,18 +142,18 @@ final class Serializer {
    */
   private void writeEntries(TomlTable table, List<String> path) throws IOException {
     List<TomlElement> elements = table.elements();
-    int lineIndent = path.size() * indent;
-    int firstSection = path.isEmpty() ? firstSectionIndex(elements) : -1;
-    int lastLine = lastLineIndex(elements);
+    String lineIndent = indentFor(path.size());
+    int firstSection = path.isEmpty() ? firstSectionIndex(elements, keepNotation) : -1;
+    int lastLine = lastLineIndex(elements, keepNotation);
     for (int i = 0; i < elements.size(); i++) {
       TomlElement element = elements.get(i);
       if (element instanceof TomlComment) {
         if (firstSection < 0 || i < firstSection) {
           writeUnattachedComment((TomlComment) element, lineIndent, i < lastLine);
         }
-      } else if (isLine((TomlEntry) element)) {
+      } else if (isLine((TomlEntry) element, keepNotation)) {
         TomlKeyValue pair = (TomlKeyValue) element;
-        writeKeyValue(lineIndent, Collections.singletonList(pair.key()), pair.value().get(), pair.comments());
+        writeKeyValue(lineIndent, Collections.singletonList(pair.key()), pair);
       }
     }
     for (int i = 0; i < elements.size(); i++) {
@@ -145,7 +165,7 @@ final class Serializer {
         continue;
       }
       TomlEntry entry = (TomlEntry) element;
-      if (isLine(entry)) {
+      if (isLine(entry, keepNotation)) {
         continue;
       }
       path.add(((TomlKeyValue) entry).key());
@@ -162,7 +182,7 @@ final class Serializer {
    * @param entry The entry holding the table, or the array of tables.
    * @param path The keys from the root to the value. Restored before returning.
    */
-  private void writeSections(TomlEntry entry, List<String> path) throws IOException {
+  void writeSections(TomlEntry entry, List<String> path) throws IOException {
     Object value = entry.value().get();
     if (value instanceof TomlTable) {
       TomlTable subTable = (TomlTable) value;
@@ -173,16 +193,25 @@ final class Serializer {
       return;
     }
     for (TomlElement element : ((TomlArray) value).elements()) {
-      TomlEntry tableEntry = (TomlEntry) element;
-      writeHeader("[[", path, "]]", tableEntry.comments());
-      writeEntries((TomlTable) tableEntry.value().get(), path);
+      writeArrayTableSection((TomlEntry) element, path);
     }
+  }
+
+  /**
+   * Write one table of an array of tables as a {@code [[header]]} section.
+   *
+   * @param tableEntry The entry of the array holding the table.
+   * @param path The keys from the root to the array.
+   */
+  void writeArrayTableSection(TomlEntry tableEntry, List<String> path) throws IOException {
+    writeHeader("[[", path, "]]", tableEntry.comments());
+    writeEntries((TomlTable) tableEntry.value().get(), path);
   }
 
   private void writeHeader(String open, List<String> path, String close, List<TomlComment> comments)
       throws IOException {
     blankLine();
-    int headerIndent = (path.size() - 1) * indent;
+    String headerIndent = indentFor(path.size() - 1);
     writeCommentAbove(comments, headerIndent);
     beginLine(headerIndent);
     StringBuilder header = new StringBuilder(open);
@@ -193,24 +222,73 @@ final class Serializer {
   }
 
   /**
+   * Write a table header line from the text the document wrote it as, with the comments of the entry holding the table
+   * written from the model around it.
+   *
+   * @param lineIndent The indentation of the line.
+   * @param header The header, its brackets included, as the document wrote it.
+   * @param comments The comments attached to the entry holding the table.
+   */
+  void writeHeaderText(String lineIndent, String header, List<TomlComment> comments) throws IOException {
+    writeCommentAbove(comments, lineIndent);
+    beginLine(lineIndent);
+    out.append(header);
+    writeCommentAfter(comments);
+    endLine();
+  }
+
+  /**
    * Write a {@code key = value} line.
    *
    * @param lineIndent The indentation of the line.
    * @param keyPath The key, as the keys of a dotted key.
-   * @param value The value.
-   * @param comments The comments attached to the entry.
+   * @param entry The entry the line holds.
    */
-  private void writeKeyValue(int lineIndent, List<String> keyPath, Object value, List<TomlComment> comments)
-      throws IOException {
+  void writeKeyValue(String lineIndent, List<String> keyPath, TomlEntry entry) throws IOException {
+    List<TomlComment> comments = entry.comments();
     writeCommentAbove(comments, lineIndent);
     beginLine(lineIndent);
     StringBuilder prefix = new StringBuilder();
-    appendKeyPath(prefix, keyPath);
+    appendEntryKey(prefix, keyPath, entry, keepNotation);
     prefix.append(" = ");
     out.append(prefix);
-    writeLineValue(value, lineIndent, lineIndent + prefix.codePointCount(0, prefix.length()));
+    writeEntryValue(entry.value(), lineIndent, width(lineIndent) + prefix.codePointCount(0, prefix.length()));
     writeCommentAfter(comments);
     endLine();
+  }
+
+  /**
+   * Write the value an entry holds on its own line: the literal the document wrote it as, where the notation is kept
+   * and the value has a span, and otherwise the value in the default style.
+   *
+   * @param value The value.
+   * @param lineIndent The indentation of the line the value starts on.
+   * @param column The width of that line before the value, in code points.
+   */
+  private void writeEntryValue(TomlValue value, String lineIndent, int column) throws IOException {
+    String literal = keepNotation ? literalOf(value) : null;
+    if (literal != null) {
+      out.append(literal);
+      return;
+    }
+    writeLineValue(value.get(), lineIndent, column);
+  }
+
+  /**
+   * Write the value an entry holds partway along a line, the literal it was written as where the notation is kept.
+   *
+   * @param value The value.
+   * @param lineIndent The indentation of the line the value starts on.
+   * @param column The width of that line before the value, in code points.
+   * @param trailing The width of what follows the value on its last line, in code points.
+   */
+  private void writeNestedValue(TomlValue value, String lineIndent, int column, int trailing) throws IOException {
+    String literal = keepNotation ? literalOf(value) : null;
+    if (literal != null) {
+      out.append(literal);
+      return;
+    }
+    writeValue(value.get(), lineIndent, column, trailing);
   }
 
   /**
@@ -220,7 +298,7 @@ final class Serializer {
    * @param lineIndent The indentation of the line the value starts on.
    * @param column The width of that line before the value, in code points.
    */
-  private void writeLineValue(Object value, int lineIndent, int column) throws IOException {
+  private void writeLineValue(Object value, String lineIndent, int column) throws IOException {
     if (value instanceof String && ((String) value).indexOf('\n') >= 0) {
       // A string with a newline is written as a multi-line basic string, so it stays readable rather than escaped
       // onto one line. The key's indentation applies only to this line; content lines are never indented.
@@ -233,7 +311,7 @@ final class Serializer {
   }
 
   /**
-   * Write a value that starts partway along a line. Unlike {@link #writeLineValue(Object, int, int)}, a string is
+   * Write a value that starts partway along a line. Unlike {@link #writeLineValue(Object, String, int)}, a string is
    * always written on one line: this writer writes a multi-line string only as the value of a {@code key = value} line.
    *
    * @param value The value.
@@ -241,7 +319,7 @@ final class Serializer {
    * @param column The width of that line before the value, in code points.
    * @param trailing The width of what follows the value on its last line, in code points.
    */
-  private void writeValue(Object value, int lineIndent, int column, int trailing) throws IOException {
+  private void writeValue(Object value, String lineIndent, int column, int trailing) throws IOException {
     if (holdsComments(value)) {
       if (value instanceof TomlTable && !version.after(TomlVersion.V1_0_0)) {
         throw new IllegalArgumentException(
@@ -253,7 +331,7 @@ final class Serializer {
 
     StringBuilder text = new StringBuilder();
     if (!canWriteOverLines(value)) {
-      appendInline(value, text, Integer.MAX_VALUE);
+      appendInline(value, text, Integer.MAX_VALUE, keepNotation);
       out.append(text);
       return;
     }
@@ -261,7 +339,9 @@ final class Serializer {
     int width = maxLineWidth - column - trailing;
     // A code point takes at most two chars, so text longer than twice the width cannot fit and need not be completed
     int limit = width > Integer.MAX_VALUE / 2 ? Integer.MAX_VALUE : 2 * width;
-    if (width >= 0 && appendInline(value, text, limit) && text.codePointCount(0, text.length()) <= width) {
+    if (width >= 0
+        && appendInline(value, text, limit, keepNotation)
+        && text.codePointCount(0, text.length()) <= width) {
       out.append(text);
       return;
     }
@@ -288,10 +368,10 @@ final class Serializer {
    * @param container The array or inline table.
    * @param lineIndent The indentation of the line the container starts on.
    */
-  private void writeOverLines(Object container, int lineIndent) throws IOException {
+  private void writeOverLines(Object container, String lineIndent) throws IOException {
     boolean isTable = container instanceof TomlTable;
     List<TomlElement> elements = isTable ? ((TomlTable) container).elements() : ((TomlArray) container).elements();
-    int elementIndent = lineIndent + ARRAY_ELEMENT_INDENT;
+    String elementIndent = lineIndent + ARRAY_ELEMENT_INDENT;
     out.append(isTable ? '{' : '[');
     endLine();
     for (int i = 0; i < elements.size(); i++) {
@@ -307,15 +387,15 @@ final class Serializer {
       TomlEntry entry = (TomlEntry) element;
       writeCommentAbove(entry.comments(), elementIndent);
       beginLine(elementIndent);
-      int column = elementIndent;
+      int column = width(elementIndent);
       if (isTable) {
         StringBuilder prefix = new StringBuilder();
-        appendKey(prefix, ((TomlKeyValue) entry).key());
+        appendEntryKey(prefix, Collections.singletonList(((TomlKeyValue) entry).key()), entry, keepNotation);
         prefix.append(" = ");
         out.append(prefix);
         column += prefix.codePointCount(0, prefix.length());
       }
-      writeValue(entry.value().get(), elementIndent, column, 1);
+      writeNestedValue(entry.value(), elementIndent, column, 1);
       out.append(',');
       writeCommentAfter(entry.comments());
       endLine();
@@ -333,7 +413,7 @@ final class Serializer {
    *        belongs to the container open where it was written, which is this container; a separated run belongs to the
    *        container of the expression that follows it.
    */
-  private void writeUnattachedComment(TomlComment comment, int lineIndent, boolean blankAbove) throws IOException {
+  private void writeUnattachedComment(TomlComment comment, String lineIndent, boolean blankAbove) throws IOException {
     if (blankAbove) {
       blankLine();
     }
@@ -341,7 +421,7 @@ final class Serializer {
     blankLine();
   }
 
-  private void writeCommentAbove(List<TomlComment> comments, int lineIndent) throws IOException {
+  private void writeCommentAbove(List<TomlComment> comments, String lineIndent) throws IOException {
     for (TomlComment comment : comments) {
       if (comment.placement() == TomlComment.Placement.ABOVE) {
         writeCommentLines(comment, lineIndent);
@@ -361,7 +441,7 @@ final class Serializer {
     }
   }
 
-  private void writeCommentLines(TomlComment comment, int lineIndent) throws IOException {
+  void writeCommentLines(TomlComment comment, String lineIndent) throws IOException {
     for (String rawLine : comment.rawLines()) {
       beginLine(lineIndent);
       out.append('#').append(rawLine);
@@ -379,12 +459,40 @@ final class Serializer {
     }
   }
 
-  private void beginLine(int lineIndent) throws IOException {
+  private void beginLine(String lineIndent) throws IOException {
     if (blankLineOwed) {
       out.append(lineSeparator);
       blankLineOwed = false;
     }
-    appendIndent(out, lineIndent);
+    out.append(lineIndent);
+  }
+
+  /**
+   * The indentation of the lines of a table whose path has a number of keys.
+   *
+   * @param depth The number of keys in the path.
+   * @return The indentation.
+   */
+  private String indentFor(int depth) {
+    return spaces(depth * indent);
+  }
+
+  private static String spaces(int width) {
+    StringBuilder text = new StringBuilder(width);
+    for (int i = 0; i < width; i++) {
+      text.append(' ');
+    }
+    return text.toString();
+  }
+
+  /**
+   * The width of an indentation, in code points, every character of which is one column wide.
+   *
+   * @param lineIndent The indentation.
+   * @return Its width.
+   */
+  private static int width(String lineIndent) {
+    return lineIndent.codePointCount(0, lineIndent.length());
   }
 
   private void endLine() throws IOException {
@@ -393,14 +501,33 @@ final class Serializer {
   }
 
   /**
+   * Append the single-line form of a value an entry holds, the literal it was written as where those are kept.
+   *
+   * @param value The value.
+   * @param text The text to append to.
+   * @param limit The length, in chars, that the text may reach.
+   * @param literals Whether a value that has a span is written with the text of that span.
+   * @return {@code false} if the text grew longer than {@code limit}, in which case the value may be incomplete.
+   */
+  private static boolean appendInlineEntryValue(TomlValue value, StringBuilder text, int limit, boolean literals) {
+    String literal = literals ? literalOf(value) : null;
+    if (literal != null) {
+      text.append(literal);
+      return text.length() <= limit;
+    }
+    return appendInline(value.get(), text, limit, literals);
+  }
+
+  /**
    * Append the single-line form of a value, giving up once the text is longer than a limit.
    *
    * @param value The value.
    * @param text The text to append to.
    * @param limit The length, in chars, that the text may reach.
+   * @param literals Whether a value that has a span is written with the text of that span.
    * @return {@code false} if the text grew longer than {@code limit}, in which case the value may be incomplete.
    */
-  private static boolean appendInline(Object value, StringBuilder text, int limit) {
+  private static boolean appendInline(Object value, StringBuilder text, int limit, boolean literals) {
     Optional<TomlType> tomlType = typeFor(value);
     assert tomlType.isPresent();
     switch (tomlType.get()) {
@@ -429,20 +556,22 @@ final class Serializer {
         text.append((boolean) (Boolean) value);
         break;
       case ARRAY:
-        return appendInlineArray((TomlArray) value, text, limit);
+        return appendInlineArray((TomlArray) value, text, limit, literals);
       case TABLE:
-        return appendInlineTable((TomlTable) value, text, limit);
+        return appendInlineTable((TomlTable) value, text, limit, literals);
     }
     return text.length() <= limit;
   }
 
-  private static boolean appendInlineArray(TomlArray array, StringBuilder text, int limit) {
+  private static boolean appendInlineArray(TomlArray array, StringBuilder text, int limit, boolean literals) {
     text.append('[');
-    for (int i = 0; i < array.size(); i++) {
+    // The array holds no comment, so every element of it is an entry
+    List<TomlElement> elements = array.elements();
+    for (int i = 0; i < elements.size(); i++) {
       if (i > 0) {
         text.append(", ");
       }
-      if (!appendInline(array.get(i), text, limit)) {
+      if (!appendInlineEntryValue(((TomlEntry) elements.get(i)).value(), text, limit, literals)) {
         return false;
       }
     }
@@ -450,28 +579,172 @@ final class Serializer {
     return text.length() <= limit;
   }
 
-  private static boolean appendInlineTable(TomlTable table, StringBuilder text, int limit) {
-    List<TomlElement> elements = table.elements();
-    if (elements.isEmpty()) {
+  private static boolean appendInlineTable(TomlTable table, StringBuilder text, int limit, boolean literals) {
+    List<InlineItem> items = inlineItems(table, literals);
+    if (items.isEmpty()) {
       text.append("{}");
       return text.length() <= limit;
     }
     text.append("{ ");
-    boolean first = true;
-    for (TomlElement element : elements) {
-      if (!first) {
+    for (int i = 0; i < items.size(); i++) {
+      if (i > 0) {
         text.append(", ");
       }
-      first = false;
-      TomlKeyValue pair = (TomlKeyValue) element;
-      appendKey(text, pair.key());
+      InlineItem item = items.get(i);
+      appendEntryKey(text, item.keyPath, item.entry, literals);
       text.append(" = ");
-      if (!appendInline(pair.value().get(), text, limit)) {
+      if (!appendInlineEntryValue(item.entry.value(), text, limit, literals)) {
         return false;
       }
     }
     text.append(" }");
     return text.length() <= limit;
+  }
+
+  /**
+   * The entries written between the braces of an inline table: its own entries, and, where the literal forms of a
+   * document are kept, the entries of the tables its dotted keys opened, which are written between those braces with
+   * the dotted keys the document wrote them with.
+   *
+   * @param table The inline table.
+   * @param literals Whether the document's own dotted keys are written.
+   * @return The entries, in the order they are written.
+   */
+  private static List<InlineItem> inlineItems(TomlTable table, boolean literals) {
+    List<InlineItem> items = new ArrayList<>();
+    collectInlineItems(table, Collections.emptyList(), literals, items);
+    if (literals) {
+      orderInlineItems(items);
+    }
+    return items;
+  }
+
+  private static void collectInlineItems(
+      TomlTable table,
+      List<String> relative,
+      boolean literals,
+      List<InlineItem> items) {
+    for (TomlElement element : table.elements()) {
+      TomlKeyValue pair = (TomlKeyValue) element;
+      List<String> keyPath = keyPath(relative, pair.key());
+      if (literals && writtenAsDottedKeys(pair)) {
+        collectInlineItems((TomlTable) pair.value().get(), keyPath, literals, items);
+      } else {
+        items.add(new InlineItem(keyPath, pair));
+      }
+    }
+  }
+
+  /**
+   * Put the entries of an inline table in the order the document wrote them: an entry the document wrote sorts where it
+   * was written, and one it did not after the entry written before it. A dotted key opens a table of its own, so the
+   * entries of <code>{ a.b = 1, c = 2, a.d = 3 }</code> are collected a table at a time rather than in the order they
+   * were written in.
+   *
+   * @param items The entries, in the order the tables holding them were walked.
+   */
+  @SuppressWarnings("ReferenceEquality") // compares the key spans' sources by identity
+  private static void orderInlineItems(List<InlineItem> items) {
+    Source source = null;
+    int previous = -1;
+    for (int i = 0; i < items.size(); i++) {
+      InlineItem item = items.get(i);
+      item.order = i;
+      SourceSpan span = writtenKeySpan(item.entry, item.keyPath.size());
+      if (span != null && (source == null || span.source == source)) {
+        source = span.source;
+        item.anchor = span.start;
+        previous = Math.max(previous, span.stop);
+      } else {
+        item.anchor = previous;
+      }
+    }
+    items.sort(Comparator.comparingInt((InlineItem item) -> item.anchor).thenComparingInt(item -> item.order));
+  }
+
+  /**
+   * Whether an entry of an inline table holds a table that is written as the dotted keys of that inline table rather
+   * than as a table of its own.
+   *
+   * <p>
+   * A dotted key writes one entry, so a table with no entries cannot be written as dotted keys, and a comment written
+   * among those keys would be read in the inline table rather than in this one, which is also why a table whose own
+   * entry carries a comment is written as a value of its own.
+   *
+   * @param pair The entry of the inline table.
+   * @return {@code true} if the entry holds such a table.
+   */
+  private static boolean writtenAsDottedKeys(TomlKeyValue pair) {
+    Object value = pair.value().get();
+    if (!pair.comments().isEmpty() || !(value instanceof LinkedTomlTable) || ((LinkedTomlTable) value).isInline()) {
+      return false;
+    }
+    boolean hasEntry = false;
+    for (TomlElement element : ((LinkedTomlTable) value).elements()) {
+      if (element instanceof TomlComment) {
+        return false;
+      }
+      hasEntry = true;
+    }
+    return hasEntry;
+  }
+
+  private static List<String> keyPath(List<String> relative, String key) {
+    List<String> keyPath = new ArrayList<>(relative.size() + 1);
+    keyPath.addAll(relative);
+    keyPath.add(key);
+    return keyPath;
+  }
+
+  /**
+   * Append the key of an entry: the key as the document wrote it, where the notation is kept and the key has as many
+   * parts as the key it is written with here, and otherwise the key in the default style.
+   *
+   * @param text The text to append to.
+   * @param keyPath The key, as the keys of a dotted key.
+   * @param entry The entry the key names.
+   * @param literals Whether a key that has a span is written with the text of that span.
+   */
+  private static void appendEntryKey(StringBuilder text, List<String> keyPath, TomlEntry entry, boolean literals) {
+    SourceSpan span = literals ? writtenKeySpan(entry, keyPath.size()) : null;
+    if (span != null) {
+      text.append(span.source.text(span.keyStart, span.keyStop));
+    } else {
+      appendKeyPath(text, keyPath);
+    }
+  }
+
+  /**
+   * Where an entry's key was written, if the entry has a span and its key has as many parts as the key it is written
+   * with here.
+   *
+   * @param entry The entry.
+   * @param parts The number of keys the key is written with here, which the key as written must have as many of.
+   * @return The span of the line or element the entry was written as, or {@code null}.
+   */
+  @Nullable
+  private static SourceSpan writtenKeySpan(TomlEntry entry, int parts) {
+    if (!(entry instanceof Entry)) {
+      return null;
+    }
+    SourceSpan span = ((Entry) entry).span;
+    return (span != null && span.keyStart >= 0 && span.keyParts == parts) ? span : null;
+  }
+
+  /**
+   * The literal a scalar was written as, where it has a span.
+   *
+   * @param value The value.
+   * @return The literal, or {@code null} if the value is a table or array, was set through the editing API, or was read
+   *         from a document parsed with no source kept.
+   */
+  @Nullable
+  private static String literalOf(TomlValue value) {
+    if (!(value instanceof Value.Scalar)) {
+      return null;
+    }
+    ValueSpan span = ((Value.Scalar) value).span;
+    return (span == null) ? null : span.source.text(span.start, span.stop);
   }
 
   /**
@@ -592,12 +865,6 @@ final class Serializer {
     }
   }
 
-  private static void appendIndent(Appendable appendable, int width) throws IOException {
-    for (int i = 0; i < width; i++) {
-      appendable.append(' ');
-    }
-  }
-
   /**
    * Whether an entry is written as a {@code key = value} line, rather than as a sub-table or an array of tables.
    *
@@ -606,17 +873,27 @@ final class Serializer {
    * neither the comments written in the array itself nor those attached to the entry holding it: a re-parse would read
    * both as the comments of the first element. Such an array is written as a {@code key = value} line, where the
    * comments of the entry and of the array keep their placement.
+   *
+   * <p>
+   * Where the notation is kept, a table read as an inline table, and an array read between brackets, are written on the
+   * entry's line as they were read, wherever the value was read from: the document being written or another one.
+   *
+   * @param entry The entry.
+   * @param keepNotation Whether the form a value was read in is kept.
    */
-  private static boolean isLine(TomlEntry entry) {
+  static boolean isLine(TomlEntry entry, boolean keepNotation) {
     Object value = entry.value().get();
     if (value instanceof TomlTable) {
-      return false;
+      return keepNotation && value instanceof LinkedTomlTable && ((LinkedTomlTable) value).hasInlineForm();
     }
     if (!(value instanceof TomlArray)) {
       return true;
     }
     TomlArray array = (TomlArray) value;
     if (array.isEmpty()) {
+      return true;
+    }
+    if (keepNotation && array instanceof ListTomlArray && ((ListTomlArray) array).hasInlineForm()) {
       return true;
     }
     for (TomlElement element : array.elements()) {
@@ -633,13 +910,13 @@ final class Serializer {
    * @param table The table.
    * @param comments The comments attached to the entry holding it, which are written on its header.
    */
-  private static boolean needsHeader(TomlTable table, List<TomlComment> comments) {
+  private boolean needsHeader(TomlTable table, List<TomlComment> comments) {
     if (!comments.isEmpty()) {
       return true;
     }
     boolean hasSection = false;
     for (TomlElement element : table.elements()) {
-      if (element instanceof TomlComment || isLine((TomlEntry) element)) {
+      if (element instanceof TomlComment || isLine((TomlEntry) element, keepNotation)) {
         return true;
       }
       hasSection = true;
@@ -673,23 +950,45 @@ final class Serializer {
     return false;
   }
 
-  private static int firstSectionIndex(List<TomlElement> elements) {
+  private static int firstSectionIndex(List<TomlElement> elements, boolean keepNotation) {
     for (int i = 0; i < elements.size(); i++) {
       TomlElement element = elements.get(i);
-      if (element instanceof TomlEntry && !isLine((TomlEntry) element)) {
+      if (element instanceof TomlEntry && !isLine((TomlEntry) element, keepNotation)) {
         return i;
       }
     }
     return -1;
   }
 
-  private static int lastLineIndex(List<TomlElement> elements) {
+  private static int lastLineIndex(List<TomlElement> elements, boolean keepNotation) {
     for (int i = elements.size() - 1; i >= 0; i--) {
       TomlElement element = elements.get(i);
-      if (element instanceof TomlEntry && isLine((TomlEntry) element)) {
+      if (element instanceof TomlEntry && isLine((TomlEntry) element, keepNotation)) {
         return i;
       }
     }
     return -1;
+  }
+
+  /**
+   * One entry written between the braces of an inline table: the entry, and the key it is written with there, which is
+   * a dotted key for an entry of a table one of the inline table's own dotted keys opened.
+   */
+  private static final class InlineItem {
+
+    private final List<String> keyPath;
+
+    private final TomlEntry entry;
+
+    /** The offset this entry sorts at: where it was written, or where the entry written before it ends. */
+    private int anchor;
+
+    /** The order this entry was collected in, which orders the entries anchored at the same offset. */
+    private int order;
+
+    InlineItem(List<String> keyPath, TomlEntry entry) {
+      this.keyPath = keyPath;
+      this.entry = entry;
+    }
   }
 }

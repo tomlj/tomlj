@@ -51,6 +51,17 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
     return isTableArray;
   }
 
+  /**
+   * Whether this array is written between brackets on the line of the entry holding it where the notation is kept,
+   * whatever it holds: it was read between brackets from a document whose source was kept. Otherwise an array whose
+   * elements are all tables is written as {@code [[x]]} headers.
+   *
+   * @return {@code true} if a writer keeping the notation writes this array between brackets.
+   */
+  boolean hasInlineForm() {
+    return bracketSpan != null;
+  }
+
   @Override
   @Nullable
   public TomlPosition position() {
