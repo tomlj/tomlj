@@ -73,6 +73,7 @@ final class Serializer {
   private static final String ARRAY_ELEMENT_INDENT = "  ";
 
   private final Appendable out;
+  private final TomlWriteOptions options;
   // The spaces to indent per level of table nesting
   private final int indent;
   // The widest a line holding a single-line array or inline table may be, in code points
@@ -92,6 +93,7 @@ final class Serializer {
 
   private Serializer(Appendable out, TomlWriteOptions options, boolean copySourceLines) {
     this.out = out;
+    this.options = options;
     this.indent = options.indent();
     this.maxLineWidth = options.maxLineWidth();
     this.lineSeparator = options.lineSeparator();
@@ -299,20 +301,27 @@ final class Serializer {
       return false;
     }
     writeCommentAbove(entry.comments(), lineIndent);
-    beginLine(lineIndent);
-    StringBuilder text = new StringBuilder();
+    // The indentation is written with the rest of the line, which lays out anything written anew within it
+    beginLine("");
+    StringBuilder text = new StringBuilder(lineIndent);
     if (span.keyParts == keyPath.size()) {
       text.append(span.source.text(span.keyStart, span.keyStop));
     } else {
       appendKeyPath(text, keyPath);
     }
     ValueSpan value = span.writtenValue(parsed.value);
+    ValueSpan brackets = (value == null) ? span.writtenBrackets(parsed.value) : null;
     if (value != null) {
       text.append(span.source.text(span.keyStop + 1, value.stop));
+    } else if (brackets != null) {
+      // The table or array was edited in place, so it is written within the brackets it was read in
+      text.append(span.source.text(span.keyStop + 1, span.valueStart - 1));
+      EditedContainerSerializer
+          .append(text, (ElementContainer<?>) parsed.value, brackets, EditedContainerSerializer.Context.LINE, options);
     } else {
       // The spacing around the '=' is the line's own; the value it held has been replaced, so it is written anew
       text.append(span.source.text(span.keyStop + 1, span.valueStart - 1));
-      int column = width(lineIndent) + text.codePointCount(0, text.length());
+      int column = text.codePointCount(0, text.length());
       out.append(text);
       text.setLength(0);
       writeEntryValue(parsed.value, lineIndent, column);
@@ -348,7 +357,7 @@ final class Serializer {
    * @param column The width of that line before the value, in code points.
    * @param trailing The width of what follows the value on its last line, in code points.
    */
-  private void writeNestedValue(TomlValue value, String lineIndent, int column, int trailing) throws IOException {
+  void writeNestedValue(TomlValue value, String lineIndent, int column, int trailing) throws IOException {
     String literal = keepNotation ? literalOf(value) : null;
     if (literal != null) {
       out.append(literal);
@@ -364,7 +373,7 @@ final class Serializer {
    * @param lineIndent The indentation of the line the value starts on.
    * @param column The width of that line before the value, in code points.
    */
-  void writeLineValue(Object value, String lineIndent, int column) throws IOException {
+  private void writeLineValue(Object value, String lineIndent, int column) throws IOException {
     if (value instanceof String && ((String) value).indexOf('\n') >= 0) {
       // A string with a newline is written as a multi-line basic string, so it stays readable rather than escaped
       // onto one line. The key's indentation applies only to this line; content lines are never indented.
@@ -387,9 +396,8 @@ final class Serializer {
    */
   private void writeValue(Object value, String lineIndent, int column, int trailing) throws IOException {
     if (holdsComments(value)) {
-      if (value instanceof TomlTable && !version.after(TomlVersion.V1_0_0)) {
-        throw new IllegalArgumentException(
-            "An inline table holding a comment cannot be written for TOML 1.0.0, which allows no line break inside an inline table");
+      if (value instanceof TomlTable) {
+        requireInlineTableOverLines(version);
       }
       writeOverLines(value, lineIndent);
       return;
@@ -412,6 +420,20 @@ final class Serializer {
       return;
     }
     writeOverLines(value, lineIndent);
+  }
+
+  /**
+   * Check that an inline table holding a comment, which has to be written over lines, can be written for a version of
+   * TOML.
+   *
+   * @param version The version of TOML being written.
+   * @throws IllegalArgumentException If the version is TOML 1.0.0, which allows no line break inside an inline table.
+   */
+  static void requireInlineTableOverLines(TomlVersion version) {
+    if (!version.after(TomlVersion.V1_0_0)) {
+      throw new IllegalArgumentException(
+          "An inline table holding a comment cannot be written for TOML 1.0.0, which allows no line break inside an inline table");
+    }
   }
 
   /**
@@ -564,6 +586,17 @@ final class Serializer {
   private void endLine() throws IOException {
     out.append(lineSeparator);
     written = true;
+  }
+
+  /**
+   * Append the single-line form of a value an entry holds, whatever the maximum line width, as everything written
+   * inside an inline table is, with the literal of the value, and of every value inside it, that has one.
+   *
+   * @param text The text to append to.
+   * @param value The value.
+   */
+  static void appendInlineValue(StringBuilder text, TomlValue value) {
+    appendInlineEntryValue(value, text, Integer.MAX_VALUE, true);
   }
 
   /**
@@ -819,7 +852,7 @@ final class Serializer {
    * @param text The text to append to.
    * @param keyPath The key.
    */
-  private static void appendKeyPath(StringBuilder text, List<String> keyPath) {
+  static void appendKeyPath(StringBuilder text, List<String> keyPath) {
     for (int i = 0; i < keyPath.size(); i++) {
       if (i > 0) {
         text.append('.');
@@ -994,8 +1027,9 @@ final class Serializer {
    * Whether a value is a table or array holding a comment, at any depth, and so cannot be written on one line.
    *
    * @param value The value.
+   * @return {@code true} if the value holds a comment.
    */
-  private static boolean holdsComments(Object value) {
+  static boolean holdsComments(Object value) {
     List<TomlElement> elements;
     if (value instanceof TomlTable) {
       elements = ((TomlTable) value).elements();

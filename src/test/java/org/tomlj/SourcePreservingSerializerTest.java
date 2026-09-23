@@ -15,6 +15,7 @@ package org.tomlj;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -36,6 +37,9 @@ class SourcePreservingSerializerTest {
 
   // New lines are written with the separator these options ask for; the lines of the document keep the one they had
   private static final TomlWriteOptions LF = TomlWriteOptions.defaults().withLineSeparator("\n");
+
+  private static final String INLINE_TABLE_OVER_LINES =
+      "An inline table holding a comment cannot be written for TOML 1.0.0, which allows no line break inside an inline table";
 
   @ParameterizedTest
   @MethodSource("org.tomlj.SourceSpanTest#allDocuments")
@@ -117,6 +121,50 @@ class SourcePreservingSerializerTest {
     result.setCommentAbove("a", "note", "and more");
 
     assertEquals("# note\r\n# and more\r\na = 1\r\n# about b\r\nb = 2\r\n", result.toToml());
+  }
+
+  @Test
+  void writesAnElementAddedToAnArrayWithTheSeparatorTheDocumentEndsItsLinesWith() {
+    TomlParseResult result = Toml.parse("a = [\r\n  1,\r\n  2\r\n]\r\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    MutableTomlArray array = result.getArray("a");
+    assertNotNull(array);
+    array.add(3);
+
+    assertEquals("a = [\r\n  1,\r\n  2,\r\n  3\r\n]\r\n", result.toToml());
+  }
+
+  @Test
+  void throwsForAnInlineTableACommentSetOnAnEntryPutsOverLinesForToml100() {
+    TomlParseResult result = Toml.parse("t = { b = 1, c = 2 }\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    requireTable(result, "t").setCommentAfter("b", "note");
+
+    assertEquals("t = {\n  b = 1,  # note\n  c = 2\n}\n", result.toToml(LF));
+    IllegalArgumentException e =
+        assertThrows(IllegalArgumentException.class, () -> result.toToml(LF.withVersion(TomlVersion.V1_0_0)));
+    assertEquals(INLINE_TABLE_OVER_LINES, e.getMessage());
+  }
+
+  @Test
+  void throwsForAnInlineTableAValueHoldingACommentPutsOverLinesForToml100() {
+    TomlParseResult result = Toml.parse("t = { b = 1, c = 2 }\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    requireTable(result, "t").set("c", MutableTomlArray.of(1).addComment("note"));
+
+    assertEquals("t = {\n  b = 1,\n  c = [\n    1,\n    # note\n  ]\n}\n", result.toToml(LF));
+    IllegalArgumentException e =
+        assertThrows(IllegalArgumentException.class, () -> result.toToml(LF.withVersion(TomlVersion.V1_0_0)));
+    assertEquals(INLINE_TABLE_OVER_LINES, e.getMessage());
+  }
+
+  @Test
+  void writesAnArrayACommentPutsOverLinesForToml100() {
+    TomlParseResult result = Toml.parse("a = [1, 2]\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    requireArray(result, "a").setCommentAfter(0, "note");
+
+    assertEquals("a = [\n  1,  # note\n  2\n]\n", result.toToml(LF.withVersion(TomlVersion.V1_0_0)));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -296,12 +344,17 @@ class SourcePreservingSerializerTest {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("editedDocuments")
-  void writesAnEditIntoTheDocument(String description, String input, Consumer<TomlParseResult> edit, String expected) {
+  void writesAnEditIntoTheDocument(
+      String description,
+      String input,
+      Consumer<TomlParseResult> edit,
+      TomlWriteOptions options,
+      String expected) {
     TomlParseResult result = Toml.parse(input);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
     edit.accept(result);
 
-    String written = result.toToml(LF);
+    String written = result.toToml(options);
     assertEquals(expected, written);
 
     TomlParseResult reparsed = Toml.parse(written);
@@ -608,6 +661,273 @@ class SourcePreservingSerializerTest {
                 "a = 1",
                 result -> result.setCommentAfter("a", "note"),
                 "a = 1  # note"),
+            edited(
+                "an array edited in place keeps its line and the comment after it",
+                "a = [1, 2]  # note\nb = 3\n",
+                result -> requireArray(result, "a").add(3),
+                "a = [1, 2, 3]  # note\nb = 3\n"),
+            edited(
+                "an inline table edited in place keeps its line",
+                "t = { p = 1 }  # note\nu = 2\n",
+                result -> requireTable(result, "t").set("q", 2),
+                "t = { p = 1, q = 2 }  # note\nu = 2\n"),
+            edited(
+                "an element added to an array laid out over lines goes on a line of its own",
+                "a = [\n  1,\n  2,\n]\nb = 3\n",
+                result -> requireArray(result, "a").add(3),
+                "a = [\n  1,\n  2,\n  3,\n]\nb = 3\n"),
+            edited(
+                "an element added to an array with no trailing comma follows the last one",
+                "a = [\n  1,\n  2\n]\n",
+                result -> requireArray(result, "a").add(3),
+                "a = [\n  1,\n  2,\n  3\n]\n"),
+            edited(
+                "an element added to an array from a value read elsewhere keeps that value's literal",
+                "a = [1]\nb = [\n  2,\n]\nc = 0x3\n",
+                result -> {
+                  requireArray(result, "a").add(result.entry("c").value());
+                  requireArray(result, "b").add(Toml.parse("d = 'lit'\n").entry("d").value());
+                },
+                "a = [1, 0x3]\nb = [\n  2,\n  'lit',\n]\nc = 0x3\n"),
+            edited(
+                "an element inserted into an array goes where it was inserted",
+                "a = [1, 3]  # note\n",
+                result -> requireArray(result, "a").insertBefore(1, 2),
+                "a = [1, 2, 3]  # note\n"),
+            edited(
+                "an element removed from an array takes the comment that ended its line",
+                "a = [\n  1,  # one\n  2,  # two\n]\n",
+                result -> requireArray(result, "a").remove(0),
+                "a = [\n  2,  # two\n]\n"),
+            edited(
+                "an element removed from the middle of an array leaves the ones around it",
+                "a = [1, 2, 3]  # note\n",
+                result -> requireArray(result, "a").remove(1),
+                "a = [1, 3]  # note\n"),
+            edited(
+                "the first element removed from an array takes the spacing that followed it",
+                "a = [1, 2, 3]\n",
+                result -> requireArray(result, "a").remove(0),
+                "a = [2, 3]\n"),
+            edited(
+                "the first element removed from a spaced array keeps the spacing of the brackets",
+                "a = [ 1, 2, 3 ]\n",
+                result -> requireArray(result, "a").remove(0),
+                "a = [ 2, 3 ]\n"),
+            edited(
+                "the last element removed from an array takes the comma that separated it",
+                "a = [1, 2, 3]\n",
+                result -> requireArray(result, "a").remove(2),
+                "a = [1, 2]\n"),
+            edited(
+                "the last element removed from an array written with a trailing comma keeps one",
+                "a = [1, 2, 3,]\n",
+                result -> requireArray(result, "a").remove(2),
+                "a = [1, 2,]\n"),
+            edited(
+                "the last element removed from an array laid out over lines leaves the closing bracket on its line",
+                "a = [\n  1,\n  2,\n]\n",
+                result -> requireArray(result, "a").remove(1),
+                "a = [\n  1,\n]\n"),
+            edited(
+                "an element replaced in an array keeps its place and the comments around it",
+                "a = [\n  1,  # one\n  2,  # two\n]\n",
+                result -> requireArray(result, "a").set(1, 9),
+                "a = [\n  1,  # one\n  9,  # two\n]\n"),
+            edited(
+                "an array left with no elements of the document is written anew",
+                "a = [1]  # note\n",
+                result -> requireArray(result, "a").remove(0),
+                "a = []  # note\n"),
+            edited(
+                "the only element of an array takes the comment after it when it is removed",
+                "a = [\n  1,  # one\n]\n",
+                result -> requireArray(result, "a").remove(0),
+                "a = []\n"),
+            edited(
+                "an array inside an array keeps the layout of the array it is in",
+                "a = [[1], [2]]\n",
+                result -> requireArray(result, "a").getArray(0).add(9),
+                "a = [[1, 9], [2]]\n"),
+            edited(
+                "an element inserted before one with a run above it goes above that run",
+                "a = [\n  # above\n  1,\n]\n",
+                result -> requireArray(result, "a").insertBefore(0, 0),
+                "a = [\n  0,\n  # above\n  1,\n]\n"),
+            edited(
+                "an element inserted after one with a run above it follows its line",
+                "a = [\n  # above\n  1,\n]\n",
+                result -> requireArray(result, "a").insertAfter(0, 2),
+                "a = [\n  # above\n  1,\n  2,\n]\n"),
+            edited(
+                "a run set above an element of an array laid out over lines is indented like it",
+                "a = [\n  1,\n  2,\n]\n",
+                result -> requireArray(result, "a").setCommentAbove(1, "note"),
+                "a = [\n  1,\n  # note\n  2,\n]\n"),
+            edited(
+                "a comment set after an element of an array written on one line lays it out over lines",
+                "a = [1, 2]\n",
+                result -> requireArray(result, "a").setCommentAfter(0, "note"),
+                "a = [\n  1,  # note\n  2\n]\n"),
+            edited(
+                "a run of two lines set above an element is written above its line",
+                "a = [\n  1,\n  2,\n]\n",
+                result -> requireArray(result, "a").setCommentAbove(1, "one", "two"),
+                "a = [\n  1,\n  # one\n  # two\n  2,\n]\n"),
+            edited(
+                "a comment set after the last element of an array written on one line lays it out over lines",
+                "a = [1, 2]\n",
+                result -> requireArray(result, "a").setCommentAfter(1, "note"),
+                "a = [\n  1,\n  2  # note\n]\n"),
+            edited(
+                "a comment set on an element whose comma is written on the next line leaves the comma there",
+                "a = [1 # c\n, 2]\n",
+                result -> requireArray(result, "a").setCommentAfter(0, "note"),
+                "a = [1 # note\n, 2]\n"),
+            edited(
+                "an element added to an array indented with tabs is indented with them",
+                "a = [\n\t1,\n\t2\n]\n",
+                result -> requireArray(result, "a").add(3),
+                "a = [\n\t1,\n\t2,\n\t3\n]\n"),
+            edited(
+                "an element added after an unattached comment of an array is separated from it",
+                "a = [\n  1,\n  # a run of its own\n]\n",
+                result -> requireArray(result, "a").add(2),
+                "a = [\n  1,\n  # a run of its own\n\n  2,\n]\n"),
+            edited(
+                "a comment removed from an element takes the spacing before it",
+                "a = [\n  1,  # one\n  2,\n]\n",
+                result -> requireArray(result, "a").removeCommentAfter(0),
+                "a = [\n  1,\n  2,\n]\n"),
+            edited(
+                "an unattached comment added to an array is written under its last element",
+                "a = [1, 2]\n",
+                result -> requireArray(result, "a").addComment("note"),
+                "a = [\n  1,\n  2\n  # note\n]\n"),
+            edited(
+                "an unattached comment inserted before an element is separated from it",
+                "a = [1, 2]\n",
+                result -> requireArray(result, "a").insertCommentBefore(1, "note"),
+                "a = [\n  1,\n  # note\n\n  2\n]\n"),
+            edited(
+                "an element removed from an array whose comma is written on the next line",
+                "a = [1 # c\n, 2]\n",
+                result -> requireArray(result, "a").remove(1),
+                "a = [1 # c\n]\n"),
+            edited(
+                "an element added to an array whose comma is written on the next line",
+                "a = [1 # c\n, 2]\n",
+                result -> requireArray(result, "a").add(3),
+                "a = [1 # c\n, 2,\n  3\n]\n"),
+            edited(
+                "an entry removed from an inline table leaves the entries around it",
+                "t = { p = 1, q = 2 }  # note\n",
+                result -> result.remove("t.p"),
+                "t = { q = 2 }  # note\n"),
+            edited(
+                "an entry added to an inline table laid out over lines goes on a line of its own",
+                "t = {\n  x = 1,\n  y = 2,\n}\n",
+                result -> requireTable(result, "t").set("z", 3),
+                "t = {\n  x = 1,\n  y = 2,\n  z = 3,\n}\n"),
+            edited(
+                "an entry added to an inline table from a value read elsewhere keeps that value's literal",
+                "t = { x = 1 }\nu = {\n  y = 2,\n}\nc = 0x3\n",
+                result -> {
+                  requireTable(result, "t").set("z", result.entry("c").value());
+                  requireTable(result, "u").set("z", Toml.parse("d = 'lit'\n").entry("d").value());
+                },
+                "t = { x = 1, z = 0x3 }\nu = {\n  y = 2,\n  z = 'lit',\n}\nc = 0x3\n"),
+            edited(
+                "an entry added under a dotted key of an inline table stays with that key",
+                "t = { a.b = 1, c = 2 }\n",
+                result -> requireTable(result, "t.a").set("z", 9),
+                "t = { a.b = 1, a.z = 9, c = 2 }\n"),
+            edited(
+                "a dotted key of an inline table left empty by a removal is written as a table",
+                "t = { a.b = 1, c = 2 }\n",
+                result -> result.remove("t.a.b"),
+                "t = { a = {}, c = 2 }\n"),
+            edited(
+                "a comment set on an entry an inline table wrote as a dotted key gives it a value of its own",
+                "t = { a.b = 1, c = 2 }\n",
+                result -> requireTable(result, "t").setCommentAfter("a", "note"),
+                "t = {\n  a = { b = 1 },  # note\n  c = 2\n}\n"),
+            edited(
+                "an inline table left with no entries of the document is written anew",
+                "t = { p = 1 }  # note\n",
+                result -> result.remove("t.p"),
+                "t = {}  # note\n"),
+            edited(
+                "an entry of an inline table replaced by a table is written inline",
+                "t = { p = 1, q = 2 }\n",
+                result -> requireTable(result, "t").set("p", MutableTomlTable.create().set("k", 1)),
+                "t = { p = { k = 1 }, q = 2 }\n"),
+            edited(
+                "a value replaced in an inline table laid out over lines is written over lines when too long",
+                "t = {\n  b = 1,\n  c = 2,\n}\n",
+                result -> requireTable(result, "t").set("c", longArray()),
+                "t = {\n  b = 1,\n  c = [\n    1000000000001,\n    1000000000002,\n    1000000000003,\n"
+                    + "    1000000000004,\n    1000000000005,\n    1000000000006,\n  ],\n}\n"),
+            edited(
+                "a value replaced in an inline table laid out over lines stays on one line for TOML 1.0.0",
+                "t = {\n  b = 1,\n  c = 2,\n}\n",
+                result -> requireTable(result, "t").set("c", longArray()),
+                LF.withVersion(TomlVersion.V1_0_0),
+                "t = {\n  b = 1,\n  c = [1000000000001, 1000000000002, 1000000000003, 1000000000004, "
+                    + "1000000000005, 1000000000006],\n}\n"),
+            edited(
+                "a value replaced in an inline table on one line stays on the line however long",
+                "t = { b = 1, c = 2 }\n",
+                result -> requireTable(result, "t").set("c", longArray()),
+                "t = { b = 1, c = [1000000000001, 1000000000002, 1000000000003, 1000000000004, 1000000000005, "
+                    + "1000000000006] }\n"),
+            edited(
+                "a value replaced in an inline table on one line keeps the literals it was read with",
+                "t = { b = 1, c = 2 }\nx = [0x10, 'lit']\n",
+                result -> requireTable(result, "t").set("c", result.get("x")),
+                "t = { b = 1, c = [0x10, 'lit'] }\nx = [0x10, 'lit']\n"),
+            edited(
+                "a value replaced in an inline table on one line stays on the line for TOML 1.0.0",
+                "t = { b = 1, c = 2 }\n",
+                result -> requireTable(result, "t").set("c", longArray()),
+                LF.withVersion(TomlVersion.V1_0_0),
+                "t = { b = 1, c = [1000000000001, 1000000000002, 1000000000003, 1000000000004, 1000000000005, "
+                    + "1000000000006] }\n"),
+            edited(
+                "an inline table inside an array is edited in place",
+                "a = [{ p = 1 }, 2]\n",
+                result -> requireArray(result, "a").getTable(0).set("q", 2),
+                "a = [{ p = 1, q = 2 }, 2]\n"),
+            edited(
+                "the second table of an array of inline tables is edited in place",
+                "a = [{ x = 1 }, { y = 2 }]\n",
+                result -> requireArray(result, "a").getTable(1).set("z", 3),
+                "a = [{ x = 1 }, { y = 2, z = 3 }]\n"),
+            edited(
+                "an array inside an inline table is edited in place",
+                "t = { a = [1, 2] }\n",
+                result -> requireArray(result, "t.a").add(3),
+                "t = { a = [1, 2, 3] }\n"),
+            edited(
+                "an array inside an inline table inside an array is edited in place",
+                "x = [{ a = [1] }]\n",
+                result -> requireArray(result, "x").getTable(0).getArray("a").add(2),
+                "x = [{ a = [1, 2] }]\n"),
+            edited(
+                "an array of a copied table is edited in place, keeping the literals it was read with",
+                "[a.b]\nx = [0x10, 2]  # kept\n",
+                result -> requireArray(result.set("z", requireTable(result, "a.b")), "z.x").add(3),
+                "[a.b]\nx = [0x10, 2]  # kept\n\n[z]\nx = [0x10, 2, 3]  # kept\n"),
+            edited(
+                "an array of a copied table keeps the literals it was read with",
+                "[a.b]\nx = [0x10, 2]  # kept\n",
+                result -> result.set("z", requireTable(result, "a.b")),
+                "[a.b]\nx = [0x10, 2]  # kept\n\n[z]\nx = [0x10, 2]  # kept\n"),
+            edited(
+                "an array of tables the editing API builds on a line stays on it",
+                "a = []\n",
+                result -> requireArray(result, "a").add(MutableTomlTable.create().set("k", 1)),
+                "a = [{ k = 1 }]\n"),
             edited("a document with no newline at its end", "a = 1", result -> result.set("b", 2), "a = 1\nb = 2\n"),
             edited("an empty document", "", result -> result.set("a", 1), "a = 1\n"),
             edited(
@@ -618,7 +938,22 @@ class SourcePreservingSerializerTest {
   }
 
   private static Arguments edited(String description, String input, Consumer<TomlParseResult> edit, String expected) {
-    return Arguments.of(description, input, edit, expected);
+    return edited(description, input, edit, LF, expected);
+  }
+
+  private static Arguments edited(
+      String description,
+      String input,
+      Consumer<TomlParseResult> edit,
+      TomlWriteOptions options,
+      String expected) {
+    return Arguments.of(description, input, edit, options, expected);
+  }
+
+  /** An array too long for the default maximum line width when written on one line. */
+  private static MutableTomlArray longArray() {
+    return MutableTomlArray
+        .of(1000000000001L, 1000000000002L, 1000000000003L, 1000000000004L, 1000000000005L, 1000000000006L);
   }
 
   private static Arguments notationKept(String description, String input, TomlWriteOptions options, String expected) {
