@@ -29,7 +29,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
   private final ErrorReporter errorReporter;
   private final LinkedTomlTable rootTable;
   private LinkedTomlTable currentTable;
-  // The comments documenting the expression being visited, which the document rule reads from the tree around it.
+  // The comments attached to the expression being visited, which the document rule reads from the tree around it.
   private List<TomlComment> attached = Collections.emptyList();
   // The number of tables and arrays enclosing the entries of currentTable, not counting the root table. Starts at 0.
   private int currentDepth;
@@ -53,10 +53,10 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
    * <p>
    * Walked here rather than left to {@link #visitChildren}, because what a comment is attached to depends on what the
    * tree holds beside it: the run before an expression and the comment ending its line are attached to it, and every
-   * other run is unattached and belongs to a container. A run glued to the line above it belongs to the container open
-   * where it was written, which is known when the run is reached. A run separated by a blank line from what precedes it
-   * belongs to the container of the expression that follows, which is not known yet, so such runs are held until that
-   * expression is reached.
+   * other run is unattached and belongs to a container. A run directly under the line above it belongs to the container
+   * open where it was written, which is known when the run is reached. A run separated by a blank line from what
+   * precedes it belongs to the container of the expression that follows, which is not known yet, so such runs are held
+   * until that expression is reached.
    */
   @Override
   public LinkedTomlTable visitToml(TomlParser.TomlContext ctx) {
@@ -79,7 +79,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
         attached = TomlComment.withoutNulls(Comments.above(previous), Comments.after(next));
         child.accept(this);
       } else if (child instanceof TomlParser.CommentRunContext && !(next instanceof TomlParser.ExpressionContext)) {
-        // A run directly above an expression is handed to it when it is reached; this one documents nothing.
+        // A run directly above an expression is handed to it when it is reached; this one is unattached.
         TomlComment comment = Comments.of((TomlParser.CommentRunContext) child, TomlComment.Placement.UNATTACHED);
         if (Comments.glued(previous, beforePrevious)) {
           currentTable.addComment(comment);
@@ -102,7 +102,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
 
   @Override
   public LinkedTomlTable visitKeyval(TomlParser.KeyvalContext ctx) {
-    // A key/value pair is written inside whatever section is open, and so is any comment written around it.
+    // A key/value pair is written inside the section that is open, and so is any comment written around it.
     List<TomlComment> comments = attached;
     TomlParser.KeyContext keyContext = ctx.key();
     TomlParser.ValContext valContext = ctx.val();
@@ -147,7 +147,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
       if (path == null) {
         return rootTable;
       }
-      // The table named by the header's last key is enclosed by whatever its leading keys walk through.
+      // The table named by the header's last key is enclosed by the tables and arrays its leading keys name.
       int depth = headerDepth(path);
       if (depth > maxNestingDepth) {
         throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
@@ -177,8 +177,8 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
       if (path == null) {
         return rootTable;
       }
-      // The array named by the header's last key is enclosed by whatever its leading keys walk through, and its new
-      // element table is enclosed by that array as well.
+      // The array named by the header's last key is enclosed by the tables and arrays its leading keys name, and its
+      // new element table is enclosed by that array as well.
       int depth = headerDepth(path);
       if ((long) depth + 1 > maxNestingDepth) {
         throw new TomlParseError(AbstractTomlParser.nestingTooDeepMessage(maxNestingDepth), new TomlPosition(ctx));
@@ -269,8 +269,9 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
    * opened, leaving the key/value pairs that follow it in the table the document was already in.
    *
    * <p>
-   * A header the parser completed by conjuring its closing bracket is the exception: nothing was discarded, and the key
-   * read is the one written, so {@code [a} opens table {@code a} with only the missing bracket reported.
+   * A header the parser completed by inserting its closing bracket during error recovery is the exception: nothing was
+   * discarded, and the key read is the one written, so {@code [a} opens table {@code a} with only the missing bracket
+   * reported.
    */
   private static boolean hasRecoveredKey(ParserRuleContext ctx, int endTokenType) {
     if (ctx.exception != null) {
@@ -279,8 +280,8 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
     for (int i = 0; i < ctx.getChildCount(); i++) {
       ParseTree child = ctx.getChild(i);
       if (child instanceof ErrorNode) {
-        // A token the parser conjured is not in the input, so it has no index; any other error node is input that the
-        // parser discarded to make the header match.
+        // A token the parser inserted during error recovery is not in the input, so it has no index; any other error
+        // node is input that the parser discarded to make the header match.
         Token symbol = ((ErrorNode) child).getSymbol();
         if (symbol.getTokenIndex() >= 0 || symbol.getType() != endTokenType) {
           return true;

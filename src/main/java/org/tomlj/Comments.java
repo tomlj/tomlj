@@ -25,23 +25,23 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
- * Reads from the parse tree what each comment of a document documents.
+ * Reads from the parse tree which entry each comment of a document is attached to, if any.
  *
  * <p>
  * The grammar says where a comment was written: the comment ending a line sits before that line's newline, and a run of
- * whole comment lines is a {@code commentRun} that takes the newline ending its last line. Where an <em>element</em> is
- * a key/value pair, a table header or a value written in an array, that leaves three cases, decided by the nodes a
+ * whole comment lines is a {@code commentRun} that includes the newline ending its last line. Where an <em>element</em>
+ * is a key/value pair, a table header or a value written in an array, that leaves three cases, decided by the nodes a
  * comment sits between rather than by any line number:
  *
  * <ul>
  * <li>A {@code commentRun} written directly before an element is the comment {@code ABOVE} it. Within brackets a run is
- * the last thing in a {@code lineBreak}, so the run a line break ends with is the comment above whatever the line break
- * precedes.</li>
+ * the last thing in a {@code lineBreak}, so the run a line break ends with is the comment above the element that
+ * follows the line break.</li>
  * <li>The comment ending the line an element ends on is the comment {@code AFTER} it: the comment written directly
  * after the element, or, within brackets, the one starting the {@code lineBreak} following the element or following the
  * comma that follows it.</li>
- * <li>Every other comment documents nothing and is unattached: a run separated from what follows it by a blank line or
- * a closing bracket, and the comment ending a line no element was written on.</li>
+ * <li>Every other comment is unattached: a run separated from what follows it by a blank line or a closing bracket, and
+ * the comment ending a line no element was written on.</li>
  * </ul>
  *
  * <p>
@@ -51,15 +51,15 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  *
  * <p>
  * An unattached comment belongs to a container rather than to an entry: within brackets to the array or inline table
- * itself, and between table headers to the container the calling visitor chooses by whether the run is glued to the
- * line above it.
+ * itself, and between table headers to the container the calling visitor chooses by whether the run is directly under
+ * the line above it.
  */
 final class Comments {
 
   private Comments() {}
 
   /**
-   * The comment above whatever follows a node.
+   * The comment above the element that follows a node.
    *
    * @param previous The node written before an element, or {@code null} if it is the first thing written.
    * @return The comment above the element, or {@code null} if there is none.
@@ -153,10 +153,10 @@ final class Comments {
    *
    * @param previous The node written before the run, or {@code null} if it is the first thing written.
    * @param beforePrevious The node written before that, or {@code null} if there is none.
-   * @return {@code true} if the run is glued to the line above it.
+   * @return {@code true} if the run is directly under the line above it.
    */
   static boolean glued(@Nullable ParseTree previous, @Nullable ParseTree beforePrevious) {
-    // A run takes its own newlines, so the node before it is the newline ending the line above, and that line holds
+    // A run includes its own newlines, so the node before it is the newline ending the line above, and that line holds
     // something if what precedes its newline is an expression or the comment written after one.
     return isToken(previous, TomlParser.NewLine)
         && (beforePrevious instanceof TomlParser.ExpressionContext || isToken(beforePrevious, TomlParser.Comment));
@@ -183,8 +183,8 @@ final class Comments {
    * Record a comment run.
    *
    * @param run The run.
-   * @param placement Where it sits relative to what it documents, or {@link TomlComment.Placement#UNATTACHED} if it
-   *        documents nothing.
+   * @param placement Where it sits relative to the entry it is attached to, or
+   *        {@link TomlComment.Placement#UNATTACHED}.
    * @return The comment.
    */
   static TomlComment of(TomlParser.CommentRunContext run, TomlComment.Placement placement) {
@@ -200,8 +200,8 @@ final class Comments {
    * Record a comment written on one line.
    *
    * @param comment The comment.
-   * @param placement Where it sits relative to what it documents, or {@link TomlComment.Placement#UNATTACHED} if it
-   *        documents nothing.
+   * @param placement Where it sits relative to the entry it is attached to, or
+   *        {@link TomlComment.Placement#UNATTACHED}.
    * @return The comment.
    */
   static TomlComment of(TerminalNode comment, TomlComment.Placement placement) {

@@ -12,8 +12,8 @@ package org.tomlj.internal;
 // here needs only one token of lookahead, and LineRecoveryStrategy can skip the rest of a line that cannot be parsed.
 toml : (expression Comment? NewLine | NewLine | commentRun)* EOF;
 
-// A run of comment lines. It takes the newline that ends its last line, so the run is directly followed by whatever
-// it is written above.
+// A run of comment lines. It includes the newline that ends its last line, so the run is directly followed by the node
+// written on the next line.
 commentRun : Comment (NewLine Comment)* NewLine;
 
 // The end of a line inside an array or an inline table, with the comment written on it, and the blank lines and

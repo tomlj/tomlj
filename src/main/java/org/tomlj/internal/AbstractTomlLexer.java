@@ -167,7 +167,7 @@ public abstract class AbstractTomlLexer extends Lexer {
   }
 
   /**
-   * Leave the value being read, whatever it is nested in, and read what follows as the document again.
+   * Leave the value being read, regardless of what it is nested in, and read what follows as the document again.
    */
   private void endValue() {
     _modeStack.clear();

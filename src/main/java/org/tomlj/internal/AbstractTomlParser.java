@@ -29,9 +29,9 @@ import org.antlr.v4.runtime.TokenStream;
  */
 public abstract class AbstractTomlParser extends Parser {
 
-  // The maximum number of tables and arrays, not counting the root table, that may enclose any value, table or array
-  // in a document. Nesting is limited so that the stack depth needed by the recursive descent parser, the visitors
-  // that build the model and the serializers stays bounded, whatever the input. Defaults to
+  // The maximum number of tables and arrays, not counting the root table, that may enclose any value, table or array in
+  // a document. Nesting is limited so that the stack depth needed by the recursive descent parser, the visitors that
+  // build the model and the serializers stays bounded, regardless of the input. Defaults to
   // TomlParseOptions.DEFAULT_MAX_NESTING_DEPTH and is changed with setMaxNestingDepth(int).
   private int maxNestingDepth = TomlParseOptions.DEFAULT_MAX_NESTING_DEPTH;
 

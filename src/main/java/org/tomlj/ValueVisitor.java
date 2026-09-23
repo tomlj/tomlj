@@ -173,9 +173,9 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
    * Read an array, with the comments written between its brackets.
    *
    * <p>
-   * Walked as one flat sequence of values, line breaks and commas, because what a comment documents is what was written
-   * beside it: a line break holds the comment ending the line of the value before it and the run above the value after
-   * it, and the array itself holds every comment that documents neither.
+   * Walked as one flat sequence of values, line breaks and commas, because the entry a comment is attached to is the
+   * one written beside it: a line break holds the comment ending the line of the value before it and the run above the
+   * value after it, and the array itself holds every comment attached to neither, as an unattached comment.
    */
   @Override
   public Object visitArray(TomlParser.ArrayContext ctx) {
