@@ -163,13 +163,12 @@ comment of the array.
 ## Unattached comments
 
 Every other comment is unattached: a run with a blank line, or nothing, below it. Its `placement()`
-is `TomlComment.Placement.UNATTACHED`. It documents no entry, so no `comment(key, placement)`
-returns it, and asking for that placement is an error.
-Instead it belongs to a container, which is a table (the root, a table with a header, or an inline
-table) or an array, and sits in it between the elements it was written between. `elements()` on a
-table or an array lists its entries and its unattached comments together, in document order. An
-unattached comment is a `TomlComment` element; an entry is a `TomlKeyValue` in a table and a
-`TomlEntry` in an array.
+is `TomlComment.Placement.UNATTACHED`. It is attached to no entry, so no `comment(key, placement)`
+returns it, and asking for that placement is an error. Instead it belongs to a container, which is a
+table (the root, a table with a header, or an inline table) or an array, and appears in its
+`elements()` between the two elements it was written between. `elements()` on a table or an array
+lists its entries and its unattached comments together, in document order. An unattached comment is
+a `TomlComment` element; an entry is a `TomlKeyValue` in a table and a `TomlEntry` in an array.
 
 ```toml
 a = 1
@@ -183,9 +182,9 @@ b = 2 # after b
 
 `elements()` on the root lists the entry `a`, the comments `below a` and `floating`, and the entry
 `b`. `a` has no comments: a comment directly below an entry is not attached to it. The alternative,
-a `BELOW` placement, would make a section's footer die with the last entry of the section. So the
-only line an unattached comment can touch is the one above it; were it directly above an
-expression, it would be that expression's `ABOVE` comment.
+a `BELOW` placement, would mean that removing the last entry of a section also removes the comment
+at the end of that section. So an unattached comment can be directly adjacent only to the line above
+it; if it were directly above an expression, it would be that expression's `ABOVE` comment.
 
 ```java
 for (TomlElement element : result.elements()) {
@@ -220,21 +219,22 @@ the point where one section ends and the next header begins. Adjacency decides i
 
 | Document | Owner of `note` |
 | --- | --- |
-| `[a]` / `x = 1` / blank / `# note` / blank / `[b]` | the root, before `b`. Survives removing `a`. |
-| `[a]` / `x = 1` / `# note` / blank / `[b]` | table `a`, after `x`. Goes when `a` goes. |
+| `[a]` / `x = 1` / blank / `# note` / blank / `[b]` | the root, before `b`. Not removed with `a`. |
+| `[a]` / `x = 1` / `# note` / blank / `[b]` | table `a`, after `x`. Removed with `a`. |
 | `[a]` / `# note` / blank / `x = 1` | table `a`, before `x`. The header opens `a`. |
 | `[a]` / blank / `# note` / blank / `x = 1` | table `a`, before `x`. The next expression is `a`'s. |
-| `[a]` / `x = 1` / blank / `# note` | the root, at the end. Does not go when `a` goes. |
+| `[a]` / `x = 1` / blank / `# note` | the root, at the end. Not removed with `a`. |
 | `a.b = 1` / `# note` | the root. A dotted key does not open a section. |
 
-The first two rows show why the blank line matters: a comment written in the gap before a header
-is a divider or a footer that should not go when the section above it goes, while a comment glued
-to a section's last line is part of that section.
+The first two rows show why the blank line matters: a comment separated by a blank line from the
+section above it and followed by a header, such as a divider or a footer, is not removed with the
+table of that section, while a comment directly under a section's last line belongs to that
+section's table.
 
 ## Indentation plays no part
 
-Only blank lines and line breaks decide where a comment belongs. TOML gives indentation no meaning,
-so TomlJ reads none into it, even where a document indents its sections:
+Only blank lines and line breaks decide where a comment belongs. Indentation has no meaning in TOML,
+and TomlJ ignores it, even where a document indents its sections:
 
 ```toml
 [a]
@@ -269,12 +269,12 @@ l = 3
 `foo` is an unattached comment of `b`, directly under `k`. `bar` is separated from it by a blank
 line, and the next expression is the header `[c]`, which is an expression of the root, so `bar` is
 an unattached comment of the root, before `c`. It does not belong to `b`, and not to `a` either,
-although it is indented under `b`. Removing `b` leaves it in place; removing `c` does too.
+although it is indented under `b`. Removing `b` does not remove it, and neither does removing `c`.
 
 ## Edge cases, gathered
 
-* **A run above a line the parser rejects** goes with that line: the document is reported with an
-  error, and the comment is not in the model.
+* **A run above a line the parser rejects** is dropped along with that line: the document is
+  reported with an error, and the comment is not in the model.
 * **A comment at the end of the document without a final newline** is kept like any other.
 * **A comment inside a string** is part of the string. `#` starts a comment only outside a value.
 * **A comment inside an inline table** is TOML 1.1.0 syntax, since it needs a line break inside the

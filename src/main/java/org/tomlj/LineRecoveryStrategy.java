@@ -94,7 +94,7 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
     boolean beforeNewLine = input.LA(1) == TomlParser.NewLine;
     if (beforeNewLine) {
       // Checked while recovering from an error inside the value as well: the lexer has read the line that follows as
-      // the document's, so the value ends here whatever went wrong inside it.
+      // the document's, so the value ends here regardless of what went wrong inside it.
       if (!startsDocumentLine(input.LA(2))) {
         return null;
       }

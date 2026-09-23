@@ -23,7 +23,7 @@ import org.antlr.v4.runtime.Token;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
- * A comment in a TOML document, either attached to the entry it documents or unattached.
+ * A comment in a TOML document, either attached to an entry or unattached.
  *
  * <p>
  * A comment attached to an entry is either the run of comment lines directly above it ({@link Placement#ABOVE}) or the
@@ -33,11 +33,11 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 public final class TomlComment implements TomlElement {
 
   /**
-   * Where a comment sits relative to the entry it documents.
+   * Where a comment sits relative to the entry it is attached to.
    */
   public enum Placement {
     /**
-     * A run of comment lines written directly above the entry it documents.
+     * A run of comment lines written directly above the entry it is attached to.
      */
     ABOVE,
     /**
@@ -45,7 +45,7 @@ public final class TomlComment implements TomlElement {
      */
     AFTER,
     /**
-     * A comment that documents no entry: a run that is not directly above one, or a comment on a line with none. It
+     * A comment attached to no entry: a run that is not directly above one, or a comment on a line with none. It
      * belongs to the table or array it was written in.
      */
     UNATTACHED
@@ -61,8 +61,7 @@ public final class TomlComment implements TomlElement {
    * Record a comment from the tokens the lexer matched for it.
    *
    * @param tokens The comment tokens, one per line, on consecutive lines of the document.
-   * @param placement Where the comment sits relative to what it documents, or {@link Placement#UNATTACHED} if it
-   *        documents nothing.
+   * @param placement Where the comment sits relative to the entry it is attached to, or {@link Placement#UNATTACHED}.
    * @return A comment.
    */
   static TomlComment of(List<Token> tokens, Placement placement) {
@@ -165,10 +164,10 @@ public final class TomlComment implements TomlElement {
   }
 
   /**
-   * Where this comment sits relative to the entry it documents.
+   * Where this comment sits relative to the entry it is attached to.
    *
    * @return {@link Placement#ABOVE} or {@link Placement#AFTER} for an attached comment, or {@link Placement#UNATTACHED}
-   *         for one that documents no entry.
+   *         for an unattached one.
    */
   public Placement placement() {
     return placement;
