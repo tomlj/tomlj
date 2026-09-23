@@ -1488,6 +1488,6 @@ public interface TomlTable {
    * @throws IOException If an IO error occurs.
    */
   default void toToml(Appendable appendable) throws IOException {
-    TomlSerializer.toToml(this, appendable);
+    Serializer.toToml(this, appendable);
   }
 }

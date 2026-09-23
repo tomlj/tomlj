@@ -30,8 +30,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-final class TomlSerializer {
-  private TomlSerializer() {}
+final class Serializer {
+  private Serializer() {}
 
   static void toToml(TomlTable table, Appendable appendable) throws IOException {
     requireNonNull(table);
