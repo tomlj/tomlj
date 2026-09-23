@@ -476,14 +476,27 @@ public interface TomlArray {
   }
 
   /**
-   * Return a representation of this array using TOML.
+   * Return a representation of this array using TOML, written with the default options.
    *
    * @return A TOML representation of this array.
+   * @see TomlWriteOptions#defaults()
    */
   default String toToml() {
+    return toToml(TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Return a representation of this array using TOML.
+   *
+   * @param options The options to write with.
+   * @return A TOML representation of this array.
+   * @throws IllegalArgumentException If the version the options write for cannot write this array: TOML 1.0.0 and an
+   *         inline table holding a comment.
+   */
+  default String toToml(TomlWriteOptions options) {
     StringBuilder builder = new StringBuilder();
     try {
-      toToml(builder);
+      toToml(builder, options);
     } catch (IOException e) {
       // not reachable
       throw new UncheckedIOException(e);
@@ -492,12 +505,26 @@ public interface TomlArray {
   }
 
   /**
-   * Append a TOML representation of this array to the appendable output.
+   * Append a TOML representation of this array to the appendable output, written with the default options.
    *
    * @param appendable The appendable output.
    * @throws IOException If an IO error occurs.
+   * @see TomlWriteOptions#defaults()
    */
   default void toToml(Appendable appendable) throws IOException {
-    Serializer.toToml(this, appendable);
+    toToml(appendable, TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Append a TOML representation of this array to the appendable output.
+   *
+   * @param appendable The appendable output.
+   * @param options The options to write with.
+   * @throws IOException If an IO error occurs.
+   * @throws IllegalArgumentException If the version the options write for cannot write this array: TOML 1.0.0 and an
+   *         inline table holding a comment.
+   */
+  default void toToml(Appendable appendable, TomlWriteOptions options) throws IOException {
+    Serializer.toToml(this, appendable, options);
   }
 }

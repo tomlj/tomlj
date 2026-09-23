@@ -63,8 +63,6 @@ final class Serializer {
   private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
   // The indentation of the elements of a multi-line array or inline table, relative to the line it starts on
   private static final int ARRAY_ELEMENT_INDENT = 2;
-  private static final int DEFAULT_INDENT = 0;
-  private static final int DEFAULT_MAX_LINE_WIDTH = 80;
 
   private final Appendable out;
   // The spaces to indent per level of table nesting
@@ -86,35 +84,28 @@ final class Serializer {
     this.version = version;
   }
 
-  static void toToml(TomlTable table, Appendable appendable) throws IOException {
-    toToml(table, appendable, TomlVersion.LATEST);
-  }
-
-  /**
-   * Write a table as a TOML document in the default style, for a version of TOML.
-   *
-   * @param table The table.
-   * @param appendable The output.
-   * @param version The version of TOML to write for.
-   * @throws IllegalArgumentException If the table holds an inline table holding a comment and {@code version} is TOML
-   *         1.0.0, which allows no line break inside an inline table.
-   */
-  static void toToml(TomlTable table, Appendable appendable, TomlVersion version) throws IOException {
+  static void toToml(TomlTable table, Appendable appendable, TomlWriteOptions options) throws IOException {
     requireNonNull(table);
     requireNonNull(appendable);
-    requireNonNull(version);
-    defaultStyle(appendable, version).writeEntries(table, new ArrayList<>());
+    requireNonNull(options);
+    serializer(appendable, options).writeEntries(table, new ArrayList<>());
   }
 
-  static void toToml(TomlArray array, Appendable appendable) throws IOException {
+  static void toToml(TomlArray array, Appendable appendable, TomlWriteOptions options) throws IOException {
     requireNonNull(array);
     requireNonNull(appendable);
+    requireNonNull(options);
     // The array starts at column 0 outside any table, so the indent never applies
-    defaultStyle(appendable, TomlVersion.LATEST).writeValue(array, 0, 0, 0);
+    serializer(appendable, options).writeValue(array, 0, 0, 0);
   }
 
-  private static Serializer defaultStyle(Appendable appendable, TomlVersion version) {
-    return new Serializer(appendable, DEFAULT_INDENT, DEFAULT_MAX_LINE_WIDTH, System.lineSeparator(), version);
+  private static Serializer serializer(Appendable appendable, TomlWriteOptions options) {
+    return new Serializer(
+        appendable,
+        options.indent(),
+        options.maxLineWidth(),
+        options.lineSeparator(),
+        options.version());
   }
 
   /**
