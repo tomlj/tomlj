@@ -110,6 +110,15 @@ class SourcePreservingSerializerTest {
     assertEquals("a = 1\r\nc = 3\r\n[t]\r\nb = 2\r\n\r\n[u]\r\nd = 4\r\n", result.toToml());
   }
 
+  @Test
+  void writesACommentSetOnALineWithTheSeparatorTheDocumentEndsItsLinesWith() {
+    TomlParseResult result = Toml.parse("a = 1\r\n# about b\r\nb = 2\r\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    result.setCommentAbove("a", "note", "and more");
+
+    assertEquals("# note\r\n# and more\r\na = 1\r\n# about b\r\nb = 2\r\n", result.toToml());
+  }
+
   @ParameterizedTest(name = "{0}")
   @MethodSource("documentsWithNotationKept")
   void writesADocumentKeepingItsNotation(
@@ -456,6 +465,149 @@ class SourcePreservingSerializerTest {
                     .set("z", MutableTomlTable.copyOf(requireTable(result, "a.b")))
                     .setComment("z.x", "note", TomlComment.Placement.AFTER),
                 "[a.b]\nx = 0x10\n\n[z]\nx = 0x10  # note\n"),
+            edited(
+                "a value that is replaced keeps its line and the comment on it",
+                "a = 1  # note\nb = 2\n",
+                result -> result.set("a", 5),
+                "a = 5  # note\nb = 2\n"),
+            edited(
+                "a value that is replaced keeps the comment above it and its place in its section",
+                "[t]\n# about x\nx = 1\ny = 2\n",
+                result -> requireTable(result, "t").set("x", "new"),
+                "[t]\n# about x\nx = \"new\"\ny = 2\n"),
+            edited(
+                "a value a dotted key names keeps its line when it is replaced",
+                "a.b = 1\nc = 2\n",
+                result -> result.set("a.b", 9),
+                "a.b = 9\nc = 2\n"),
+            edited(
+                "an inline table replaced by a value keeps its line",
+                "t = { p = 1 }  # note\nu = 2\n",
+                result -> result.set("t", 3),
+                "t = 3  # note\nu = 2\n"),
+            edited(
+                "a value replaced by a string with a newline is written over lines, and the line keeps its comment",
+                "a = 1  # note\n",
+                result -> result.set("a", "x\ny"),
+                "a = \"\"\"\nx\ny\"\"\"  # note\n"),
+            edited(
+                "an array replaced by a scalar keeps its line",
+                "a = [1, 2]\nb = 3\n",
+                result -> result.set("a", 9),
+                "a = 9\nb = 3\n"),
+            edited(
+                "a scalar replaced by an array that fits on the line keeps it",
+                "a = 1  # note\n",
+                result -> result.set("a", MutableTomlArray.of(1, 2)),
+                "a = [1, 2]  # note\n"),
+            edited(
+                "a value replaced by a table leaves its line and is written as a section",
+                "a = 1  # note\nb = 2\n",
+                result -> result.set("a", MutableTomlTable.create().set("k", 1)),
+                "b = 2\n\n[a]  # note\nk = 1\n"),
+            edited(
+                "a value replaced by an array of tables leaves its line and is written as sections",
+                "a = 1\nb = 2\n",
+                result -> result.set("a", MutableTomlArray.of(MutableTomlTable.create().set("k", 1))),
+                "b = 2\n\n[[a]]\nk = 1\n"),
+            edited(
+                "an array of tables that replaces a value keeps the line when a comment is written on it",
+                "a = 1  # note\nb = 2\n",
+                result -> result.set("a", MutableTomlArray.of(MutableTomlTable.create().set("k", 1))),
+                "a = [{ k = 1 }]  # note\nb = 2\n"),
+            edited(
+                "an array of inline tables the document wrote as a literal keeps its line",
+                "x = [{ a = 1 }]\ny = 2\n",
+                result -> result.set("z", 3),
+                "x = [{ a = 1 }]\ny = 2\nz = 3\n"),
+            edited(
+                "a value replaced in a table of an array of tables keeps its line",
+                "[[x]]\na = 1  # note\n",
+                result -> requireArray(result, "x").getTable(0).set("a", 2),
+                "[[x]]\na = 2  # note\n"),
+            edited(
+                "a value replaced in a copied table keeps the line's spacing and its comment",
+                "[a.b]\nx = 0x10  # kept\ny = 1\n",
+                result -> requireTable(result.set("z", requireTable(result, "a.b")), "z").set("x", 5),
+                "[a.b]\nx = 0x10  # kept\ny = 1\n\n[z]\nx = 5  # kept\ny = 1\n"),
+            edited(
+                "a value replaced twice is written as it was left",
+                "a = 1  # note\n",
+                result -> result.set("a", 5).set("a", 6),
+                "a = 6  # note\n"),
+            edited(
+                "a value replaced by one read from another line keeps that value's literal",
+                "a = 1  # note\nb = 0x10\n[t]\nc = 2\n",
+                result -> {
+                  result.set("a", result.entry("b").value());
+                  requireTable(result, "t").set("c", Toml.parse("d = 'lit'\n").entry("d").value());
+                },
+                "a = 0x10  # note\nb = 0x10\n[t]\nc = 'lit'\n"),
+            edited(
+                "a comment set above a line is indented like it",
+                "[t]\n\tx = 1\n",
+                result -> requireTable(result, "t").setCommentAbove("x", "note"),
+                "[t]\n\t# note\n\tx = 1\n"),
+            edited(
+                "a run replaced by a longer one",
+                "# one\na = 1\n",
+                result -> result.setCommentAbove("a", "first", "second"),
+                "# first\n# second\na = 1\n"),
+            edited(
+                "a run replaced by a shorter one",
+                "# one\n# two\na = 1\n",
+                result -> result.setCommentAbove("a", "new"),
+                "# new\na = 1\n"),
+            edited(
+                "a run that is removed takes its lines, and the blank lines above it stay",
+                "x = 0\n\n# one\n# two\na = 1\n",
+                result -> result.removeCommentAbove("a"),
+                "x = 0\n\na = 1\n"),
+            edited(
+                "a comment set after a value is written two spaces from it",
+                "a = 1\nb = 2\n",
+                result -> result.setCommentAfter("a", "note"),
+                "a = 1  # note\nb = 2\n"),
+            edited(
+                "a comment that replaces another keeps the spacing the document wrote before it",
+                "a = 1    # old\n",
+                result -> result.setCommentAfter("a", "new"),
+                "a = 1    # new\n"),
+            edited(
+                "a comment after a value that is removed takes the spacing before it",
+                "a = 1    # old\nb = 2\n",
+                result -> result.removeCommentAfter("a"),
+                "a = 1\nb = 2\n"),
+            edited(
+                "a comment set above a header keeps the header line as it was written",
+                "[a.b]  # h\nx = 1\n",
+                result -> result.setCommentAbove("a.b", "note"),
+                "# note\n[a.b]  # h\nx = 1\n"),
+            edited(
+                "a comment removed from a header line takes the spacing before it",
+                "[a.b]  # h\nx = 1\n",
+                result -> result.removeCommentAfter("a.b"),
+                "[a.b]\nx = 1\n"),
+            edited(
+                "a comment set above the header of a table of an array of tables",
+                "[[x]]\na = 1\n",
+                result -> requireArray(result, "x").setCommentAbove(0, "note"),
+                "# note\n[[x]]\na = 1\n"),
+            edited(
+                "both comments of an entry edited at once",
+                "# old\na = 1  # old after\n",
+                result -> result.setCommentAbove("a", "new").setCommentAfter("a", "new after"),
+                "# new\na = 1  # new after\n"),
+            edited(
+                "a value replaced and the comment on its line edited",
+                "a = 1  # old\n",
+                result -> result.set("a", 2).setCommentAfter("a", "new"),
+                "a = 2  # new\n"),
+            edited(
+                "a comment set on the last line of a document that ends without a newline",
+                "a = 1",
+                result -> result.setCommentAfter("a", "note"),
+                "a = 1  # note"),
             edited("a document with no newline at its end", "a = 1", result -> result.set("b", 2), "a = 1\nb = 2\n"),
             edited("an empty document", "", result -> result.set("a", 1), "a = 1\n"),
             edited(

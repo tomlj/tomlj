@@ -14,6 +14,7 @@ package org.tomlj;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Where a line, a table header, an unattached comment or an element of an array or inline table was written in the text
@@ -280,6 +281,21 @@ final class SourceSpan {
     this.tailStart = builder.tailStart;
     this.newlineStart = builder.newlineStart;
     this.stop = stop;
+  }
+
+  /**
+   * The span of the value written between this span's key and its tail, where the value's own span has the same source
+   * and starts at this span's value offset.
+   *
+   * @param value The value the line or element holds.
+   * @return The span of the value's text, or {@code null} where it was replaced or edited through the editing API, or
+   *         came from another line or another document, so that its span has a different source or start.
+   */
+  @Nullable
+  @SuppressWarnings("ReferenceEquality") // compares the value span's source by identity
+  ValueSpan writtenValue(Value value) {
+    ValueSpan written = value.writtenSpan();
+    return (written != null && written.source == source && written.start == valueStart) ? written : null;
   }
 
   @Override

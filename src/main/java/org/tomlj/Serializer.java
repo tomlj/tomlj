@@ -281,12 +281,13 @@ final class Serializer {
   /**
    * Write a line from its span: its key, the spacing around the {@code =}, its value and the comment after it, as they
    * were written. The key is written anew when the line was written with a dotted key of a different number of parts
-   * than the key it is written with here, and the line ends with the line separator from the options.
+   * than the key it is written with here, the value is written anew when it has no usable span, and the line ends with
+   * the options' line separator, since the line is written at a new position.
    *
    * @param lineIndent The indentation of the line.
    * @param keyPath The key, as the keys of a dotted key.
    * @param entry The entry the line holds.
-   * @return {@code false} if the line has no span, its comments were edited, or its value has no span or was edited.
+   * @return {@code false} if the entry has no line span, or its comments were set or removed.
    */
   private boolean writeSourceLine(String lineIndent, List<String> keyPath, TomlEntry entry) throws IOException {
     if (!(entry instanceof Entry)) {
@@ -297,10 +298,6 @@ final class Serializer {
     if (span == null || span.kind != SourceSpan.Kind.LINE || parsed.commentsModified()) {
       return false;
     }
-    int valueStop = writtenValueStop(parsed.value);
-    if (valueStop < 0) {
-      return false;
-    }
     writeCommentAbove(entry.comments(), lineIndent);
     beginLine(lineIndent);
     StringBuilder text = new StringBuilder();
@@ -309,28 +306,21 @@ final class Serializer {
     } else {
       appendKeyPath(text, keyPath);
     }
-    text.append(span.source.text(span.keyStop + 1, valueStop));
+    ValueSpan value = span.writtenValue(parsed.value);
+    if (value != null) {
+      text.append(span.source.text(span.keyStop + 1, value.stop));
+    } else {
+      // The spacing around the '=' is the line's own; the value it held has been replaced, so it is written anew
+      text.append(span.source.text(span.keyStop + 1, span.valueStart - 1));
+      int column = width(lineIndent) + text.codePointCount(0, text.length());
+      out.append(text);
+      text.setLength(0);
+      writeEntryValue(parsed.value, lineIndent, column);
+    }
     text.append(span.source.text(span.tailStart, span.newlineStart - 1));
     out.append(text);
     endLine();
     return true;
-  }
-
-  /**
-   * The last offset of a value as the document it was read from wrote it.
-   *
-   * @param value The value.
-   * @return The last offset of its literal, or of the closing bracket of a table or array that has not been edited
-   *         since, or {@code -1} if the value has no span or was edited.
-   */
-  private static int writtenValueStop(Value value) {
-    if (value instanceof Value.Scalar) {
-      ValueSpan span = ((Value.Scalar) value).span;
-      return (span != null) ? span.stop : -1;
-    }
-    ElementContainer<?> container = (ElementContainer<?>) value;
-    ValueSpan brackets = container.bracketSpan;
-    return (brackets != null && !container.isModified()) ? brackets.stop : -1;
   }
 
   /**
@@ -341,7 +331,7 @@ final class Serializer {
    * @param lineIndent The indentation of the line the value starts on.
    * @param column The width of that line before the value, in code points.
    */
-  private void writeEntryValue(TomlValue value, String lineIndent, int column) throws IOException {
+  void writeEntryValue(TomlValue value, String lineIndent, int column) throws IOException {
     String literal = keepNotation ? literalOf(value) : null;
     if (literal != null) {
       out.append(literal);
@@ -374,7 +364,7 @@ final class Serializer {
    * @param lineIndent The indentation of the line the value starts on.
    * @param column The width of that line before the value, in code points.
    */
-  private void writeLineValue(Object value, String lineIndent, int column) throws IOException {
+  void writeLineValue(Object value, String lineIndent, int column) throws IOException {
     if (value instanceof String && ((String) value).indexOf('\n') >= 0) {
       // A string with a newline is written as a multi-line basic string, so it stays readable rather than escaped
       // onto one line. The key's indentation applies only to this line; content lines are never indented.
@@ -819,7 +809,7 @@ final class Serializer {
     if (!(value instanceof Value.Scalar)) {
       return null;
     }
-    ValueSpan span = ((Value.Scalar) value).span;
+    ValueSpan span = ((Value.Scalar) value).writtenSpan();
     return (span == null) ? null : span.source.text(span.start, span.stop);
   }
 
