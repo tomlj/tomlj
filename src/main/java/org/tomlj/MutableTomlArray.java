@@ -46,6 +46,10 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * An array read from {@code [[x]]} headers accepts any value; nothing requires its entries to stay tables.
  *
  * <p>
+ * An array is written back out with {@link #toToml()}, and {@link #reformat(TomlWriteOptions.Keep)} makes it, and
+ * everything nested in it, keep less of its existing structure and format.
+ *
+ * <p>
  * Not safe for use from multiple threads without external synchronization.
  */
 @DefaultQualifier(value = NonNull.class ,

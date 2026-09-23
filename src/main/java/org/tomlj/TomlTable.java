@@ -1472,13 +1472,13 @@ public interface TomlTable {
    * Return a representation of this table using TOML, written with the default options.
    *
    * <p>
-   * A {@link TomlParseResult} is written keeping its layout: the document it was parsed from is written back, with only
-   * what the editing API changed written anew; see {@link TomlWriteOptions.Keep#LAYOUT}. Any other table, including a
-   * table of a parse result rather than the result itself, is written in the default style, keeping the literal form
-   * each of its values was parsed with.
+   * A {@link TomlParseResult} is written keeping its layout: the text it was parsed from is written back, with only
+   * what the editing API changed written anew; any other table, including a table of a parse result rather than the
+   * result itself, is written in the default style, keeping the literal form each of its values was parsed with.
    *
    * @return A TOML representation of this table.
    * @see TomlWriteOptions#defaults()
+   * @see TomlWriteOptions
    */
   default String toToml() {
     return toToml(TomlWriteOptions.defaults());
@@ -1488,14 +1488,15 @@ public interface TomlTable {
    * Return a representation of this table using TOML.
    *
    * <p>
-   * A {@link TomlParseResult} keeps as much of its existing structure and format as the options ask for; see
-   * {@link TomlWriteOptions.Keep}. {@link TomlWriteOptions.Keep#NOTHING} writes everything in the default style and
-   * drops the literal forms; see {@link #toToml()}.
+   * A {@link TomlParseResult} keeps as much of its existing structure and format as {@code options} ask for; see
+   * {@link TomlWriteOptions.Keep}. Any other table is written in the default style, keeping the literal form of each
+   * value unless the options ask for {@link TomlWriteOptions.Keep#NOTHING}. See {@link #toToml()}.
    *
    * @param options The options to write with.
    * @return A TOML representation of this table.
    * @throws IllegalArgumentException If the version the options write for cannot write this table: TOML 1.0.0 and an
    *         inline table holding a comment.
+   * @see TomlWriteOptions
    */
   default String toToml(TomlWriteOptions options) {
     StringBuilder builder = new StringBuilder();
@@ -1511,9 +1512,13 @@ public interface TomlTable {
   /**
    * Append a TOML representation of this table to the appendable output, written with the default options.
    *
+   * <p>
+   * Written as {@link #toToml()} writes it.
+   *
    * @param appendable The appendable output.
    * @throws IOException If an IO error occurs.
    * @see TomlWriteOptions#defaults()
+   * @see TomlWriteOptions
    */
   default void toToml(Appendable appendable) throws IOException {
     toToml(appendable, TomlWriteOptions.defaults());
@@ -1522,11 +1527,15 @@ public interface TomlTable {
   /**
    * Append a TOML representation of this table to the appendable output.
    *
+   * <p>
+   * Written as {@link #toToml(TomlWriteOptions)} writes it.
+   *
    * @param appendable The appendable output.
    * @param options The options to write with.
    * @throws IOException If an IO error occurs.
    * @throws IllegalArgumentException If the version the options write for cannot write this table: TOML 1.0.0 and an
    *         inline table holding a comment.
+   * @see TomlWriteOptions
    */
   default void toToml(Appendable appendable, TomlWriteOptions options) throws IOException {
     Serializer.toToml(this, appendable, options);
