@@ -99,6 +99,7 @@ final class Serializer {
     this.lineSeparator = options.lineSeparator();
     this.version = options.version();
     this.keepNotation = (options.keep() != TomlWriteOptions.Keep.NOTHING);
+    // Only a block of a document written keeping its layout copies lines; when less is kept, every line is written anew
     this.copySourceLines = copySourceLines && (options.keep() == TomlWriteOptions.Keep.LAYOUT);
   }
 
@@ -114,9 +115,10 @@ final class Serializer {
   }
 
   /**
-   * A writer of a block of a document written keeping its layout: the default style, except that a line that has a span
-   * is copied rather than written anew, so that a copied entry keeps the literal and the spacing it was read with. When
-   * the options keep only the notation, every line is written anew and only the literal forms are kept.
+   * A writer of a block of a parsed document: the default style, except that, when the options keep the layout, a line
+   * that has a span is copied rather than written anew, so that a copied entry keeps the literal and the spacing it was
+   * read with. When the options keep only the notation, every line is written anew keeping the literal forms, and when
+   * they keep nothing, every line is written in the default style.
    *
    * @param out The output.
    * @param options The options to write with.
@@ -130,14 +132,17 @@ final class Serializer {
     requireNonNull(table);
     requireNonNull(appendable);
     requireNonNull(options);
-    if (options.keep() != TomlWriteOptions.Keep.NOTHING && table instanceof ParsedTomlTable) {
+    // A table reformatted through the editing API keeps as much as reformat() asked for, or as the options ask for if
+    // that is less
+    TomlWriteOptions tableOptions = ElementContainer.optionsWithin(table, options);
+    if (tableOptions.keep() != TomlWriteOptions.Keep.NOTHING && table instanceof ParsedTomlTable) {
       ParsedTomlTable parsed = (ParsedTomlTable) table;
       if (parsed.source() != null) {
         SourcePreservingSerializer.toToml(parsed, appendable, options);
         return;
       }
     }
-    defaultStyle(appendable, options).writeEntries(table, new ArrayList<>());
+    defaultStyle(appendable, tableOptions).writeEntries(table, new ArrayList<>());
   }
 
   static void toToml(TomlArray array, Appendable appendable, TomlWriteOptions options) throws IOException {
@@ -145,7 +150,7 @@ final class Serializer {
     requireNonNull(appendable);
     requireNonNull(options);
     // The array starts at column 0 outside any table, so the indent never applies
-    defaultStyle(appendable, options).writeValue(array, "", 0, 0);
+    defaultStyle(appendable, ElementContainer.optionsWithin(array, options)).writeValue(array, "", 0, 0);
   }
 
   /**
@@ -350,20 +355,22 @@ final class Serializer {
   }
 
   /**
-   * Write the value an entry holds partway along a line, the literal it was written as where the notation is kept.
+   * Write the value an entry holds partway along a line, the literal it was written as where literals are kept.
    *
    * @param value The value.
    * @param lineIndent The indentation of the line the value starts on.
    * @param column The width of that line before the value, in code points.
    * @param trailing The width of what follows the value on its last line, in code points.
+   * @param literals Whether a value that has a span is written with the text of that span.
    */
-  void writeNestedValue(TomlValue value, String lineIndent, int column, int trailing) throws IOException {
-    String literal = keepNotation ? literalOf(value) : null;
+  void writeNestedValue(TomlValue value, String lineIndent, int column, int trailing, boolean literals)
+      throws IOException {
+    String literal = literals ? literalOf(value) : null;
     if (literal != null) {
       out.append(literal);
       return;
     }
-    writeValue(value.get(), lineIndent, column, trailing);
+    writeValue(value.get(), lineIndent, column, trailing, literals);
   }
 
   /**
@@ -395,17 +402,29 @@ final class Serializer {
    * @param trailing The width of what follows the value on its last line, in code points.
    */
   private void writeValue(Object value, String lineIndent, int column, int trailing) throws IOException {
+    writeValue(value, lineIndent, column, trailing, keepNotation);
+  }
+
+  /**
+   * Write a value that starts partway along a line; see {@link #writeValue(Object, String, int, int)}.
+   *
+   * @param literals Whether a value that has a span is written with the text of that span, before what reformat() set
+   *        on the value applies.
+   */
+  private void writeValue(Object value, String lineIndent, int column, int trailing, boolean literals)
+      throws IOException {
+    boolean literalsInside = literalsWithin(value, literals);
     if (holdsComments(value)) {
       if (value instanceof TomlTable) {
         requireInlineTableOverLines(version);
       }
-      writeOverLines(value, lineIndent);
+      writeOverLines(value, lineIndent, literalsInside);
       return;
     }
 
     StringBuilder text = new StringBuilder();
     if (!canWriteOverLines(value)) {
-      appendInline(value, text, Integer.MAX_VALUE, keepNotation);
+      appendInline(value, text, Integer.MAX_VALUE, literals);
       out.append(text);
       return;
     }
@@ -413,13 +432,11 @@ final class Serializer {
     int width = maxLineWidth - column - trailing;
     // A code point takes at most two chars, so text longer than twice the width cannot fit and need not be completed
     int limit = width > Integer.MAX_VALUE / 2 ? Integer.MAX_VALUE : 2 * width;
-    if (width >= 0
-        && appendInline(value, text, limit, keepNotation)
-        && text.codePointCount(0, text.length()) <= width) {
+    if (width >= 0 && appendInline(value, text, limit, literals) && text.codePointCount(0, text.length()) <= width) {
       out.append(text);
       return;
     }
-    writeOverLines(value, lineIndent);
+    writeOverLines(value, lineIndent, literalsInside);
   }
 
   /**
@@ -455,8 +472,9 @@ final class Serializer {
    *
    * @param container The array or inline table.
    * @param lineIndent The indentation of the line the container starts on.
+   * @param literals Whether a key or value inside it that has a span is written with the text of that span.
    */
-  private void writeOverLines(Object container, String lineIndent) throws IOException {
+  private void writeOverLines(Object container, String lineIndent, boolean literals) throws IOException {
     boolean isTable = container instanceof TomlTable;
     List<TomlElement> elements = isTable ? ((TomlTable) container).elements() : ((TomlArray) container).elements();
     String elementIndent = lineIndent + ARRAY_ELEMENT_INDENT;
@@ -478,12 +496,12 @@ final class Serializer {
       int column = width(elementIndent);
       if (isTable) {
         StringBuilder prefix = new StringBuilder();
-        appendEntryKey(prefix, Collections.singletonList(((TomlKeyValue) entry).key()), entry, keepNotation);
+        appendEntryKey(prefix, Collections.singletonList(((TomlKeyValue) entry).key()), entry, literals);
         prefix.append(" = ");
         out.append(prefix);
         column += prefix.codePointCount(0, prefix.length());
       }
-      writeNestedValue(entry.value(), elementIndent, column, 1);
+      writeNestedValue(entry.value(), elementIndent, column, 1, literals);
       out.append(',');
       writeCommentAfter(entry.comments());
       endLine();
@@ -589,14 +607,15 @@ final class Serializer {
   }
 
   /**
-   * Append the single-line form of a value an entry holds, whatever the maximum line width, as everything written
-   * inside an inline table is, with the literal of the value, and of every value inside it, that has one.
+   * Append the single-line form of a value an entry holds, regardless of the maximum line width, as everything written
+   * inside an inline table is.
    *
    * @param text The text to append to.
    * @param value The value.
+   * @param literals Whether a value that has a span is written with the text of that span.
    */
-  static void appendInlineValue(StringBuilder text, TomlValue value) {
-    appendInlineEntryValue(value, text, Integer.MAX_VALUE, true);
+  static void appendInlineValue(StringBuilder text, TomlValue value, boolean literals) {
+    appendInlineEntryValue(value, text, Integer.MAX_VALUE, literals);
   }
 
   /**
@@ -662,7 +681,8 @@ final class Serializer {
     return text.length() <= limit;
   }
 
-  private static boolean appendInlineArray(TomlArray array, StringBuilder text, int limit, boolean literals) {
+  private static boolean appendInlineArray(TomlArray array, StringBuilder text, int limit, boolean inherited) {
+    boolean literals = literalsWithin(array, inherited);
     text.append('[');
     // The array holds no comment, so every element of it is an entry
     List<TomlElement> elements = array.elements();
@@ -678,7 +698,8 @@ final class Serializer {
     return text.length() <= limit;
   }
 
-  private static boolean appendInlineTable(TomlTable table, StringBuilder text, int limit, boolean literals) {
+  private static boolean appendInlineTable(TomlTable table, StringBuilder text, int limit, boolean inherited) {
+    boolean literals = literalsWithin(table, inherited);
     List<InlineItem> items = inlineItems(table, literals);
     if (items.isEmpty()) {
       text.append("{}");
@@ -828,6 +849,19 @@ final class Serializer {
     }
     SourceSpan span = ((Entry) entry).span;
     return (span != null && span.keyStart >= 0 && span.keyParts == parts) ? span : null;
+  }
+
+  /**
+   * Whether the keys and values inside a container are written with the text of their spans: not if reformat() set
+   * {@link TomlWriteOptions.Keep#NOTHING} on the container, which writes everything in it in the default style.
+   *
+   * @param container The array or inline table, or a scalar, for which the answer is {@code inherited}.
+   * @param inherited Whether the spans are used around the container.
+   */
+  private static boolean literalsWithin(Object container, boolean inherited) {
+    return inherited
+        && !(container instanceof ElementContainer
+            && ((ElementContainer<?>) container).keep == TomlWriteOptions.Keep.NOTHING);
   }
 
   /**

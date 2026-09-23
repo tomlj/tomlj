@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -43,11 +45,16 @@ abstract class ElementContainer<E extends Entry> extends Value {
 
   private boolean sequenceModified;
 
-  // Where the brackets of this table or array were written in the document, and where the whitespace before the
-  // closing one starts. Null for a table or array built through the editing API, for one read from a document parsed
-  // with no source kept, and for the tables of a [[x]] header and the array holding them, which are written as
-  // sections rather than in brackets. A copy shares it, since it describes the brackets rather than a place in a
-  // document.
+  // How much of the existing structure and format of this table or array is kept, regardless of what the options ask
+  // for the enclosing document. LAYOUT until reformat() sets less, and never set back to more. A copy keeps it, since
+  // it applies wherever the table or array is stored.
+  TomlWriteOptions.Keep keep = TomlWriteOptions.Keep.LAYOUT;
+
+  // Where the brackets of this table or array were written in the document, and where the whitespace before the closing
+  // one starts. Null for a table or array built through the editing API, for one read from a document parsed with no
+  // source kept, and for the tables of a [[x]] header and the array holding them, which are written as sections rather
+  // than in brackets. A copy shares it, since the span is offsets into the source the brackets were read from, and a
+  // copy is still written from that text.
   @Nullable
   ValueSpan bracketSpan;
 
@@ -185,16 +192,81 @@ abstract class ElementContainer<E extends Entry> extends Value {
   }
 
   /**
+   * Set how much of the existing structure and format of this table or array is kept; see
+   * {@link MutableTomlTable#reformat(TomlWriteOptions.Keep)}.
+   *
+   * @param keep How much to keep.
+   */
+  void reformatAs(TomlWriteOptions.Keep keep) {
+    requireNonNull(keep);
+    // A table reformatted twice keeps the lesser of the two amounts: the later of them in the order LAYOUT, NOTATION,
+    // NOTHING. So LAYOUT, the amount every table starts with, changes nothing
+    if (keep.compareTo(this.keep) > 0) {
+      this.keep = keep;
+    }
+  }
+
+  /**
+   * How much of the existing structure and format of this table or array is kept within a document that keeps
+   * {@code inherited}: the later of that and the amount set here, in the order LAYOUT, NOTATION, NOTHING, each of which
+   * keeps less than the one before it.
+   *
+   * @param inherited How much the document, or the table or array holding this one, keeps.
+   * @return How much this table or array keeps.
+   */
+  TomlWriteOptions.Keep keepWithin(TomlWriteOptions.Keep inherited) {
+    return (keep.compareTo(inherited) > 0) ? keep : inherited;
+  }
+
+  /**
+   * The options a value nested in a document is written with: the options of the table or array holding it, keeping no
+   * more than reformat() set on the value itself.
+   *
+   * @param value The value.
+   * @param enclosing The options the table or array holding it is written with.
+   * @return Those options, or a copy of them that keeps less.
+   */
+  static TomlWriteOptions optionsWithin(Object value, TomlWriteOptions enclosing) {
+    if (!(value instanceof ElementContainer)) {
+      return enclosing;
+    }
+    TomlWriteOptions.Keep keep = ((ElementContainer<?>) value).keepWithin(enclosing.keep());
+    return (keep == enclosing.keep()) ? enclosing : enclosing.keep(keep);
+  }
+
+  /**
+   * Whether reformat() was called on this table or array, or on one written inside it, in which case the span of its
+   * brackets is not used.
+   *
+   * @return {@code true} if reformat() was called here or anywhere within.
+   */
+  private boolean reformatted() {
+    if (keep != TomlWriteOptions.Keep.LAYOUT) {
+      return true;
+    }
+    for (TomlElement element : elements) {
+      if (!(element instanceof Entry)) {
+        continue;
+      }
+      Value value = ((Entry) element).value;
+      if (value instanceof ElementContainer && ((ElementContainer<?>) value).reformatted()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * {@inheritDoc}
    *
    * <p>
-   * The brackets this table or array was written in describe what it held when it was read, so they no longer describe
-   * it once anything in it has been edited.
+   * The span of the brackets this table or array was written in covers what it held when it was read, so it is not used
+   * once anything in it has been edited, or once reformat() has been called on it or on a table or array inside it.
    */
   @Override
   @Nullable
   ValueSpan writtenSpan() {
-    return isModified() ? null : bracketSpan;
+    return (isModified() || reformatted()) ? null : bracketSpan;
   }
 
   /**

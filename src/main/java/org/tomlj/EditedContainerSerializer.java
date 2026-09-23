@@ -114,7 +114,14 @@ final class EditedContainerSerializer {
       ValueSpan brackets,
       Context context,
       TomlWriteOptions options) throws IOException {
-    new EditedContainerSerializer(text, brackets, options).write(container, context);
+    EditedContainerSerializer writer = new EditedContainerSerializer(text, brackets, options);
+    TomlWriteOptions containerOptions = ElementContainer.optionsWithin(container, options);
+    if (containerOptions.keep() != options.keep()) {
+      // reformat() was called on the container, so none of its source text is copied
+      writer.appendValue(container, context, containerOptions);
+      return;
+    }
+    writer.write(container, context);
   }
 
   private EditedContainerSerializer(StringBuilder out, ValueSpan brackets, TomlWriteOptions options) {
@@ -139,7 +146,7 @@ final class EditedContainerSerializer {
     order(items);
     if (!anySpanned(items)) {
       // No element with a span remains, so no source text is copied
-      appendValue(container, context);
+      appendValue(container, context, options);
       return;
     }
     layout(items, table);
@@ -360,10 +367,11 @@ final class EditedContainerSerializer {
   private void appendEntry(Item item, Context context) throws IOException {
     Entry entry = item.entry();
     SourceSpan span = item.span;
+    TomlWriteOptions valueOptions = ElementContainer.optionsWithin(entry.value, options);
     if (span == null) {
       appendCommentAbove(entry);
       appendKey(item.keyPath);
-      appendValue(entry.value, context);
+      appendValue(entry.value, context, valueOptions);
       return;
     }
     int from;
@@ -381,9 +389,9 @@ final class EditedContainerSerializer {
     out.append(source.text(from, span.valueStart - 1));
     ValueSpan nested = span.writtenBrackets(entry.value);
     if (nested != null) {
-      new EditedContainerSerializer(out, nested, options).write((ElementContainer<?>) entry.value, context);
+      append(out, (ElementContainer<?>) entry.value, nested, context, options);
     } else {
-      appendValue(entry.value, context);
+      appendValue(entry.value, context, valueOptions);
     }
   }
 
@@ -529,23 +537,26 @@ final class EditedContainerSerializer {
    *
    * @param value The value.
    * @param context Where the value sits.
+   * @param valueOptions The options the value is written with, which are these options unless reformat() set less to
+   *        keep on it.
    */
-  private void appendValue(TomlValue value, Context context) throws IOException {
+  private void appendValue(TomlValue value, Context context, TomlWriteOptions valueOptions) throws IOException {
+    boolean literals = valueOptions.keep() != TomlWriteOptions.Keep.NOTHING;
     if (context == Context.ENTRY) {
-      // The inline table is on one line, or the version does not allow line breaks inside it, so the value stays on
-      // the one line whatever the maximum line width is. The value holds no comments: a comment in the inline table
-      // lays it out over lines, where its entries are in the ELEMENT context, or the write throws for TOML 1.0.0
-      Serializer.appendInlineValue(out, value);
+      // The inline table is on one line, or the version does not allow line breaks inside it, so the value is written
+      // on the one line regardless of the maximum line width. The value holds no comments: an inline table holding a
+      // comment is written over lines, where its entries are in the ELEMENT context, or the write throws for TOML 1.0.0
+      Serializer.appendInlineValue(out, value, literals);
       return;
     }
     int lineStart = lastLineStart(out);
     String indent = indentOfLastLine(out);
     int column = out.codePointCount(lineStart, out.length());
-    Serializer serializer = Serializer.defaultStyle(out, options);
+    Serializer serializer = Serializer.defaultStyle(out, valueOptions);
     if (context == Context.LINE) {
       serializer.writeEntryValue(value, indent, column);
     } else {
-      serializer.writeNestedValue(value, indent, column, 1);
+      serializer.writeNestedValue(value, indent, column, 1, literals);
     }
   }
 

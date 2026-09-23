@@ -33,7 +33,9 @@ public final class TomlWriteOptions {
    * How much of the existing document structure and format is kept.
    *
    * <p>
-   * Each value keeps less than the one before it, and where a value has nothing to keep, the next value applies.
+   * Each value keeps less than the one before it, and where a value has nothing to keep, the next value applies. Where
+   * an amount is set on a single table or array through {@link MutableTomlTable#reformat(Keep)} as well as in the
+   * options, the table or array keeps the later of the two in this order.
    */
   public enum Keep {
     /**

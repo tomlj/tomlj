@@ -1022,6 +1022,29 @@ public interface MutableTomlTable extends TomlTable {
   boolean removeComment(TomlComment comment);
 
   /**
+   * Keep less of the existing structure and format of this table, and of everything in it.
+   *
+   * <p>
+   * A parse result is written from the text it was parsed from, so a table keeps its layout until it is changed.
+   * Reformatting it discards that:
+   * <ul>
+   * <li>With {@link TomlWriteOptions.Keep#LAYOUT}, which every table starts with, nothing changes.</li>
+   * <li>With {@link TomlWriteOptions.Keep#NOTATION} its lines keep their order, comments, literal forms and structure,
+   * whether a header, dotted keys or an inline table, and take the layout the options give.</li>
+   * <li>With {@link TomlWriteOptions.Keep#NOTHING} it is written entirely in the default style, as a table built with
+   * the editing API is, in the place its header had.</li>
+   * </ul>
+   * The amount to keep applies to every table and array nested in this one. A later call keeps the lesser of the two
+   * amounts, so a call asking for more than was set changes nothing and a reformat cannot be undone. A copy of this
+   * table is reformatted the same way.
+   *
+   * @param keep How much of the existing structure and format of this table to keep.
+   * @return This table.
+   * @throws NullPointerException If {@code keep} is {@code null}.
+   */
+  MutableTomlTable reformat(TomlWriteOptions.Keep keep);
+
+  /**
    * Get the entry for a key, or throw if the key is not set.
    *
    * @param path The key path.

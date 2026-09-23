@@ -599,6 +599,31 @@ public interface MutableTomlArray extends TomlArray {
   boolean removeComment(TomlComment comment);
 
   /**
+   * Keep less of the existing structure and format of this array, and of everything in it.
+   *
+   * <p>
+   * A parse result is written from the text it was parsed from, so an array keeps its layout until it is changed.
+   * Reformatting it discards that:
+   * <ul>
+   * <li>With {@link TomlWriteOptions.Keep#LAYOUT}, which every array starts with, nothing changes.</li>
+   * <li>With {@link TomlWriteOptions.Keep#NOTATION} its elements keep their order, comments, literal forms and the
+   * structure of the tables among them, and take the layout the options give.</li>
+   * <li>With {@link TomlWriteOptions.Keep#NOTHING} it is written entirely in the default style, as an array built with
+   * the editing API is.</li>
+   * </ul>
+   * An array of the tables of {@code [[header]]} sections is written as those sections, keeping that amount, in the
+   * place the first of them had; any other array is written anew on the line it is written on. The amount to keep
+   * applies to every table and array nested in this one. A later call keeps the lesser of the two amounts, so a call
+   * asking for more than was set changes nothing and a reformat cannot be undone. A copy of this array is reformatted
+   * the same way.
+   *
+   * @param keep How much of the existing structure and format of this array to keep.
+   * @return This array.
+   * @throws NullPointerException If {@code keep} is {@code null}.
+   */
+  MutableTomlArray reformat(TomlWriteOptions.Keep keep);
+
+  /**
    * Create a deep copy of an array.
    *
    * <p>

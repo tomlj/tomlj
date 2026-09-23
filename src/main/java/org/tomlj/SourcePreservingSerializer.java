@@ -57,6 +57,13 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * the indentation of its section, the comments of the model, the key and the literal each value was written with, and
  * an array or inline table laid out anew. A line keeps one blank line above it where the document wrote any, a header
  * always gets one, and the blank lines a document ends with are dropped.
+ *
+ * <p>
+ * A table or array reformatted by {@link MutableTomlTable#reformat(TomlWriteOptions.Keep)} is written at its position
+ * in the document, keeping what reformat() asked for: keeping the notation writes its lines from their parts, in place,
+ * and keeping nothing writes the whole of it from the model as one block, in the place its header had - or, for a table
+ * the document wrote as the dotted keys of the section around it, and for one whose header names a different path,
+ * after the last line of that section. No span is used for anything in such a table.
  */
 final class SourcePreservingSerializer {
 
@@ -72,13 +79,14 @@ final class SourcePreservingSerializer {
   private final Source source;
   private final Appendable out;
 
-  // The options anything written anew is written with, which end a new line the way the document ends its own unless
-  // the caller asked for a separator.
+  // The options anything written anew is written with, which use the document's line separator unless the caller set
+  // one.
   private final TomlWriteOptions options;
   private final String lineSeparator;
 
-  // Whether only the notation is kept, so that every line is written from its parts in the layout the options ask for
-  private final boolean notationOnly;
+  // The options the root table is written with: these options, or the amount to keep that reformat() set on the root
+  // if that is less
+  private final TomlWriteOptions rootOptions;
 
   private final List<Chunk> chunks = new ArrayList<>();
   private int sequence;
@@ -109,7 +117,7 @@ final class SourcePreservingSerializer {
     this.out = out;
     this.options = documentOptions(source, options);
     this.lineSeparator = this.options.lineSeparator();
-    this.notationOnly = (options.keep() == TomlWriteOptions.Keep.NOTATION);
+    this.rootOptions = ElementContainer.optionsWithin(root, this.options);
   }
 
   /**
@@ -125,7 +133,7 @@ final class SourcePreservingSerializer {
   }
 
   private void write() throws IOException {
-    collectTable(root, Collections.emptyList(), Collections.emptyList(), new Group(null), -1, true);
+    collectTable(root, Collections.emptyList(), Collections.emptyList(), new Group(null), -1, true, rootOptions);
     chunks
         .sort(
             Comparator
@@ -136,7 +144,7 @@ final class SourcePreservingSerializer {
       chunk.write();
     }
     // Keeping only the notation ends the document with the last line written, so the blank lines below it are dropped
-    if (!notationOnly && root.trailerStart() >= 0) {
+    if (rootOptions.keep() != TomlWriteOptions.Keep.NOTATION && root.trailerStart() >= 0) {
       startLine();
       // The document's trailing blank lines are copied, so the pending blank line is not written
       blankLineOwed = false;
@@ -154,6 +162,7 @@ final class SourcePreservingSerializer {
    * @param sectionAnchor Where an element of this table with no line of the document beside it goes: after the
    *        section's header, or {@code -1} for the root, which puts it before everything.
    * @param rootTable Whether this table is the document root.
+   * @param tableOptions The options this table is written with, which say how much of it is kept.
    * @return The lines this table contributes to {@code section}, which are the lines of the table itself and of any
    *         table the document opened with a dotted key within it.
    */
@@ -163,7 +172,8 @@ final class SourcePreservingSerializer {
       List<String> relative,
       Group section,
       int sectionAnchor,
-      boolean rootTable) {
+      boolean rootTable,
+      TomlWriteOptions tableOptions) {
     List<TomlElement> elements = table.elements();
     int count = elements.size();
     Contribution[] parts = new Contribution[count];
@@ -171,12 +181,13 @@ final class SourcePreservingSerializer {
     Group[] subtrees = new Group[count];
     List<Integer> pending = new ArrayList<>();
     Contribution contributed = new Contribution();
+    boolean notationOnly = (tableOptions.keep() == TomlWriteOptions.Keep.NOTATION);
     // The last line this table writes, which an unattached run after it is written directly under
     int lastLine = notationOnly ? lastLineIndex(elements) : -1;
     // When only the notation is kept, the lines of this table are written at the indentation the options give the
     // section around it, and the header of a table written in it at the indentation of the lines it is written among
     String lineIndent = notationOnly ? spaces(sectionPath.size() * options.indent()) : "";
-    String headerIndent = notationOnly ? spaces((sectionPath.size() + relative.size()) * options.indent()) : "";
+    String headerIndent = spaces((sectionPath.size() + relative.size()) * options.indent());
     boolean sawSection = false;
 
     for (int i = 0; i < count; i++) {
@@ -189,7 +200,14 @@ final class SourcePreservingSerializer {
         SourceSpan span = comment.span();
         if (span != null && usable(span, SourceSpan.Kind.COMMENT)) {
           // A run written after a section of the root belongs to the root only if a blank line separates it from it
-          addComment(span, comment, section, part, lineIndent, (i < lastLine) || (rootTable && sawSection));
+          addComment(
+              span,
+              comment,
+              section,
+              part,
+              lineIndent,
+              (i < lastLine) || (rootTable && sawSection),
+              tableOptions);
         } else {
           pending.add(i);
         }
@@ -202,7 +220,7 @@ final class SourcePreservingSerializer {
       if (writtenOnALine(pair)) {
         SourceSpan span = pair.span;
         if (span != null && usable(span, SourceSpan.Kind.LINE) && span.keyParts == (relative.size() + 1)) {
-          addLine(span, pair, section, part, path(relative, key), lineIndent);
+          addLine(span, pair, section, part, path(relative, key), lineIndent, tableOptions);
         } else {
           pending.add(i);
         }
@@ -213,47 +231,87 @@ final class SourcePreservingSerializer {
       sections[i] = true;
       if (pair.value instanceof LinkedTomlTable) {
         LinkedTomlTable subTable = (LinkedTomlTable) pair.value;
+        TomlWriteOptions subOptions = ElementContainer.optionsWithin(subTable, tableOptions);
         SourceSpan header = headerOf(pair, subTable);
-        if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
+        boolean headerWritten = (header != null) && usable(header, SourceSpan.Kind.HEADER);
+        if (subOptions.keep() == TomlWriteOptions.Keep.NOTHING) {
+          // The table is written whole, in the place its header had, so nothing of the subtree is read from the
+          // document; only where its text ended is, which is where a section written into the table around it goes.
+          subtrees[i] = closedGroup(section, subtreeStop(subTable, headerWritten ? header.stop : -1));
+          chunks
+              .add(
+                  new SectionChunk(
+                      pair,
+                      path(sectionPath, relative, key),
+                      false,
+                      section,
+                      headerWritten ? header.start : -1,
+                      headerWritten ? SOURCE_LINE : NEW_SECTION,
+                      subOptions));
+        } else if (headerWritten) {
           Group group = new Group(section);
           subtrees[i] = group;
-          addHeader(header, pair, group, headerIndent);
-          collectTable(subTable, path(sectionPath, relative, key), Collections.emptyList(), group, header.stop, false);
+          addHeader(header, pair, group, headerIndent, subOptions);
+          collectTable(
+              subTable,
+              path(sectionPath, relative, key),
+              Collections.emptyList(),
+              group,
+              header.stop,
+              false,
+              subOptions);
         } else if (!pair.valueModified && !pair.commentsModified() && writtenAsDottedKeys(subTable)) {
           // A table the document opened with a dotted key, or implicitly as a parent of a header: its lines belong to
           // this section, written with the dotted keys the document wrote them with.
           sections[i] = false;
-          part.merge(collectTable(subTable, sectionPath, path(relative, key), section, sectionAnchor, false));
+          part
+              .merge(
+                  collectTable(subTable, sectionPath, path(relative, key), section, sectionAnchor, false, subOptions));
         } else {
           // A table a dotted key can no longer name gets a header of its own
-          addSection(pair, path(sectionPath, relative, key), section);
+          addSection(pair, path(sectionPath, relative, key), section, subOptions);
         }
       } else {
         ListTomlArray array = (ListTomlArray) pair.value;
+        TomlWriteOptions arrayOptions = ElementContainer.optionsWithin(array, tableOptions);
         List<String> arrayPath = path(sectionPath, relative, key);
-        Group arrayGroup = new Group(section);
-        subtrees[i] = arrayGroup;
-        List<Group> preceding = new ArrayList<>();
-        for (TomlElement tableElement : array.elements()) {
-          Entry.Indexed indexed = (Entry.Indexed) tableElement;
-          SourceSpan header = null;
-          if (!pair.valueModified && indexed.value instanceof LinkedTomlTable) {
-            header = headerOf(indexed, (LinkedTomlTable) indexed.value);
-          }
-          if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
-            Group group = new Group(arrayGroup);
-            addHeader(header, indexed, group, headerIndent);
-            collectTable(
-                (LinkedTomlTable) indexed.value,
-                arrayPath,
-                Collections.emptyList(),
-                group,
-                header.stop,
-                false);
-            preceding.add(group);
-          } else {
-            // A table the editing API added to the array follows the one before it, which the walk has already read
-            chunks.add(new SectionChunk(indexed, arrayPath, true, section, stopOf(preceding)));
+        if (arrayOptions.keep() == TomlWriteOptions.Keep.NOTHING) {
+          collectTableArrayKeepingNothing(pair, array, arrayPath, section, subtrees, i, arrayOptions);
+        } else {
+          Group arrayGroup = new Group(section);
+          subtrees[i] = arrayGroup;
+          List<Group> preceding = new ArrayList<>();
+          for (TomlElement tableElement : array.elements()) {
+            Entry.Indexed indexed = (Entry.Indexed) tableElement;
+            SourceSpan header = null;
+            if (!pair.valueModified && indexed.value instanceof LinkedTomlTable) {
+              header = headerOf(indexed, (LinkedTomlTable) indexed.value);
+            }
+            if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
+              Group group = new Group(arrayGroup);
+              addHeader(header, indexed, group, headerIndent, arrayOptions);
+              collectTable(
+                  (LinkedTomlTable) indexed.value,
+                  arrayPath,
+                  Collections.emptyList(),
+                  group,
+                  header.stop,
+                  false,
+                  arrayOptions);
+              preceding.add(group);
+            } else {
+              // A table the editing API added to the array follows the one before it, which the walk has already read
+              chunks
+                  .add(
+                      new SectionChunk(
+                          indexed,
+                          arrayPath,
+                          true,
+                          section,
+                          stopOf(preceding),
+                          NEW_SECTION,
+                          arrayOptions));
+            }
           }
         }
       }
@@ -261,8 +319,130 @@ final class SourcePreservingSerializer {
       contributed.merge(part);
     }
 
-    anchorNewElements(elements, parts, sections, subtrees, pending, sectionPath, relative, sectionAnchor, rootTable);
+    anchorNewElements(
+        elements,
+        parts,
+        sections,
+        subtrees,
+        pending,
+        sectionPath,
+        relative,
+        sectionAnchor,
+        rootTable,
+        tableOptions);
     return contributed;
+  }
+
+  /**
+   * Collect the one chunk an array of tables that keeps nothing is written as: every table of it, as a
+   * {@code [[header]]} section, in the place the first of them had.
+   *
+   * @param pair The entry holding the array.
+   * @param array The array.
+   * @param arrayPath The keys from the root to the array.
+   * @param section The section the array is written in.
+   * @param subtrees Where the group for the text the array was read from is recorded.
+   * @param index The index of the entry in its table's sequence.
+   * @param arrayOptions The options the array is written with.
+   */
+  private void collectTableArrayKeepingNothing(
+      Entry.KeyValue pair,
+      ListTomlArray array,
+      List<String> arrayPath,
+      Group section,
+      Group[] subtrees,
+      int index,
+      TomlWriteOptions arrayOptions) {
+    int anchor = -1;
+    int stop = -1;
+    for (TomlElement tableElement : array.elements()) {
+      Entry.Indexed indexed = (Entry.Indexed) tableElement;
+      if (!(indexed.value instanceof LinkedTomlTable)) {
+        continue;
+      }
+      SourceSpan header = pair.valueModified ? null : headerOf(indexed, (LinkedTomlTable) indexed.value);
+      if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
+        if (anchor < 0) {
+          anchor = header.start;
+        }
+        stop = Math.max(stop, header.stop);
+      }
+      stop = subtreeStop((LinkedTomlTable) indexed.value, stop);
+    }
+    subtrees[index] = closedGroup(section, stop);
+    chunks
+        .add(
+            new SectionChunk(
+                pair,
+                arrayPath,
+                false,
+                section,
+                anchor,
+                (anchor >= 0) ? SOURCE_LINE : NEW_SECTION,
+                arrayOptions));
+  }
+
+  /**
+   * A group for text of the document that is written from the model instead: it holds no chunk, and records only the
+   * end offset of that text, so that a section added to the enclosing table is written after it.
+   *
+   * @param section The section the text was written in.
+   * @param stop The end of the text, or {@code -1} if none of it has a span.
+   * @return The group.
+   */
+  private static Group closedGroup(Group section, int stop) {
+    Group group = new Group(section);
+    if (stop >= 0) {
+      group.addLine(stop);
+    }
+    return group;
+  }
+
+  /**
+   * The end of the last span anywhere in a table: its lines, the unattached comments among them, and the headers and
+   * lines of every table and array of tables written in it.
+   *
+   * @param table The table.
+   * @param stop The end found so far.
+   * @return The greater of that and the end of the text of this table.
+   */
+  private int subtreeStop(LinkedTomlTable table, int stop) {
+    int last = stop;
+    for (TomlElement element : table.elements()) {
+      if (element instanceof TomlComment) {
+        SourceSpan span = ((TomlComment) element).span();
+        if (span != null && usable(span, SourceSpan.Kind.COMMENT)) {
+          last = Math.max(last, span.stop);
+        }
+        continue;
+      }
+      Entry.KeyValue pair = (Entry.KeyValue) element;
+      if (pair.span != null && usable(pair.span, SourceSpan.Kind.LINE)) {
+        last = Math.max(last, pair.span.stop);
+      }
+      if (pair.value instanceof LinkedTomlTable) {
+        last = subtreeStop((LinkedTomlTable) pair.value, headerStop(pair, (LinkedTomlTable) pair.value, last));
+      } else if (pair.value instanceof ListTomlArray) {
+        for (TomlElement tableElement : ((ListTomlArray) pair.value).elements()) {
+          if (!(tableElement instanceof Entry.Indexed)) {
+            // An unattached comment in an array, which is written within the brackets of the line the array is on
+            continue;
+          }
+          Entry.Indexed indexed = (Entry.Indexed) tableElement;
+          if (indexed.value instanceof LinkedTomlTable) {
+            LinkedTomlTable elementTable = (LinkedTomlTable) indexed.value;
+            last = subtreeStop(elementTable, headerStop(indexed, elementTable, last));
+          }
+        }
+      }
+    }
+    return last;
+  }
+
+  /** The end of a table's header line, where the document wrote one that still names it, or {@code stop}. */
+  private int headerStop(Entry entry, LinkedTomlTable table, int stop) {
+    SourceSpan header = headerOf(entry, table);
+    return (header != null && usable(header, SourceSpan.Kind.HEADER)) ? Math.max(stop, header.stop) : stop;
   }
 
   /**
@@ -285,10 +465,12 @@ final class SourcePreservingSerializer {
       List<String> sectionPath,
       List<String> relative,
       int sectionAnchor,
-      boolean rootTable) {
+      boolean rootTable,
+      TomlWriteOptions tableOptions) {
     if (pending.isEmpty()) {
       return;
     }
+    boolean notationOnly = (tableOptions.keep() == TomlWriteOptions.Keep.NOTATION);
     int lastLine = lastLineIndex(elements);
     // A new entry must be written before the first section of this table, since a re-parse reads a line written after a
     // header into the table that header opens. A comment is placed by the rules below.
@@ -347,10 +529,11 @@ final class SourcePreservingSerializer {
       // neighbouring line
       String lineIndent = (indent != null && !notationOnly) ? indent : spaces(sectionPath.size() * options.indent());
       if (isComment) {
-        chunks.add(new CommentChunk((TomlComment) element, lineIndent, anchor, rank, blankAbove));
+        chunks.add(new CommentChunk((TomlComment) element, lineIndent, anchor, rank, blankAbove, tableOptions));
       } else {
         Entry.KeyValue pair = (Entry.KeyValue) element;
-        chunks.add(new EntryChunk(pair, path(relative, pair.key()), lineIndent, anchor, rank, blankAbove));
+        chunks
+            .add(new EntryChunk(pair, path(relative, pair.key()), lineIndent, anchor, rank, blankAbove, tableOptions));
       }
     }
   }
@@ -361,8 +544,9 @@ final class SourcePreservingSerializer {
       Group section,
       Contribution part,
       List<String> keyPath,
-      String lineIndent) {
-    chunks.add(new LineChunk(span, entry, keyPath, lineIndent));
+      String lineIndent,
+      TomlWriteOptions lineOptions) {
+    chunks.add(new LineChunk(span, entry, keyPath, lineIndent, lineOptions));
     section.addLine(span.stop);
     part.add(span.start, span.stop, indentOf(span));
   }
@@ -377,22 +561,29 @@ final class SourcePreservingSerializer {
       Group section,
       Contribution part,
       String lineIndent,
-      boolean blankAbove) {
+      boolean blankAbove,
+      TomlWriteOptions lineOptions) {
     chunks
         .add(
-            notationOnly ? new CommentChunk(comment, lineIndent, span.start, SOURCE_LINE, blankAbove)
-                : new LineChunk(span, null, Collections.<String>emptyList(), lineIndent));
+            (lineOptions.keep() == TomlWriteOptions.Keep.NOTATION)
+                ? new CommentChunk(comment, lineIndent, span.start, SOURCE_LINE, blankAbove, lineOptions)
+                : new LineChunk(span, null, Collections.<String>emptyList(), lineIndent, lineOptions));
     section.addLine(span.stop);
     part.add(span.start, span.stop, indentOf(span));
   }
 
-  private void addHeader(SourceSpan header, Entry entry, Group group, String headerIndent) {
-    chunks.add(new LineChunk(header, entry, Collections.emptyList(), headerIndent));
+  private void addHeader(
+      SourceSpan header,
+      Entry entry,
+      Group group,
+      String headerIndent,
+      TomlWriteOptions tableOptions) {
+    chunks.add(new LineChunk(header, entry, Collections.emptyList(), headerIndent, tableOptions));
     group.addLine(header.stop);
   }
 
-  private void addSection(TomlEntry entry, List<String> path, Group section) {
-    chunks.add(new SectionChunk(entry, path, false, section, -1));
+  private void addSection(TomlEntry entry, List<String> path, Group section, TomlWriteOptions tableOptions) {
+    chunks.add(new SectionChunk(entry, path, false, section, -1, NEW_SECTION, tableOptions));
   }
 
   /**
@@ -725,12 +916,21 @@ final class SourcePreservingSerializer {
     /** The indentation this line is written at when only the notation is kept. */
     private final String lineIndent;
 
-    LineChunk(SourceSpan span, @Nullable Entry entry, List<String> keyPath, String lineIndent) {
+    /** The options this line is written with, which say how much of the table holding it is kept. */
+    private final TomlWriteOptions lineOptions;
+
+    LineChunk(
+        SourceSpan span,
+        @Nullable Entry entry,
+        List<String> keyPath,
+        String lineIndent,
+        TomlWriteOptions lineOptions) {
       super(SOURCE_LINE);
       this.span = span;
       this.entry = entry;
       this.keyPath = keyPath;
       this.lineIndent = lineIndent;
+      this.lineOptions = lineOptions;
     }
 
     @Override
@@ -740,7 +940,7 @@ final class SourcePreservingSerializer {
 
     @Override
     void write() throws IOException {
-      if (notationOnly) {
+      if (lineOptions.keep() == TomlWriteOptions.Keep.NOTATION) {
         writeFromParts();
         return;
       }
@@ -799,7 +999,7 @@ final class SourcePreservingSerializer {
       startLine();
       flushBlankLine();
       StringBuilder line = new StringBuilder();
-      Serializer writer = Serializer.defaultStyle(line, options);
+      Serializer writer = Serializer.defaultStyle(line, lineOptions);
       if (header) {
         writer.writeHeaderText(lineIndent, source.text(span.keyStart, span.keyStop), lineEntry.comments());
       } else {
@@ -815,7 +1015,7 @@ final class SourcePreservingSerializer {
       line.append(blankLines);
       TomlComment above = lineEntry.comment(TomlComment.Placement.ABOVE);
       if (above != null) {
-        Serializer.defaultStyle(line, options).writeCommentLines(above, indent);
+        Serializer.defaultStyle(line, lineOptions).writeCommentLines(above, indent);
       }
       line.append(indent);
     }
@@ -842,11 +1042,13 @@ final class SourcePreservingSerializer {
                 (ElementContainer<?>) lineEntry.value,
                 brackets,
                 EditedContainerSerializer.Context.LINE,
-                options);
+                lineOptions);
         return;
       }
       int column = width(indent) + width(source.text(span.keyStart, span.valueStart - 1));
-      Serializer.defaultStyle(line, options).writeEntryValue(lineEntry.value, indent, column);
+      Serializer
+          .defaultStyle(line, ElementContainer.optionsWithin(lineEntry.value, lineOptions))
+          .writeEntryValue(lineEntry.value, indent, column);
     }
 
     /**
@@ -879,13 +1081,24 @@ final class SourcePreservingSerializer {
     private final int anchor;
     private final boolean blankAbove;
 
-    EntryChunk(TomlEntry entry, List<String> keyPath, String lineIndent, int anchor, int rank, boolean blankAbove) {
+    /** The options this line is written with, which say how much of the table holding it is kept. */
+    private final TomlWriteOptions lineOptions;
+
+    EntryChunk(
+        TomlEntry entry,
+        List<String> keyPath,
+        String lineIndent,
+        int anchor,
+        int rank,
+        boolean blankAbove,
+        TomlWriteOptions lineOptions) {
       super(rank);
       this.entry = entry;
       this.keyPath = keyPath;
       this.lineIndent = lineIndent;
       this.anchor = anchor;
       this.blankAbove = blankAbove;
+      this.lineOptions = lineOptions;
     }
 
     @Override
@@ -901,7 +1114,7 @@ final class SourcePreservingSerializer {
       }
       flushBlankLine();
       StringBuilder text = new StringBuilder();
-      Serializer.defaultStyle(text, options).writeKeyValue(lineIndent, keyPath, entry);
+      Serializer.defaultStyle(text, lineOptions).writeKeyValue(lineIndent, keyPath, entry);
       append(text);
       afterComment = false;
     }
@@ -918,12 +1131,22 @@ final class SourcePreservingSerializer {
     private final int anchor;
     private final boolean blankAbove;
 
-    CommentChunk(TomlComment comment, String lineIndent, int anchor, int rank, boolean blankAbove) {
+    /** The options these lines are written with, which say how much of the table holding them is kept. */
+    private final TomlWriteOptions lineOptions;
+
+    CommentChunk(
+        TomlComment comment,
+        String lineIndent,
+        int anchor,
+        int rank,
+        boolean blankAbove,
+        TomlWriteOptions lineOptions) {
       super(rank);
       this.comment = comment;
       this.lineIndent = lineIndent;
       this.anchor = anchor;
       this.blankAbove = blankAbove;
+      this.lineOptions = lineOptions;
     }
 
     @Override
@@ -939,7 +1162,7 @@ final class SourcePreservingSerializer {
       }
       flushBlankLine();
       StringBuilder text = new StringBuilder();
-      Serializer.defaultStyle(text, options).writeCommentLines(comment, lineIndent);
+      Serializer.defaultStyle(text, lineOptions).writeCommentLines(comment, lineIndent);
       append(text);
       requestBlankLine();
       afterComment = false;
@@ -947,8 +1170,9 @@ final class SourcePreservingSerializer {
   }
 
   /**
-   * A table, or one table of an array of tables, that the document has no header for, written in the default style as a
-   * section of its own after the last line of the subtree it belongs to.
+   * A table, or one table of an array of tables, written in the default style as a section of its own: one the document
+   * has no header for, which goes after the last line of the subtree it belongs to, or one that keeps nothing, which is
+   * written at the offset of its header.
    */
   private final class SectionChunk extends Chunk {
 
@@ -960,13 +1184,24 @@ final class SourcePreservingSerializer {
     /** Where this section goes, or {@code -1} to take the group's own anchor once the whole document is walked. */
     private final int after;
 
-    SectionChunk(TomlEntry entry, List<String> path, boolean arrayTable, Group group, int after) {
-      super(NEW_SECTION);
+    /** The options this section is written with, which say how much of the table or array is kept. */
+    private final TomlWriteOptions blockOptions;
+
+    SectionChunk(
+        TomlEntry entry,
+        List<String> path,
+        boolean arrayTable,
+        Group group,
+        int after,
+        int rank,
+        TomlWriteOptions blockOptions) {
+      super(rank);
       this.entry = entry;
       this.path = path;
       this.arrayTable = arrayTable;
       this.group = group;
       this.after = after;
+      this.blockOptions = blockOptions;
     }
 
     @Override
@@ -980,7 +1215,7 @@ final class SourcePreservingSerializer {
       requestBlankLine();
       flushBlankLine();
       StringBuilder text = new StringBuilder();
-      Serializer block = Serializer.blockStyle(text, options);
+      Serializer block = Serializer.blockStyle(text, blockOptions);
       if (arrayTable) {
         block.writeArrayTableSection(entry, new ArrayList<>(path));
       } else {
