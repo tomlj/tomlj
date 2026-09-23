@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -929,12 +930,100 @@ class SourcePreservingSerializerTest {
                 result -> requireArray(result, "a").add(MutableTomlTable.create().set("k", 1)),
                 "a = [{ k = 1 }]\n"),
             edited("a document with no newline at its end", "a = 1", result -> result.set("b", 2), "a = 1\nb = 2\n"),
+            edited(
+                "a comment left after the last line of its table when the line below it goes is written directly under"
+                    + " the line above",
+                "[t]\nx = 1\n\n# note\n\ny = 2\n\n[u]\n",
+                result -> requireTable(result, "t").remove("y"),
+                "[t]\nx = 1\n# note\n\n[u]\n"),
+            edited(
+                "two comments added to the root after its last section stay separate runs",
+                "[t]\nx = 1\n",
+                result -> result.addComment("one").addComment("two"),
+                "[t]\nx = 1\n\n# one\n\n# two\n"),
             edited("an empty document", "", result -> result.set("a", 1), "a = 1\n"),
             edited(
                 "a new table in an empty document",
                 "",
                 result -> result.getOrCreateTable("t").set("k", 1),
                 "[t]\nk = 1\n"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("joinedRuns")
+  void joinsTheRunsAfterTheLastLineOfATable(
+      String description,
+      String input,
+      Consumer<TomlParseResult> edit,
+      TomlWriteOptions options,
+      String expected) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    edit.accept(result);
+
+    String written = result.toToml(options);
+    assertEquals(expected, written);
+
+    // The two runs come back as one run of the table they were written in, and nothing of them in the root
+    TomlParseResult reparsed = Toml.parse(written);
+    assertFalse(reparsed.hasErrors(), () -> written + "\n" + joinErrors(reparsed));
+    assertTrue(Toml.equals(result, reparsed), () -> written);
+    assertTrue(unattachedComments(reparsed).isEmpty(), () -> written);
+    List<TomlComment> comments = unattachedComments(requireTable(reparsed, "t"));
+    assertEquals(1, comments.size(), () -> written);
+    assertEquals(List.of("one", "", "two"), comments.get(0).lines());
+  }
+
+  private static List<TomlComment> unattachedComments(TomlTable table) {
+    return table.elements().stream().filter(TomlComment.class::isInstance).map(TomlComment.class::cast).toList();
+  }
+
+  static Stream<Arguments> joinedRuns() {
+    return Stream
+        .of(
+            joined(
+                "a comment added after the last comment of a table",
+                "[t]\nx = 1\n# one\n\n[u]\ny = 2\n",
+                result -> requireTable(result, "t").addComment("two"),
+                LF,
+                "[t]\nx = 1\n# one\n#\n# two\n\n[u]\ny = 2\n"),
+            joined(
+                "two comments added after the last line of a table",
+                "[t]\nx = 1\n",
+                result -> requireTable(result, "t").addComment("one").addComment("two"),
+                LF,
+                "[t]\nx = 1\n# one\n#\n# two\n"),
+            joined(
+                "two comments added under the header of an empty table",
+                "[t]\n\n[u]\n",
+                result -> requireTable(result, "t").addComment("one").addComment("two"),
+                LF,
+                "[t]\n# one\n#\n# two\n\n[u]\n"),
+            joined(
+                "the comments left after the last line of a table when the line between them goes",
+                "[t]\n# one\n\nx = 1\n# two\n\n[u]\n",
+                result -> requireTable(result, "t").remove("x"),
+                LF,
+                "[t]\n# one\n#\n# two\n\n[u]\n"),
+            joined(
+                "a comment added after the last comment of a table is indented like it",
+                "[t]\n  x = 1\n  # one\n",
+                result -> requireTable(result, "t").addComment("two"),
+                LF,
+                "[t]\n  x = 1\n  # one\n  #\n  # two\n"),
+            joined(
+                "a comment added after the last comment of a table when only the notation is kept",
+                "[t]\n  x = 1\n  # one\n\n[u]\n",
+                result -> requireTable(result, "t").addComment("two"),
+                LF.keep(TomlWriteOptions.Keep.NOTATION),
+                "[t]\nx = 1\n# one\n#\n# two\n\n[u]\n"),
+            joined(
+                "the comments left after the last line of a table when the line between them goes, when only the"
+                    + " notation is kept",
+                "[t]\n# one\n\nx = 1\n# two\n\n[u]\n",
+                result -> requireTable(result, "t").remove("x"),
+                LF.keep(TomlWriteOptions.Keep.NOTATION),
+                "[t]\n# one\n#\n# two\n\n[u]\n"));
   }
 
   private static Arguments edited(String description, String input, Consumer<TomlParseResult> edit, String expected) {
@@ -954,6 +1043,15 @@ class SourcePreservingSerializerTest {
   private static MutableTomlArray longArray() {
     return MutableTomlArray
         .of(1000000000001L, 1000000000002L, 1000000000003L, 1000000000004L, 1000000000005L, 1000000000006L);
+  }
+
+  private static Arguments joined(
+      String description,
+      String input,
+      Consumer<TomlParseResult> edit,
+      TomlWriteOptions options,
+      String expected) {
+    return Arguments.of(description, input, edit, options, expected);
   }
 
   private static Arguments notationKept(String description, String input, TomlWriteOptions options, String expected) {

@@ -30,25 +30,27 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * chunk for each of those, and writes them in the order of the offsets they were read at, which keeps the document's
  * layout: its comments, the form each value was written in, and the order of its sections, including sections the
  * document interleaves ({@code [a]}, {@code [b]}, {@code [a.c]}). A line the parser rejected recorded nothing, so it is
- * not written; the comments above it were carried to the next accepted line as the document was read, so they are
- * written above that line.
+ * not written, and neither is the comment run above it, which is not in the model.
  *
  * <p>
- * A span is used only where the parse itself put the element the walk finds. The walk stops reading spans as soon as it
- * passes through an entry the editing API added or replaced, since a table stored under a new key keeps the span of the
- * header that named its old path, and a table copied in from another document keeps spans that read that document's
- * text. Everything else is written as {@link TomlWriteOptions.Keep#NOTATION} writes it ({@link Serializer}), where it
- * belongs: a new entry after the nearest line of its table, indented like it and named by a key relative to the section
- * that line is in; a new unattached comment likewise, with a blank line above and below; a new table, or one of a copy,
- * as a section after the last line of its parent's subtree. A section written anew copies each of its lines that has a
- * span, so a copied entry is written with the literal it was read as.
+ * A span is used only for an element that is still in the container and at the key path it was parsed at. The walk
+ * stops using spans as soon as it passes through an entry the editing API added or replaced, since a table stored under
+ * a new key keeps the span of the header that named its old path, and a table copied in from another document keeps
+ * spans whose source is that document. Everything else is written as {@link TomlWriteOptions.Keep#NOTATION} writes it
+ * ({@link Serializer}), where it belongs: a new entry after the nearest line of its table, indented like it and named
+ * by a key relative to the section that line is in; a new unattached comment likewise, with a blank line above and
+ * below, except that a run after the last line of a table is written directly under the line above it, and joined to a
+ * run already there by an empty comment line, since a re-parse reads a run separated from that line by a blank line as
+ * an unattached comment of the root; a new table, or one of a copy, as a section after the last line of its parent's
+ * subtree. A section written anew copies each of its lines that has a span, so a copied entry is written with the
+ * literal it was read as.
  *
  * <p>
- * A line whose value was replaced, or whose comments were set or removed, keeps the place the document gave it: the
- * blank lines above it, its key and the spacing around the {@code =} are written as they were read, and only what
+ * A line whose value was replaced, or whose comments were set or removed, is written at the offset it was read from:
+ * the blank lines above it, its key and the spacing around the {@code =} are written as they were read, and only what
  * changed is written anew. A value the default style writes under a header of its own, a table or an array of tables,
- * cannot stay on a line, so the line goes and the value is written as a section. An array or inline table edited in
- * place keeps its line and its brackets, and is written from the spans of its elements that were not edited
+ * cannot stay on a line, so the line is not written and the value is written as a section. An array or inline table
+ * edited in place keeps its line and its brackets, and is written from the spans of its elements that were not edited
  * ({@link EditedContainerSerializer}).
  *
  * <p>
@@ -182,13 +184,13 @@ final class SourcePreservingSerializer {
     List<Integer> pending = new ArrayList<>();
     Contribution contributed = new Contribution();
     boolean notationOnly = (tableOptions.keep() == TomlWriteOptions.Keep.NOTATION);
-    // The last line this table writes, which an unattached run after it is written directly under
-    int lastLine = notationOnly ? lastLineIndex(elements) : -1;
+    // The spans of the unattached comments the document wrote, whose chunks are collected once the table's last line
+    // is known, since a run after that line is written differently
+    SourceSpan[] commentSpans = new SourceSpan[count];
     // When only the notation is kept, the lines of this table are written at the indentation the options give the
     // section around it, and the header of a table written in it at the indentation of the lines it is written among
     String lineIndent = notationOnly ? spaces(sectionPath.size() * options.indent()) : "";
     String headerIndent = spaces((sectionPath.size() + relative.size()) * options.indent());
-    boolean sawSection = false;
 
     for (int i = 0; i < count; i++) {
       TomlElement element = elements.get(i);
@@ -199,15 +201,9 @@ final class SourcePreservingSerializer {
         TomlComment comment = (TomlComment) element;
         SourceSpan span = comment.span();
         if (span != null && usable(span, SourceSpan.Kind.COMMENT)) {
-          // A run written after a section of the root belongs to the root only if a blank line separates it from it
-          addComment(
-              span,
-              comment,
-              section,
-              part,
-              lineIndent,
-              (i < lastLine) || (rootTable && sawSection),
-              tableOptions);
+          commentSpans[i] = span;
+          section.addLine(span.stop);
+          part.add(span.start, span.stop, indentOf(span));
         } else {
           pending.add(i);
         }
@@ -315,10 +311,11 @@ final class SourcePreservingSerializer {
           }
         }
       }
-      sawSection = sawSection || sections[i];
       contributed.merge(part);
     }
 
+    int lastLine = lastLineIndex(elements, parts);
+    collectComments(elements, commentSpans, sections, lastLine, rootTable, lineIndent, tableOptions);
     anchorNewElements(
         elements,
         parts,
@@ -328,9 +325,50 @@ final class SourcePreservingSerializer {
         sectionPath,
         relative,
         sectionAnchor,
+        lastLine,
         rootTable,
         tableOptions);
     return contributed;
+  }
+
+  /**
+   * Collect a chunk for each unattached comment the document wrote. When only the notation is kept, it is written from
+   * the model, as one the editing API added is, since where the blank lines around it go is part of the layout.
+   *
+   * @param elements The elements of the table.
+   * @param commentSpans The span of each element that is such a comment, by index, and {@code null} elsewhere.
+   * @param sections Which elements are written as sections rather than as lines.
+   * @param lastLine The index of the last element written as a line of the section, or {@code -1}.
+   * @param rootTable Whether the table is the document root.
+   * @param lineIndent The indentation the comment is written at when only the notation is kept.
+   * @param tableOptions The options the table is written with.
+   */
+  private void collectComments(
+      List<TomlElement> elements,
+      SourceSpan[] commentSpans,
+      boolean[] sections,
+      int lastLine,
+      boolean rootTable,
+      String lineIndent,
+      TomlWriteOptions tableOptions) {
+    boolean notationOnly = (tableOptions.keep() == TomlWriteOptions.Keep.NOTATION);
+    boolean sawSection = false;
+    for (int i = 0; i < commentSpans.length; i++) {
+      SourceSpan span = commentSpans[i];
+      if (span == null) {
+        sawSection = sawSection || sections[i];
+        continue;
+      }
+      TomlComment comment = (TomlComment) elements.get(i);
+      boolean trailing = !rootTable && (i > lastLine);
+      if (notationOnly) {
+        // A run written after a section of the root belongs to the root only if a blank line separates it from it
+        boolean blankAbove = (i < lastLine) || (rootTable && sawSection);
+        chunks.add(new CommentChunk(comment, lineIndent, span.start, SOURCE_LINE, blankAbove, trailing, tableOptions));
+      } else {
+        chunks.add(new LineChunk(span, null, Collections.<String>emptyList(), lineIndent, trailing, tableOptions));
+      }
+    }
   }
 
   /**
@@ -455,6 +493,10 @@ final class SourcePreservingSerializer {
    * neither, at the section's own anchor. It is written with the indentation of that neighbour, and with a key relative
    * to the section the neighbour's line is in, so a new entry of a table written as dotted keys is written as a dotted
    * key.
+   *
+   * @param lastLine The index of the last element written as a line of the section, or {@code -1}. A comment after it
+   *        is written directly under the line above it, so that a re-parse reads it in this table rather than in the
+   *        table whose header follows.
    */
   private void anchorNewElements(
       List<TomlElement> elements,
@@ -465,13 +507,13 @@ final class SourcePreservingSerializer {
       List<String> sectionPath,
       List<String> relative,
       int sectionAnchor,
+      int lastLine,
       boolean rootTable,
       TomlWriteOptions tableOptions) {
     if (pending.isEmpty()) {
       return;
     }
     boolean notationOnly = (tableOptions.keep() == TomlWriteOptions.Keep.NOTATION);
-    int lastLine = lastLineIndex(elements);
     // A new entry must be written before the first section of this table, since a re-parse reads a line written after a
     // header into the table that header opens. A comment is placed by the rules below.
     int firstSection = firstSectionIndex(sections);
@@ -481,9 +523,8 @@ final class SourcePreservingSerializer {
       int anchor = sectionAnchor;
       int rank = AFTER_LINE;
       String indent = null;
-      // A run with no line of its table after it in the sequence is written directly under the line above it, so that
-      // a re-parse reads it in this table rather than in whatever follows.
       boolean blankAbove = isComment && (index < lastLine);
+      boolean trailing = isComment && !rootTable && (index > lastLine);
       int limit = (isComment || firstSection < 0) ? parts.length : firstSection;
 
       boolean found = false;
@@ -529,7 +570,8 @@ final class SourcePreservingSerializer {
       // neighbouring line
       String lineIndent = (indent != null && !notationOnly) ? indent : spaces(sectionPath.size() * options.indent());
       if (isComment) {
-        chunks.add(new CommentChunk((TomlComment) element, lineIndent, anchor, rank, blankAbove, tableOptions));
+        chunks
+            .add(new CommentChunk((TomlComment) element, lineIndent, anchor, rank, blankAbove, trailing, tableOptions));
       } else {
         Entry.KeyValue pair = (Entry.KeyValue) element;
         chunks
@@ -546,28 +588,7 @@ final class SourcePreservingSerializer {
       List<String> keyPath,
       String lineIndent,
       TomlWriteOptions lineOptions) {
-    chunks.add(new LineChunk(span, entry, keyPath, lineIndent, lineOptions));
-    section.addLine(span.stop);
-    part.add(span.start, span.stop, indentOf(span));
-  }
-
-  /**
-   * Collect an unattached comment the document wrote. When only the notation is kept, it is written from the model, as
-   * one the editing API added is, since where the blank lines around it go is part of the layout.
-   */
-  private void addComment(
-      SourceSpan span,
-      TomlComment comment,
-      Group section,
-      Contribution part,
-      String lineIndent,
-      boolean blankAbove,
-      TomlWriteOptions lineOptions) {
-    chunks
-        .add(
-            (lineOptions.keep() == TomlWriteOptions.Keep.NOTATION)
-                ? new CommentChunk(comment, lineIndent, span.start, SOURCE_LINE, blankAbove, lineOptions)
-                : new LineChunk(span, null, Collections.<String>emptyList(), lineIndent, lineOptions));
+    chunks.add(new LineChunk(span, entry, keyPath, lineIndent, false, lineOptions));
     section.addLine(span.stop);
     part.add(span.start, span.stop, indentOf(span));
   }
@@ -578,7 +599,7 @@ final class SourcePreservingSerializer {
       Group group,
       String headerIndent,
       TomlWriteOptions tableOptions) {
-    chunks.add(new LineChunk(header, entry, Collections.emptyList(), headerIndent, tableOptions));
+    chunks.add(new LineChunk(header, entry, Collections.emptyList(), headerIndent, false, tableOptions));
     group.addLine(header.stop);
   }
 
@@ -658,10 +679,19 @@ final class SourcePreservingSerializer {
     return -1;
   }
 
-  private static int lastLineIndex(List<TomlElement> elements) {
+  /**
+   * The index of the last element of a table written as a line of the section the table is in: a {@code key = value}
+   * line, whether the document holds it or the editing API added it, or a table the document opened with a dotted key,
+   * whose lines are written among this table's.
+   *
+   * @param elements The elements of the table.
+   * @param parts The lines each element contributed to the section.
+   * @return The index, or {@code -1} if no element is written as a line.
+   */
+  private static int lastLineIndex(List<TomlElement> elements, Contribution[] parts) {
     for (int i = elements.size() - 1; i >= 0; i--) {
       TomlElement element = elements.get(i);
-      if (element instanceof Entry && writtenOnALine((Entry) element)) {
+      if (element instanceof Entry && (writtenOnALine((Entry) element) || parts[i].hasLines())) {
         return i;
       }
     }
@@ -796,6 +826,21 @@ final class SourcePreservingSerializer {
   }
 
   /**
+   * Write an empty comment line in place of the blank line that would separate the run about to be written from the one
+   * just written. Two runs after the last line of a table are written as one run this way, since with a blank line
+   * between them a re-parse reads the second as an unattached comment of the root.
+   *
+   * @param indent The indentation of the line.
+   */
+  private void joinRun(String indent) throws IOException {
+    startLine();
+    blankLineOwed = false;
+    append(indent);
+    append("#");
+    append(lineSeparator);
+  }
+
+  /**
    * The lines this table contributes to its section, whose offsets anchor the elements the editing API added next to
    * them.
    */
@@ -916,6 +961,9 @@ final class SourcePreservingSerializer {
     /** The indentation this line is written at when only the notation is kept. */
     private final String lineIndent;
 
+    /** Whether this is an unattached comment after the last line of its table. */
+    private final boolean trailing;
+
     /** The options this line is written with, which say how much of the table holding it is kept. */
     private final TomlWriteOptions lineOptions;
 
@@ -924,12 +972,14 @@ final class SourcePreservingSerializer {
         @Nullable Entry entry,
         List<String> keyPath,
         String lineIndent,
+        boolean trailing,
         TomlWriteOptions lineOptions) {
       super(SOURCE_LINE);
       this.span = span;
       this.entry = entry;
       this.keyPath = keyPath;
       this.lineIndent = lineIndent;
+      this.trailing = trailing;
       this.lineOptions = lineOptions;
     }
 
@@ -946,20 +996,17 @@ final class SourcePreservingSerializer {
       }
       startLine();
       String leading = source.text(span.start, firstToken(span) - 1);
+      Entry lineEntry = entry;
+      if (lineEntry == null) {
+        writeComment(leading);
+        return;
+      }
       if (afterComment && leading.indexOf('\n') < 0) {
         // In the document that unattached comment was followed by a blank line, which was part of the text between them
         // that is not written, so a blank line is requested
         requestBlankLine();
       }
       boolean blankWritten = flushBlankLine();
-      Entry lineEntry = entry;
-      if (lineEntry == null) {
-        // A blank line written above this one already separates it from what came before
-        append(blankWritten ? lastLineOf(leading) : leading);
-        append(source.text(firstToken(span), span.stop));
-        afterComment = true;
-        return;
-      }
       boolean modelComments = lineEntry.commentsModified();
       String indent = indentOf(span);
       // The line is assembled whole, so that a value written anew into it is laid out at the column it reaches
@@ -984,6 +1031,33 @@ final class SourcePreservingSerializer {
     }
 
     /**
+     * Write an unattached comment from the text it was read from, after the blank lines the document had above it. A
+     * comment after the last line of its table is written directly under the line above it instead, regardless of the
+     * blank lines in the document, since a re-parse reads a run separated from that line by a blank line as an
+     * unattached comment of the root; and where that line is a run as well, an empty comment line joins the two.
+     *
+     * @param leading The blank lines and indentation the document wrote above the comment.
+     */
+    private void writeComment(String leading) throws IOException {
+      if (trailing) {
+        if (afterComment) {
+          joinRun(indentOf(span));
+        }
+        append(lastLineOf(leading));
+      } else {
+        if (afterComment && leading.indexOf('\n') < 0) {
+          // In the document that unattached comment was followed by a blank line, which was part of the text between
+          // them that is not written, so a blank line is requested
+          requestBlankLine();
+        }
+        // A blank line written above this one already separates it from what came before
+        append(flushBlankLine() ? lastLineOf(leading) : leading);
+      }
+      append(source.text(firstToken(span), span.stop));
+      afterComment = true;
+    }
+
+    /**
      * Write the line from its parts, in the layout the options set: the indentation of its section, the comments the
      * model holds, the key and, for a header, the text the document wrote them as, and the value laid out anew around
      * the literal each scalar was written with. A line keeps one blank line above it where the document wrote any, and
@@ -993,7 +1067,7 @@ final class SourcePreservingSerializer {
       Entry lineEntry = entry;
       assert lineEntry != null : "an unattached comment is written from the model";
       boolean header = (span.kind == SourceSpan.Kind.HEADER);
-      if (header || source.text(span.start, firstToken(span) - 1).indexOf('\n') >= 0) {
+      if (header || afterComment || source.text(span.start, firstToken(span) - 1).indexOf('\n') >= 0) {
         requestBlankLine();
       }
       startLine();
@@ -1121,8 +1195,10 @@ final class SourcePreservingSerializer {
   }
 
   /**
-   * An unattached comment the document holds no text for, written with a blank line above it and one below, so that a
-   * re-parse reads it in the table it was added to and as the comment above nothing.
+   * An unattached comment written from the model, with a blank line above it and one below, so that a re-parse reads it
+   * in the table it was added to and as an unattached comment. A comment after the last line of its table is written
+   * directly under the line above it instead, since a re-parse reads a run separated from that line by a blank line as
+   * an unattached comment of the root; where that line is a run as well, an empty comment line joins the two.
    */
   private final class CommentChunk extends Chunk {
 
@@ -1130,6 +1206,7 @@ final class SourcePreservingSerializer {
     private final String lineIndent;
     private final int anchor;
     private final boolean blankAbove;
+    private final boolean trailing;
 
     /** The options these lines are written with, which say how much of the table holding them is kept. */
     private final TomlWriteOptions lineOptions;
@@ -1140,12 +1217,14 @@ final class SourcePreservingSerializer {
         int anchor,
         int rank,
         boolean blankAbove,
+        boolean trailing,
         TomlWriteOptions lineOptions) {
       super(rank);
       this.comment = comment;
       this.lineIndent = lineIndent;
       this.anchor = anchor;
       this.blankAbove = blankAbove;
+      this.trailing = trailing;
       this.lineOptions = lineOptions;
     }
 
@@ -1157,15 +1236,16 @@ final class SourcePreservingSerializer {
     @Override
     void write() throws IOException {
       startLine();
-      if (blankAbove || afterComment) {
+      if (trailing && afterComment) {
+        joinRun(lineIndent);
+      } else if (blankAbove || afterComment) {
         requestBlankLine();
       }
       flushBlankLine();
       StringBuilder text = new StringBuilder();
       Serializer.defaultStyle(text, lineOptions).writeCommentLines(comment, lineIndent);
       append(text);
-      requestBlankLine();
-      afterComment = false;
+      afterComment = true;
     }
   }
 

@@ -83,9 +83,15 @@ anew, in the place the document gives it:
   written with a blank line below it, and a blank line above it unless it comes after the last line
   of its table, without doubling one the document already has: a run directly under a line belongs
   to the table open there, and one after a blank line to the table of the next expression, so the
-  placement keeps the comment in its table on a re-parse. An unattached comment added to the root
-  goes after its last section, with a blank line above it. A comment set on a table the document
-  wrote as dotted keys gives it a header to hold the comment.
+  placement keeps the comment in its table on a re-parse. Two unattached comments after the last
+  line of a table are written as one run, joined by an empty comment line, since with a blank line
+  between them a re-parse would read the second as an unattached comment of the root; and a single
+  run left after the last line of a table when the line below it is removed is written directly
+  under the line above it, regardless of the blank lines the document had there. The root is not
+  affected: a run after its last section belongs to the root whether or not a blank line precedes
+  it. An unattached comment added to the root goes after its last section, with a blank line above
+  it. A comment set on a table the document wrote as dotted keys gives it a header to hold the
+  comment.
 * **An array or inline table edited in place** keeps its line and its brackets. Each element that
   was not replaced is written from its own text, with its literal, its comments and the layout
   around it; an element added or replaced is written in the default style, laid out like the
@@ -141,9 +147,11 @@ written as a single-line basic string.
 Comments are written from the model: the run above an entry or header, the comment after it, and the
 unattached comments of each table or array, in the container they were written in. A blank line
 separates an unattached comment from the element it would otherwise be attached to, so that a
-re-parse reads it as unattached. An array or inline table holding a comment is written over lines
-for every TOML version, since a comment ends at a line break; for TOML 1.0.0 an inline table holding
-a comment cannot be written, and `toToml` throws `IllegalArgumentException`.
+re-parse reads it as unattached. Two unattached comments after the last line of a table are written
+as one run, joined by an empty comment line, since with a blank line between them a re-parse would
+read the second as an unattached comment of the root. An array or inline table holding a comment is
+written over lines for every TOML version, since a comment ends at a line break; for TOML 1.0.0 an
+inline table holding a comment cannot be written, and `toToml` throws `IllegalArgumentException`.
 
 ## The options
 

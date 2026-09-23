@@ -59,7 +59,9 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * {@link IllegalArgumentException}. Where a comment is written decides which container a re-parse reads it in, and a
  * blank line separates an unattached comment from the element it would otherwise be attached to: a run separated by a
  * blank line from what follows it belongs to the container of the next expression, and a run written directly under a
- * line belongs to the container open where it was written.
+ * line belongs to the container open where it was written. Two runs after the last line of a table are therefore
+ * written as one run, with an empty comment line between them: with a blank line between them, a re-parse would read
+ * the second run as an unattached comment of the root.
  *
  * <p>
  * Unless the options ask for {@link TomlWriteOptions.Keep#NOTHING}, a key or a scalar that has a span is written with
@@ -170,11 +172,15 @@ final class Serializer {
     String lineIndent = indentFor(path.size());
     int firstSection = path.isEmpty() ? firstSectionIndex(elements, keepNotation) : -1;
     int lastLine = lastLineIndex(elements, keepNotation);
+    // Whether the element written last was a run after the last line of this table, which the next such run joins
+    boolean trailingRun = false;
     for (int i = 0; i < elements.size(); i++) {
       TomlElement element = elements.get(i);
       if (element instanceof TomlComment) {
         if (firstSection < 0 || i < firstSection) {
-          writeUnattachedComment((TomlComment) element, lineIndent, i < lastLine);
+          boolean trailing = !path.isEmpty() && (i > lastLine);
+          writeUnattachedComment((TomlComment) element, lineIndent, i < lastLine, trailing && trailingRun);
+          trailingRun = trailing;
         }
       } else if (isLine((TomlEntry) element, keepNotation)) {
         TomlKeyValue pair = (TomlKeyValue) element;
@@ -185,7 +191,7 @@ final class Serializer {
       TomlElement element = elements.get(i);
       if (element instanceof TomlComment) {
         if (firstSection >= 0 && i > firstSection) {
-          writeUnattachedComment((TomlComment) element, lineIndent, true);
+          writeUnattachedComment((TomlComment) element, lineIndent, true, false);
         }
         continue;
       }
@@ -518,9 +524,19 @@ final class Serializer {
    * @param blankAbove Whether to separate it from the line above with a blank line. A run written directly under a line
    *        belongs to the container open where it was written, which is this container; a separated run belongs to the
    *        container of the expression that follows it.
+   * @param joinAbove Whether to write it as a continuation of the run above it, with an empty comment line between them
+   *        rather than a blank one. Two runs after the last line of a table cannot both be separated from what is above
+   *        them: a re-parse would read the second as an unattached comment of the root.
    */
-  private void writeUnattachedComment(TomlComment comment, String lineIndent, boolean blankAbove) throws IOException {
-    if (blankAbove) {
+  private void writeUnattachedComment(TomlComment comment, String lineIndent, boolean blankAbove, boolean joinAbove)
+      throws IOException {
+    if (joinAbove) {
+      // The pending blank line below the run above is written as an empty comment line instead
+      blankLineOwed = false;
+      beginLine(lineIndent);
+      out.append('#');
+      endLine();
+    } else if (blankAbove) {
       blankLine();
     }
     writeCommentLines(comment, lineIndent);

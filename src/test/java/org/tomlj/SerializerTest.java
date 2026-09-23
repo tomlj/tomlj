@@ -909,6 +909,35 @@ class SerializerTest {
     assertThrows(NullPointerException.class, () -> array.toToml(new StringBuilder(), null));
   }
 
+  @Test
+  void joinsTheRunsAfterTheLastLineOfATableWithAnEmptyCommentLine() {
+    TomlParseResult table = parse("[a]\n# one\n\nx = 1\n# two\n\n[b]\ny = 2\n");
+    table.remove("a.x");
+    String toml = table.toToml();
+    assertEquals("[a]\n# one\n#\n# two\n\n[b]\ny = 2\n", toml);
+
+    // The two runs come back as one run of the table they were written in, and nothing of them in the root
+    TomlParseResult reparsed = Toml.parse(toml);
+    assertFalse(reparsed.hasErrors(), () -> toml + "\n" + reparsed.errors());
+    assertTrue(unattachedComments(reparsed).isEmpty());
+    TomlTable a = reparsed.getTable("a");
+    assertNotNull(a);
+    List<TomlComment> comments = unattachedComments(a);
+    assertEquals(1, comments.size());
+    assertEquals(List.of("one", "", "two"), comments.get(0).lines());
+  }
+
+  private static List<TomlComment> unattachedComments(TomlTable table) {
+    return table.elements().stream().filter(TomlComment.class::isInstance).map(TomlComment.class::cast).toList();
+  }
+
+  @Test
+  void keepsTheRunsAfterTheLastLineOfTheRootApart() {
+    TomlParseResult table = parse("x = 1\n# one\n\ny = 2\n# two\n");
+    table.remove("y");
+    assertSerializes(table, "x = 1\n# one\n\n# two\n");
+  }
+
   private static Arguments unchanged(String description, String toml) {
     return Arguments.of(description, parse(toml), toml);
   }
