@@ -62,6 +62,18 @@ doc.set("path", TomlValue.parse("'C:\\Users\\tom'"));
 doc.set("point", TomlValue.parse("{ x = 1, y = 2 }"));
 ```
 
+For the notations that are easy to get wrong by hand, `TomlValue` has factories that take the
+value itself: `hex(255)` for `0xFF` and `hexLowercase(255)` for `0xff`, `octal(493)` for `0o755`,
+`binary(10)` for `0b1010`, `grouped(1000000)` for `1_000_000`, `literal("C:\\Users")` for
+`'C:\Users'` and `multilineLiteral(text)` for a `'''` string. Each throws `IllegalArgumentException`
+for a value its notation cannot write, such as a negative integer with a base prefix or an
+apostrophe in a literal string.
+
+```java
+doc.set("mode", TomlValue.octal(493));
+doc.set("pattern", TomlValue.literal("\\d+"));
+```
+
 [writing.md](writing.md) describes what is written from what.
 
 Keys and `String` values must not contain an unpaired surrogate, and dates must be ones TOML can

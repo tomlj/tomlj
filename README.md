@@ -135,11 +135,12 @@ result.remove("title");
 Files.writeString(source, result.toToml());
 ```
 
-`set` and `add` put a new entry after the last element, and `insertBefore` and `insertAfter` put
-one next to an existing entry. A value parsed from its TOML text, `TomlValue.parse("0xFF")`, is
-written back as it was parsed, and a table made with `MutableTomlTable.createInline()` is written
-between braces on its entry's line. Comments are set and removed by placement: a run above an entry,
-the comment after it, or an unattached comment of a table or array.
+`set` and `add` put a new entry after the last element, and `insertBefore` and `insertAfter` put one
+next to an existing entry. A value parsed from its TOML text, `TomlValue.parse("0xFF")`, or made
+with a notation factory, `TomlValue.hex(255)`, is written back in that notation, and a table made
+with `MutableTomlTable.createInline()` is written between braces on its entry's line. Comments are
+set and removed by placement: a run above an entry, the comment after it, or an unattached comment
+of a table or array.
 [docs/editing.md](docs/editing.md) describes the mutators in full: the values they accept, where a
 new entry goes, and how comments are edited.
 

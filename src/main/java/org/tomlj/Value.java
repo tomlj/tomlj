@@ -54,6 +54,20 @@ abstract class Value implements TomlValue {
   }
 
   /**
+   * Wrap a scalar with the text it is to be written as, which a writer keeping the notation copies as it copies the
+   * literal a document wrote.
+   *
+   * @param value The scalar.
+   * @param text The literal, which must read back as {@code value}.
+   * @return A new {@link Scalar} with no position, whose span covers all of {@code text}.
+   */
+  static Scalar withText(Object value, String text) {
+    Scalar scalar = new Scalar(value, null);
+    scalar.span = ValueSpan.scalar(new Source(text), 0, text.codePointCount(0, text.length()) - 1);
+    return scalar;
+  }
+
+  /**
    * Wrap a copy of a {@link TomlValue}, keeping the record of where the original was written.
    *
    * @param original The value being copied.

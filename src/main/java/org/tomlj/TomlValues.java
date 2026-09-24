@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -92,6 +93,102 @@ final class TomlValues {
       return value;
     }
     throw new IllegalArgumentException("Cannot convert a " + value.getClass().getSimpleName() + " to a TOML value");
+  }
+
+  /**
+   * An integer to be written in a base other than ten; see {@link TomlValue#hex(long)}.
+   *
+   * @param value The integer.
+   * @param prefix The prefix of the notation: {@code 0x}, {@code 0o} or {@code 0b}.
+   * @param radix The base.
+   * @param uppercase Whether a digit beyond 9 is written as an uppercase letter.
+   * @return The value, carrying the text.
+   * @throws IllegalArgumentException If {@code value} is negative, since TOML writes no sign before a prefix.
+   */
+  static TomlValue inBase(long value, String prefix, int radix, boolean uppercase) {
+    if (value < 0) {
+      throw new IllegalArgumentException("A negative integer cannot be written with the " + prefix + " prefix");
+    }
+    String digits = Long.toString(value, radix);
+    return Value.withText(value, prefix + (uppercase ? digits.toUpperCase(Locale.ROOT) : digits));
+  }
+
+  /**
+   * An integer to be written in decimal with its digits grouped in threes by underscores; see
+   * {@link TomlValue#grouped(long)}.
+   *
+   * @param value The integer.
+   * @return The value, carrying the text.
+   */
+  static TomlValue grouped(long value) {
+    String digits = Long.toString(value);
+    if (value < 0) {
+      digits = digits.substring(1);
+    }
+    StringBuilder text = new StringBuilder();
+    if (value < 0) {
+      text.append('-');
+    }
+    int lead = digits.length() % 3;
+    for (int i = 0; i < digits.length(); i++) {
+      if (i > 0 && (i - lead) % 3 == 0) {
+        text.append('_');
+      }
+      text.append(digits.charAt(i));
+    }
+    return Value.withText(value, text.toString());
+  }
+
+  /**
+   * A string to be written as a literal string, between apostrophes with no escaping; see
+   * {@link TomlValue#literal(String)}.
+   *
+   * @param value The string.
+   * @return The value, carrying the text.
+   * @throws IllegalArgumentException If {@code value} holds an apostrophe, a newline or a control character other than
+   *         tab, none of which a literal string can hold.
+   */
+  static TomlValue literal(String value) {
+    checkNoUnpairedSurrogate(value, "String");
+    for (int i = 0; i < value.length(); i++) {
+      char c = value.charAt(i);
+      if (c == '\'') {
+        throw new IllegalArgumentException("A literal string cannot hold an apostrophe");
+      }
+      if (isControl(c)) {
+        throw new IllegalArgumentException("A literal string cannot hold a newline or a control character");
+      }
+    }
+    return Value.withText(value, "'" + value + "'");
+  }
+
+  /**
+   * A string to be written as a multi-line literal string, between triple apostrophes with no escaping; see
+   * {@link TomlValue#multilineLiteral(String)}.
+   *
+   * @param value The string.
+   * @return The value, carrying the text.
+   * @throws IllegalArgumentException If {@code value} holds three apostrophes in a row, or a control character other
+   *         than tab and newline, none of which a multi-line literal string can hold.
+   */
+  static TomlValue multilineLiteral(String value) {
+    checkNoUnpairedSurrogate(value, "String");
+    if (value.contains("'''")) {
+      throw new IllegalArgumentException("A multi-line literal string cannot hold three apostrophes in a row");
+    }
+    for (int i = 0; i < value.length(); i++) {
+      char c = value.charAt(i);
+      if (c != '\n' && isControl(c)) {
+        throw new IllegalArgumentException("A multi-line literal string cannot hold a control character");
+      }
+    }
+    // The newline directly after the opening delimiter is trimmed when read, so it makes the text a line of its own
+    return Value.withText(value, "'''\n" + value + "'''");
+  }
+
+  // A character no string can hold unescaped: a control character other than tab, or the delete character.
+  private static boolean isControl(char c) {
+    return (c < 0x20 && c != '\t') || c == 0x7F;
   }
 
   /**

@@ -162,6 +162,95 @@ class TomlValueTest {
     assertEquals("t = { a = 1, b.c = 2 }\nl = [{ x = 1 }]\n", doc.toToml(LF));
   }
 
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("madeValues")
+  void aValueMadeWithANotationIsWrittenInItAndReadsBack(String description, TomlValue value, String expected) {
+    MutableTomlTable doc = MutableTomlTable.create();
+    doc.set("k", value);
+    String written = doc.toToml(LF);
+    assertEquals("k = " + expected + "\n", written);
+
+    TomlParseResult reparsed = Toml.parse(written);
+    assertFalse(reparsed.hasErrors(), () -> reparsed.errors().toString());
+    assertEquals(value.get(), reparsed.get("k"));
+  }
+
+  static Stream<Arguments> madeValues() {
+    return Stream
+        .of(
+            Arguments.of("hex", TomlValue.hex(255), "0xFF"),
+            Arguments.of("hex zero", TomlValue.hex(0), "0x0"),
+            Arguments.of("hex of the largest long", TomlValue.hex(Long.MAX_VALUE), "0x7FFFFFFFFFFFFFFF"),
+            Arguments.of("lowercase hex", TomlValue.hexLowercase(255), "0xff"),
+            Arguments.of("octal", TomlValue.octal(493), "0o755"),
+            Arguments.of("binary", TomlValue.binary(10), "0b1010"),
+            Arguments.of("grouped", TomlValue.grouped(1_000_000), "1_000_000"),
+            Arguments.of("grouped negative", TomlValue.grouped(-1_234_567), "-1_234_567"),
+            Arguments.of("grouped two digits", TomlValue.grouped(12), "12"),
+            Arguments.of("grouped three digits", TomlValue.grouped(123), "123"),
+            Arguments.of("grouped four digits", TomlValue.grouped(1234), "1_234"),
+            Arguments.of("grouped zero", TomlValue.grouped(0), "0"),
+            Arguments.of("grouped smallest long", TomlValue.grouped(Long.MIN_VALUE), "-9_223_372_036_854_775_808"),
+            Arguments.of("grouped largest long", TomlValue.grouped(Long.MAX_VALUE), "9_223_372_036_854_775_807"),
+            Arguments.of("literal with backslashes", TomlValue.literal("C:\\Users\\x"), "'C:\\Users\\x'"),
+            Arguments.of("literal with quotes", TomlValue.literal("say \"hi\""), "'say \"hi\"'"),
+            Arguments.of("literal with a tab", TomlValue.literal("a\tb"), "'a\tb'"),
+            Arguments.of("literal beyond ASCII", TomlValue.literal("日本 😀"), "'日本 😀'"),
+            Arguments.of("empty literal", TomlValue.literal(""), "''"),
+            Arguments.of("multi-line literal", TomlValue.multilineLiteral("a\\d+\nb"), "'''\na\\d+\nb'''"),
+            Arguments
+                .of("multi-line literal ending in an apostrophe", TomlValue.multilineLiteral("it'"), "'''\nit''''"),
+            Arguments
+                .of("multi-line literal ending in two apostrophes", TomlValue.multilineLiteral("it''"), "'''\nit'''''"),
+            Arguments.of("multi-line literal on one line", TomlValue.multilineLiteral("plain"), "'''\nplain'''"),
+            Arguments.of("multi-line literal ending in a newline", TomlValue.multilineLiteral("a\n"), "'''\na\n'''"),
+            Arguments
+                .of("multi-line literal starting with a newline", TomlValue.multilineLiteral("\na"), "'''\n\na'''"),
+            Arguments.of("empty multi-line literal", TomlValue.multilineLiteral(""), "'''\n'''"));
+  }
+
+  @Test
+  void rejectsAValueItsNotationCannotWrite() {
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.hex(-1));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.hexLowercase(-1));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.octal(-1));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.binary(-1));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.literal("it's"));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.literal("a\nb"));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.literal("a\u0001b"));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.literal("a\u007Fb"));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.literal("bad\uD800"));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.multilineLiteral("it'''"));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.multilineLiteral("a\r\nb"));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.multilineLiteral("a\u0001b"));
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.multilineLiteral("bad\uD800"));
+    assertThrows(NullPointerException.class, () -> TomlValue.literal(null));
+    assertThrows(NullPointerException.class, () -> TomlValue.multilineLiteral(null));
+  }
+
+  @Test
+  void aValueMadeWithANotationIsWrittenInTheDefaultStyleWhenNothingIsKept() {
+    MutableTomlTable doc = MutableTomlTable.create();
+    doc.set("mask", TomlValue.hex(255));
+    doc.set("path", TomlValue.literal("C:\\Users"));
+    doc.set("text", TomlValue.multilineLiteral("a\nb"));
+
+    assertEquals("mask = 0xFF\npath = 'C:\\Users'\ntext = '''\na\nb'''\n", doc.toToml(LF));
+    assertEquals(
+        "mask = 255\npath = \"C:\\\\Users\"\ntext = \"\"\"\na\nb\"\"\"\n",
+        doc.toToml(LF.keep(TomlWriteOptions.Keep.NOTHING)));
+  }
+
+  @Test
+  void aValueMadeWithANotationSetInAParsedDocumentIsWrittenInIt() {
+    TomlParseResult result = Toml.parse("mask = 1  # c\nl = [ 1 ]\n");
+    assertFalse(result.hasErrors());
+    result.set("mask", TomlValue.hex(255));
+    result.getArray("l").add(TomlValue.binary(5));
+
+    assertEquals("mask = 0xFF  # c\nl = [ 1, 0b101 ]\n", result.toToml(LF));
+  }
+
   @Test
   void aParsedValueSetInAParsedDocumentIsWrittenAsItWasParsed() {
     TomlParseResult result = Toml.parse("x = 1  # c\n[t]\ny = 2\n");

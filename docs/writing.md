@@ -24,8 +24,9 @@ A value read from a document keeps the literal it was written with, `0x10` or `'
 it is written, in the default style included, unless the options ask to keep nothing. An inline
 table, and an array read between brackets, keep their form the same way: a table taken from one
 document and set in another is written as `t = { a = 1 }` where it was read so, rather than as a
-`[t]` section. A value parsed from text with `TomlValue.parse` keeps its text and its form the
-same way. The key of a `key = value` line read from a document keeps its quoting the same way.
+`[t]` section. A value parsed from text with `TomlValue.parse`, or made with one of the notation
+factories on `TomlValue` such as `hex(255)`, keeps its text and its form the same way. The key of
+a `key = value` line read from a document keeps its quoting the same way.
 The keys of a header are written from the document's text only while the document keeps its
 notation; the default style quotes a header key only where TOML requires it.
 

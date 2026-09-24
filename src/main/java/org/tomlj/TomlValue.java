@@ -74,6 +74,95 @@ public interface TomlValue extends TomlElement {
   }
 
   /**
+   * An integer to be written in hexadecimal with uppercase digits, as {@code 0xFF}.
+   *
+   * <p>
+   * The value carries the notation with it: stored in a table or an array through the editing API, it is written in
+   * that notation unless the document is written keeping nothing ({@link TomlWriteOptions.Keep#NOTHING}).
+   * {@link #parse(String)} gives a value any notation TOML has.
+   *
+   * @param value The integer.
+   * @return The value.
+   * @throws IllegalArgumentException If {@code value} is negative, since TOML writes no sign before {@code 0x}.
+   * @see #hexLowercase(long)
+   */
+  static TomlValue hex(long value) {
+    return TomlValues.inBase(value, "0x", 16, true);
+  }
+
+  /**
+   * An integer to be written in hexadecimal with lowercase digits, as {@code 0xff}; see {@link #hex(long)}.
+   *
+   * @param value The integer.
+   * @return The value.
+   * @throws IllegalArgumentException If {@code value} is negative, since TOML writes no sign before {@code 0x}.
+   */
+  static TomlValue hexLowercase(long value) {
+    return TomlValues.inBase(value, "0x", 16, false);
+  }
+
+  /**
+   * An integer to be written in octal, as {@code 0o755}; see {@link #hex(long)}.
+   *
+   * @param value The integer.
+   * @return The value.
+   * @throws IllegalArgumentException If {@code value} is negative, since TOML writes no sign before {@code 0o}.
+   */
+  static TomlValue octal(long value) {
+    return TomlValues.inBase(value, "0o", 8, false);
+  }
+
+  /**
+   * An integer to be written in binary, as {@code 0b1010}; see {@link #hex(long)}.
+   *
+   * @param value The integer.
+   * @return The value.
+   * @throws IllegalArgumentException If {@code value} is negative, since TOML writes no sign before {@code 0b}.
+   */
+  static TomlValue binary(long value) {
+    return TomlValues.inBase(value, "0b", 2, false);
+  }
+
+  /**
+   * An integer to be written in decimal with its digits grouped in threes, as {@code 1_000_000}; see
+   * {@link #hex(long)}.
+   *
+   * @param value The integer.
+   * @return The value.
+   */
+  static TomlValue grouped(long value) {
+    return TomlValues.grouped(value);
+  }
+
+  /**
+   * A string to be written as a literal string, between apostrophes with nothing escaped, as {@code 'C:\Users'}; see
+   * {@link #hex(long)}.
+   *
+   * @param value The string.
+   * @return The value.
+   * @throws NullPointerException If {@code value} is {@code null}.
+   * @throws IllegalArgumentException If {@code value} holds an apostrophe, a newline or a control character other than
+   *         tab, none of which a literal string can hold, or an unpaired surrogate.
+   */
+  static TomlValue literal(String value) {
+    return TomlValues.literal(value);
+  }
+
+  /**
+   * A string to be written as a multi-line literal string, between triple apostrophes with nothing escaped, its
+   * newlines written as line breaks; see {@link #hex(long)}.
+   *
+   * @param value The string.
+   * @return The value.
+   * @throws NullPointerException If {@code value} is {@code null}.
+   * @throws IllegalArgumentException If {@code value} holds three apostrophes in a row, or a control character other
+   *         than tab and newline, none of which a multi-line literal string can hold, or an unpaired surrogate.
+   */
+  static TomlValue multilineLiteral(String value) {
+    return TomlValues.multilineLiteral(value);
+  }
+
+  /**
    * Get the value.
    *
    * @return The value: a {@code String}, {@code Long}, {@code Double}, {@code Boolean}, date/time, {@link TomlTable} or
