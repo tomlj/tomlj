@@ -95,6 +95,48 @@ final class Parser {
     return new Source(stream.getText(Interval.of(0, stream.size() - 1)));
   }
 
+  /**
+   * Parse the text of one value, as it is written after the {@code =} of a {@code key = value} line.
+   *
+   * @param text The value.
+   * @param version The version of TOML the value is written in.
+   * @return The value, recording the text it was written as, so that a writer keeping the notation writes it back.
+   * @throws IllegalArgumentException If {@code text} is not one value.
+   */
+  static TomlValue parseValue(String text, TomlVersion version) {
+    Source source = new Source(text);
+    TomlLexer lexer = new TomlLexer(CharStreams.fromString(text));
+    // The mode a value is lexed in after '=', pushed so that the value's end pops back to the default mode
+    lexer.pushMode(TomlLexer.ValueMode);
+    lexer.setEndOfInputEndsLine(false);
+    TomlParser parser = new TomlParser(new CommonTokenStream(lexer));
+    parser.removeErrorListeners();
+    AccumulatingErrorListener errorListener = new AccumulatingErrorListener();
+    parser.addErrorListener(errorListener);
+    TomlParser.TomlValueContext tree = parser.tomlValue();
+    List<TomlParseError> errors = errorListener.errors();
+    if (!errors.isEmpty()) {
+      TomlParseError e = errors.get(0);
+      throw new IllegalArgumentException("Invalid value: " + e.getMessage(), e);
+    }
+    TomlParser.ValContext valContext = tree.val();
+    Object value;
+    try {
+      value = valContext.accept(new ValueVisitor(version.canonical, source));
+    } catch (TomlParseError e) {
+      throw new IllegalArgumentException("Invalid value: " + e.getMessage(), e);
+    }
+    if (value == null) {
+      throw new IllegalArgumentException("Invalid value: " + text);
+    }
+    Value wrapped = Value.of(value, new TomlPosition(valContext));
+    if (wrapped instanceof Value.Scalar) {
+      ((Value.Scalar) wrapped).span =
+          ValueSpan.scalar(source, valContext.getStart().getStartIndex(), valContext.getStop().getStopIndex());
+    }
+    return wrapped;
+  }
+
   static List<String> parseDottedKey(String dottedKey) {
     TomlLexer lexer = new TomlLexer(CharStreams.fromString(dottedKey));
     lexer.mode(TomlLexer.TomlKeyMode);

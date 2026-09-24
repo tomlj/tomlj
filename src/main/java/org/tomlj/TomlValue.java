@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.Objects;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.framework.qual.DefaultQualifier;
@@ -33,6 +34,44 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public interface TomlValue extends TomlElement {
+
+  /**
+   * Parse the text of one value, written as it is after the {@code =} of a {@code key = value} line, in the latest
+   * version of TOML.
+   *
+   * @param text The value, e.g. {@code 0xFF}, {@code 'C:\path'} or <code>{ a = 1 }</code>.
+   * @return The value, which keeps the notation it was written in; see {@link #parse(String, TomlVersion)}.
+   * @throws NullPointerException If {@code text} is {@code null}.
+   * @throws IllegalArgumentException If {@code text} is not one TOML value.
+   */
+  static TomlValue parse(String text) {
+    return parse(text, TomlVersion.LATEST);
+  }
+
+  /**
+   * Parse the text of one value, written as it is after the {@code =} of a {@code key = value} line.
+   *
+   * <p>
+   * The value keeps the notation it was written in. Stored in a table or an array through the editing API, it is
+   * written with the text it was parsed from, as a value read from a document is, unless the document is written
+   * keeping nothing ({@link TomlWriteOptions.Keep#NOTHING}); an inline table is written as an inline table, and an
+   * array of tables as an array, rather than under {@code [x]} or {@code [[x]]} headers.
+   *
+   * <p>
+   * A comment or a line break before or after the value is rejected. A comment inside an inline table or an array is
+   * part of the value and is kept.
+   *
+   * @param text The value, e.g. {@code 0xFF}, {@code 'C:\path'} or <code>{ a = 1 }</code>.
+   * @param version The version of TOML the value is written in.
+   * @return The value.
+   * @throws NullPointerException If {@code text} or {@code version} is {@code null}.
+   * @throws IllegalArgumentException If {@code text} is not one TOML value.
+   */
+  static TomlValue parse(String text, TomlVersion version) {
+    Objects.requireNonNull(text);
+    Objects.requireNonNull(version);
+    return Parser.parseValue(text, version);
+  }
 
   /**
    * Get the value.

@@ -42,6 +42,22 @@ A `TomlValue` read from an entry, `result.entry("port").value()`, stores what it
 can be taken from one entry and set on another. `set` creates any intermediate tables that do not
 exist.
 
+A value can also be parsed from its TOML text with `TomlValue.parse`, which takes what is written
+after the `=` of a `key = value` line: a scalar, an inline table or an array. The value keeps the
+notation it was written in, so `toToml()` writes it back as it was parsed, `0xFF` rather than `255`
+and `{ a = 1 }` on the entry's line rather than under a `[t]` header, unless the options keep
+nothing. Text that is not exactly one value, or that has a comment or a line break before or after
+the value, throws `IllegalArgumentException`; a comment inside an inline table or an array is part
+of the value and is kept.
+
+```java
+doc.set("mask", TomlValue.parse("0xFF"));
+doc.set("path", TomlValue.parse("'C:\\Users\\tom'"));
+doc.set("point", TomlValue.parse("{ x = 1, y = 2 }"));
+```
+
+[writing.md](writing.md) describes what is written from what.
+
 Keys and `String` values must not contain an unpaired surrogate, and dates must be ones TOML can
 write (a year from 0 to 9999, and no seconds in the offset). A value that cannot be written as TOML
 throws `IllegalArgumentException`.
