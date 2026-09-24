@@ -18,13 +18,19 @@ import static org.tomlj.TomlVersion.V1_0_0;
 import org.tomlj.internal.TomlParser;
 import org.tomlj.internal.TomlParserBaseVisitor;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
 
   private final TomlVersion version;
+
+  // The text the string is read from, or null when nothing is recorded about where it was written
+  private final @Nullable Source source;
   private final StringBuilder builder = new StringBuilder();
 
-  public QuotedStringVisitor(TomlVersion version) {
+  QuotedStringVisitor(TomlVersion version, @Nullable Source source) {
     this.version = version;
+    this.source = source;
   }
 
   @Override
@@ -93,6 +99,14 @@ final class QuotedStringVisitor extends TomlParserBaseVisitor<StringBuilder> {
       throw new TomlParseError(
           "Invalid escape sequence '" + text + "' (TOML versions before 1.1.0)",
           new TomlPosition(ctx));
+    }
+    if (source != null) {
+      source
+          .requireVersion(
+              ctx.getStart().getStartIndex(),
+              TomlVersion.V1_1_0,
+              "The escape sequence '" + text + "'",
+              new TomlPosition(ctx));
     }
   }
 

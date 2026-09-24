@@ -182,9 +182,14 @@ inline table holding a comment cannot be written, and `toToml` throws `IllegalAr
   first line, and a document with no source, or with no line break, uses the platform's.
 * **`withVersion(version)`** names the version of TOML the output is written for, 1.1.0 by default.
   The version determines whether an inline table too long for its line may be written over lines,
-  which 1.0.0 does not allow. Text copied from the document is written as the document wrote it,
-  regardless of the version, and an element added to an inline table the document wrote over lines
-  is laid out like the elements around it.
+  which 1.0.0 does not allow. Text is copied from a document only for a version that allows it:
+  writing for 1.0.0 throws `IllegalArgumentException` where it would copy a construct of 1.1.0, an
+  escape sequence `\e` or `\xHH`, a time without seconds, or a line break or trailing comma inside
+  an inline table, whether the text comes from the document being written, from a value made with
+  `TomlValue.parse`, or from a value copied out of another document. The message names the
+  construct and where it was written. A value replaced or removed through the editing API is not
+  copied, and `NOTHING` copies no text, so a document can be brought to 1.0.0 by editing the
+  constructs away or by writing it in the default style.
 
 ```java
 TomlWriteOptions options = TomlWriteOptions.defaults()

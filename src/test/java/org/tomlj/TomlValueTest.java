@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -173,6 +174,53 @@ class TomlValueTest {
     TomlParseResult reparsed = Toml.parse(written);
     assertFalse(reparsed.hasErrors(), () -> reparsed.errors().toString());
     assertEquals(value.get(), reparsed.get("k"));
+
+    // Every notation a factory writes is TOML 1.0.0
+    assertEquals(written, doc.toToml(LF.withVersion(TomlVersion.V1_0_0)));
+    TomlParseResult reparsedAs100 = Toml.parse(written, TomlVersion.V1_0_0);
+    assertFalse(reparsedAs100.hasErrors(), () -> reparsedAs100.errors().toString());
+  }
+
+  @Test
+  void aParsedValueIsNotWrittenForAVersionThatCannotReadIt() {
+    MutableTomlTable doc = MutableTomlTable.create();
+    doc.set("t", TomlValue.parse("07:32"));
+    TomlWriteOptions toml100 = LF.withVersion(TomlVersion.V1_0_0);
+
+    assertEquals("t = 07:32\n", doc.toToml(LF));
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> doc.toToml(toml100));
+    assertEquals(
+        "A time without seconds originally at line 1, column 1 needs TOML 1.1.0 and cannot be written for TOML 1.0.0",
+        e.getMessage());
+    assertThrows(IllegalArgumentException.class, () -> doc.toToml(toml100.keep(TomlWriteOptions.Keep.NOTATION)));
+    assertEquals("t = 07:32:00\n", doc.toToml(toml100.keep(TomlWriteOptions.Keep.NOTHING)));
+  }
+
+  @Test
+  void aValueCopiedFromADocumentCarriesTheVersionItNeeds() {
+    // The trailing comma is recorded before the escape written ahead of it
+    TomlParseResult source = Toml.parse("t = { a = \"\\e\", }\n");
+    assertFalse(source.hasErrors());
+    MutableTomlTable doc = MutableTomlTable.create();
+    doc.set("x", source.entry("t.a").value());
+    TomlWriteOptions toml100 = LF.withVersion(TomlVersion.V1_0_0);
+
+    assertEquals("x = \"\\e\"\n", doc.toToml(LF));
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> doc.toToml(toml100));
+    assertEquals(
+        "The escape sequence '\\e' originally at line 1, column 12 needs TOML 1.1.0 and cannot be written for TOML 1.0.0",
+        e.getMessage());
+    assertEquals("x = \"\\u001b\"\n", doc.toToml(toml100.keep(TomlWriteOptions.Keep.NOTHING)));
+  }
+
+  @Test
+  void aValueBuiltFromAJavaValueIsWrittenForToml100() {
+    MutableTomlTable doc = MutableTomlTable.create();
+    doc.set("t", LocalTime.of(7, 32));
+    doc.set("e", "\u001b[0m");
+    doc.set(List.of("\u001b"), 1);
+
+    assertEquals("t = 07:32:00\ne = \"\\u001b[0m\"\n\"\\u001b\" = 1\n", doc.toToml(LF.withVersion(TomlVersion.V1_0_0)));
   }
 
   static Stream<Arguments> madeValues() {

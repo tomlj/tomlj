@@ -123,6 +123,18 @@ final class SourcePreservingSerializer {
   }
 
   /**
+   * A range of the document's text, for writing.
+   *
+   * @param start The first offset, inclusive.
+   * @param stop The last offset, inclusive.
+   * @return The text.
+   * @throws IllegalArgumentException If the range holds a construct the version written cannot write.
+   */
+  private String text(int start, int stop) {
+    return source.text(start, stop, options.version());
+  }
+
+  /**
    * The options anything written anew is written with: unless the caller set a line separator, the lines added to a
    * document use the document's line separator.
    */
@@ -150,7 +162,7 @@ final class SourcePreservingSerializer {
       startLine();
       // The document's trailing blank lines are copied, so the pending blank line is not written
       blankLineOwed = false;
-      append(source.text(root.trailerStart(), source.length() - 1));
+      append(text(root.trailerStart(), source.length() - 1));
     }
   }
 
@@ -716,7 +728,7 @@ final class SourcePreservingSerializer {
     boolean run = (span.kind != SourceSpan.Kind.COMMENT) && (span.aboveStop >= 0);
     int from = run ? (span.aboveStop + 1) : span.start;
     int token = (span.kind == SourceSpan.Kind.COMMENT) ? span.aboveStart : span.keyStart;
-    return lastLineOf(source.text(from, token - 1));
+    return lastLineOf(text(from, token - 1));
   }
 
   /** The first offset of a span's own text, after the blank lines above it and the indentation of its first line. */
@@ -995,7 +1007,7 @@ final class SourcePreservingSerializer {
         return;
       }
       startLine();
-      String leading = source.text(span.start, firstToken(span) - 1);
+      String leading = text(span.start, firstToken(span) - 1);
       Entry lineEntry = entry;
       if (lineEntry == null) {
         writeComment(leading);
@@ -1016,16 +1028,16 @@ final class SourcePreservingSerializer {
       } else {
         line.append(blankWritten ? lastLineOf(leading) : leading);
         // The comment run above the line and the indentation of the line itself, as they were written
-        line.append(source.text(firstToken(span), span.keyStart - 1));
+        line.append(text(firstToken(span), span.keyStart - 1));
       }
       if (span.kind == SourceSpan.Kind.HEADER) {
-        line.append(source.text(span.keyStart, span.keyStop));
+        line.append(text(span.keyStart, span.keyStop));
       } else {
-        line.append(source.text(span.keyStart, span.valueStart - 1));
+        line.append(text(span.keyStart, span.valueStart - 1));
         appendValue(line, lineEntry, indent);
       }
       // Input the parser skipped between the value or header and the newline lies before the tail, so it is not written
-      line.append(modelComments ? tailWithCommentAfter(lineEntry) : source.text(span.tailStart, span.stop));
+      line.append(modelComments ? tailWithCommentAfter(lineEntry) : text(span.tailStart, span.stop));
       append(line);
       afterComment = false;
     }
@@ -1053,7 +1065,7 @@ final class SourcePreservingSerializer {
         // A blank line written above this one already separates it from what came before
         append(flushBlankLine() ? lastLineOf(leading) : leading);
       }
-      append(source.text(firstToken(span), span.stop));
+      append(text(firstToken(span), span.stop));
       afterComment = true;
     }
 
@@ -1067,7 +1079,7 @@ final class SourcePreservingSerializer {
       Entry lineEntry = entry;
       assert lineEntry != null : "an unattached comment is written from the model";
       boolean header = (span.kind == SourceSpan.Kind.HEADER);
-      if (header || afterComment || source.text(span.start, firstToken(span) - 1).indexOf('\n') >= 0) {
+      if (header || afterComment || text(span.start, firstToken(span) - 1).indexOf('\n') >= 0) {
         requestBlankLine();
       }
       startLine();
@@ -1075,7 +1087,7 @@ final class SourcePreservingSerializer {
       StringBuilder line = new StringBuilder();
       Serializer writer = Serializer.defaultStyle(line, lineOptions);
       if (header) {
-        writer.writeHeaderText(lineIndent, source.text(span.keyStart, span.keyStop), lineEntry.comments());
+        writer.writeHeaderText(lineIndent, text(span.keyStart, span.keyStop), lineEntry.comments());
       } else {
         writer.writeKeyValue(lineIndent, keyPath, lineEntry);
       }
@@ -1105,7 +1117,7 @@ final class SourcePreservingSerializer {
     private void appendValue(StringBuilder line, Entry lineEntry, String indent) throws IOException {
       ValueSpan value = span.writtenValue(lineEntry.value);
       if (value != null) {
-        line.append(source.text(value.start, value.stop));
+        line.append(text(value.start, value.stop));
         return;
       }
       ValueSpan brackets = span.writtenBrackets(lineEntry.value);
@@ -1119,7 +1131,7 @@ final class SourcePreservingSerializer {
                 lineOptions);
         return;
       }
-      int column = width(indent) + width(source.text(span.keyStart, span.valueStart - 1));
+      int column = width(indent) + width(text(span.keyStart, span.valueStart - 1));
       Serializer
           .defaultStyle(line, ElementContainer.optionsWithin(lineEntry.value, lineOptions))
           .writeEntryValue(lineEntry.value, indent, column);
@@ -1133,13 +1145,13 @@ final class SourcePreservingSerializer {
      * @return The text.
      */
     private String tailWithCommentAfter(Entry lineEntry) {
-      String newline = source.text(span.newlineStart, span.stop);
+      String newline = text(span.newlineStart, span.stop);
       TomlComment after = lineEntry.comment(TomlComment.Placement.AFTER);
       if (after == null) {
         return newline;
       }
       // The spacing the document wrote before its own comment, or the two spaces of the default style
-      String spacing = (span.afterStart >= 0) ? source.text(span.tailStart, span.afterStart - 1) : "  ";
+      String spacing = (span.afterStart >= 0) ? text(span.tailStart, span.afterStart - 1) : "  ";
       return spacing + '#' + after.rawLines().get(0) + newline;
     }
   }

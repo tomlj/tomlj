@@ -229,7 +229,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
       return rootTable;
     }
     try {
-      List<String> path = keyContext.accept(new KeyVisitor(version));
+      List<String> path = keyContext.accept(new KeyVisitor(version, source));
       if (path == null || path.isEmpty()) {
         return rootTable;
       }
@@ -264,7 +264,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
       return rootTable;
     }
     try {
-      List<String> path = keyContext.accept(new KeyVisitor(version));
+      List<String> path = keyContext.accept(new KeyVisitor(version, source));
       if (path == null) {
         return rootTable;
       }
@@ -295,7 +295,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
       return rootTable;
     }
     try {
-      List<String> path = keyContext.accept(new KeyVisitor(version));
+      List<String> path = keyContext.accept(new KeyVisitor(version, source));
       if (path == null) {
         return rootTable;
       }

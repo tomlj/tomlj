@@ -499,7 +499,8 @@ public interface TomlArray {
    * @param options The options to write with.
    * @return A TOML representation of this array.
    * @throws IllegalArgumentException If the version the options write for cannot write this array: TOML 1.0.0 and an
-   *         inline table holding a comment.
+   *         inline table holding a comment, or text copied from a document that only TOML 1.1.0 allows; see
+   *         {@link TomlWriteOptions#withVersion(TomlVersion)}.
    * @see TomlWriteOptions
    */
   default String toToml(TomlWriteOptions options) {
@@ -538,7 +539,8 @@ public interface TomlArray {
    * @param options The options to write with.
    * @throws IOException If an IO error occurs.
    * @throws IllegalArgumentException If the version the options write for cannot write this array: TOML 1.0.0 and an
-   *         inline table holding a comment.
+   *         inline table holding a comment, or text copied from a document that only TOML 1.1.0 allows; see
+   *         {@link TomlWriteOptions#withVersion(TomlVersion)}.
    * @see TomlWriteOptions
    */
   default void toToml(Appendable appendable, TomlWriteOptions options) throws IOException {

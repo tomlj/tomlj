@@ -240,6 +240,14 @@ public final class TomlWriteOptions {
    * An inline table holding a comment can only be written over several lines, since a comment ends at a line break, so
    * writing one for TOML 1.0.0 throws {@link IllegalArgumentException}.
    *
+   * <p>
+   * Text copied from a document (a line kept as it was read, or the literal a key or value was written as) is copied
+   * only for a version that allows it. Writing for TOML 1.0.0 throws {@link IllegalArgumentException} where it would
+   * copy a construct of TOML 1.1.0: an escape sequence {@code \e} or {@code \xHH}, a time without seconds, or a line
+   * break or trailing comma inside an inline table, whether the text comes from the document being written, from a
+   * value made with {@link TomlValue#parse(String)}, or from a value copied out of another document. A value replaced
+   * or removed through the editing API is not copied, and {@link Keep#NOTHING} copies no text.
+   *
    * @param version The version of TOML to write for.
    * @return A new set of options with the given version.
    * @see #withMaxLineWidth(int)

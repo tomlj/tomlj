@@ -21,24 +21,39 @@ import org.tomlj.internal.TomlParserBaseVisitor;
 import java.time.LocalTime;
 
 import org.antlr.v4.runtime.tree.ErrorNode;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 final class LocalTimeVisitor extends TomlParserBaseVisitor<LocalTime> {
 
   private final TomlVersion version;
+
+  // The text the time is read from, or null when nothing is recorded about where it was written
+  private final @Nullable Source source;
   private LocalTime time = LocalTime.MIN;
 
-  LocalTimeVisitor(TomlVersion version) {
+  LocalTimeVisitor(TomlVersion version, @Nullable Source source) {
     this.version = version;
+    this.source = source;
   }
 
   @Override
   public LocalTime visitTime(TomlParser.TimeContext ctx) {
     LocalTime result = visitChildren(ctx);
     // Seconds became optional in TOML 1.1.0
-    if (ctx.second() == null && !version.after(V1_0_0)) {
-      throw new TomlParseError(
-          "Seconds are required in a time (TOML versions before 1.1.0)",
-          new TomlPosition(ctx.minute(), ctx.minute().getText().length()));
+    if (ctx.second() == null) {
+      if (!version.after(V1_0_0)) {
+        throw new TomlParseError(
+            "Seconds are required in a time (TOML versions before 1.1.0)",
+            new TomlPosition(ctx.minute(), ctx.minute().getText().length()));
+      }
+      if (source != null) {
+        source
+            .requireVersion(
+                ctx.getStart().getStartIndex(),
+                TomlVersion.V1_1_0,
+                "A time without seconds",
+                new TomlPosition(ctx));
+      }
     }
     return result;
   }

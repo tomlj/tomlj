@@ -157,7 +157,7 @@ final class Parser {
           e);
     }
     try {
-      return tree.accept(new KeyVisitor(TomlVersion.HEAD));
+      return tree.accept(new KeyVisitor(TomlVersion.HEAD, null));
     } catch (TomlParseError e) {
       // An invalid escape sequence in a quoted key, which the hint about quoting would not help with
       throw new IllegalArgumentException("Invalid key: " + e.getMessage(), e);

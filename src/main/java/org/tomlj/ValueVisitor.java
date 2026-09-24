@@ -56,7 +56,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitString(TomlParser.StringContext ctx) {
-    return ctx.accept(new QuotedStringVisitor(version)).toString();
+    return ctx.accept(new QuotedStringVisitor(version, source)).toString();
   }
 
   @Override
@@ -147,7 +147,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
   @Override
   public Object visitOffsetDateTime(TomlParser.OffsetDateTimeContext ctx) {
     LocalDate date = ctx.date().accept(new LocalDateVisitor());
-    LocalTime time = ctx.time().accept(new LocalTimeVisitor(version));
+    LocalTime time = ctx.time().accept(new LocalTimeVisitor(version, source));
     ZoneOffset offset = ctx.timeOffset().accept(new ZoneOffsetVisitor());
     // A part is null when the parser recovered from a syntax error inside it, which it has already reported.
     if (date == null || time == null || offset == null) {
@@ -159,7 +159,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
   @Override
   public Object visitLocalDateTime(TomlParser.LocalDateTimeContext ctx) {
     LocalDate date = ctx.date().accept(new LocalDateVisitor());
-    LocalTime time = ctx.time().accept(new LocalTimeVisitor(version));
+    LocalTime time = ctx.time().accept(new LocalTimeVisitor(version, source));
     // A part is null when the parser recovered from a syntax error inside it, which it has already reported.
     if (date == null || time == null) {
       return null;
@@ -174,7 +174,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
 
   @Override
   public Object visitLocalTime(TomlParser.LocalTimeContext ctx) {
-    return ctx.time().accept(new LocalTimeVisitor(version));
+    return ctx.time().accept(new LocalTimeVisitor(version, source));
   }
 
   /**
@@ -237,9 +237,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
    */
   @Override
   public Object visitInlineTable(TomlParser.InlineTableContext ctx) {
-    if (!version.after(V1_0_0)) {
-      checkSingleLineInlineTable(ctx);
-    }
+    checkInlineTableVersion(ctx);
     LinkedTomlTable table = LinkedTomlTable.inline(new TomlPosition(ctx));
     // The tables that dotted keys open within this one, which close with it: nothing written later may add to them.
     Map<LinkedTomlTable, TomlPosition> openTables = null;
@@ -277,7 +275,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     if (keyContext == null || valContext == null) {
       return;
     }
-    List<String> path = keyContext.accept(new KeyVisitor(version));
+    List<String> path = keyContext.accept(new KeyVisitor(version, source));
     if (path == null || path.isEmpty()) {
       return;
     }
@@ -471,9 +469,45 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     }
   }
 
-  // Newlines and trailing commas in inline tables were added in TOML 1.1.0. Newlines inside the values of an inline
-  // table (multi-line strings and arrays) are not direct children of the inline table rules, so are not collected.
-  private static void checkSingleLineInlineTable(TomlParser.InlineTableContext ctx) {
+  // Newlines and trailing commas in inline tables were added in TOML 1.1.0: reading for 1.0.0 rejects them, and reading
+  // for a later version records them, so that a writer copying the text for 1.0.0 refuses to. Newlines inside the
+  // values of an inline table (multi-line strings and arrays) are not direct children of the inline table rules, so
+  // are not collected.
+  private void checkInlineTableVersion(TomlParser.InlineTableContext ctx) {
+    List<Token> unsupported = lineBreaksAndTrailingComma(ctx);
+    if (unsupported.isEmpty()) {
+      return;
+    }
+    if (!version.after(V1_0_0)) {
+      Token first = Collections.min(unsupported, Comparator.comparingInt(Token::getTokenIndex));
+      String message = (first.getType() == TomlLexer.Comma) ? "A trailing comma is not allowed in an inline table"
+          : "Newlines are not allowed in an inline table";
+      throw new TomlParseError(
+          message + " (TOML versions before 1.1.0)",
+          TomlPosition.positionAt(first.getLine(), first.getCharPositionInLine() + 1));
+    }
+    if (source != null) {
+      for (Token token : unsupported) {
+        String what = (token.getType() == TomlLexer.Comma) ? "A trailing comma in an inline table"
+            : "A newline inside an inline table";
+        source
+            .requireVersion(
+                token.getStartIndex(),
+                TomlVersion.V1_1_0,
+                what,
+                TomlPosition.positionAt(token.getLine(), token.getCharPositionInLine() + 1));
+      }
+    }
+  }
+
+  /**
+   * The tokens of an inline table that TOML 1.0.0 does not allow: the newline of each line break between its braces,
+   * and the comma after its last entry.
+   *
+   * @param ctx The inline table.
+   * @return The tokens, in no particular order.
+   */
+  private static List<Token> lineBreaksAndTrailingComma(TomlParser.InlineTableContext ctx) {
     List<Token> unsupported = new ArrayList<>();
     for (TomlParser.LineBreakContext lineBreak : ctx.lineBreak()) {
       unsupported.add(lineBreak.NewLine(0).getSymbol());
@@ -493,15 +527,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
         }
       }
     }
-    if (unsupported.isEmpty()) {
-      return;
-    }
-    Token first = Collections.min(unsupported, Comparator.comparingInt(Token::getTokenIndex));
-    String message = (first.getType() == TomlLexer.Comma) ? "A trailing comma is not allowed in an inline table"
-        : "Newlines are not allowed in an inline table";
-    throw new TomlParseError(
-        message + " (TOML versions before 1.1.0)",
-        TomlPosition.positionAt(first.getLine(), first.getCharPositionInLine() + 1));
+    return unsupported;
   }
 
   @Override

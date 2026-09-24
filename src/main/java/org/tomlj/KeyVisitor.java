@@ -20,13 +20,19 @@ import org.tomlj.internal.TomlParserBaseVisitor;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 final class KeyVisitor extends TomlParserBaseVisitor<List<String>> {
 
   private final TomlVersion version;
+
+  // The text the key is read from, or null when nothing is recorded about where it was written
+  private final @Nullable Source source;
   private final List<String> keys = new ArrayList<>();
 
-  public KeyVisitor(TomlVersion version) {
+  KeyVisitor(TomlVersion version, @Nullable Source source) {
     this.version = version;
+    this.source = source;
   }
 
   @Override
@@ -37,7 +43,7 @@ final class KeyVisitor extends TomlParserBaseVisitor<List<String>> {
 
   @Override
   public List<String> visitQuotedKey(TomlParser.QuotedKeyContext ctx) {
-    StringBuilder builder = ctx.accept(new QuotedStringVisitor(version));
+    StringBuilder builder = ctx.accept(new QuotedStringVisitor(version, source));
     keys.add(builder.toString());
     return keys;
   }

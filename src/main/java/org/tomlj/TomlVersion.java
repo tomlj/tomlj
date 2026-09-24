@@ -60,4 +60,17 @@ public enum TomlVersion {
   boolean after(TomlVersion other) {
     return this.ordinal() > other.ordinal();
   }
+
+  /**
+   * The version as the specification numbers it: {@code 1.0.0}, {@code 1.1.0}, or {@code HEAD} for the development
+   * specification.
+   *
+   * @return The number, for a message.
+   */
+  String number() {
+    if (canonical == V1_0_0) {
+      return "1.0.0";
+    }
+    return (canonical == V1_1_0) ? "1.1.0" : "HEAD";
+  }
 }

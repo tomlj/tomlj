@@ -12,7 +12,9 @@
  */
 package org.tomlj;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -37,6 +39,12 @@ final class Source {
   private final int[] surrogatePairOffsets;
 
   private final int length;
+
+  /**
+   * The constructs written in this source that an earlier version of TOML cannot write, in offset order. The parser
+   * records them as it reads the source; a writer copying text for a version looks them up.
+   */
+  private final List<VersionNeed> versionNeeds = new ArrayList<>();
 
   Source(String text) {
     this.text = text;
@@ -86,6 +94,81 @@ final class Source {
    */
   String text(int start, int stop) {
     return (start > stop) ? "" : text.substring(charIndex(start), charIndex(stop + 1));
+  }
+
+  /**
+   * A range of this source, to be written for a version of TOML.
+   *
+   * @param start The first offset, inclusive.
+   * @param stop The last offset, inclusive.
+   * @param version The version of TOML the text is written for.
+   * @return The text between the offsets, or {@code ""} if {@code start} is greater than {@code stop}.
+   * @throws IllegalArgumentException If the range holds a construct that version of TOML cannot write, such as a
+   *         {@code \e} escape for TOML 1.0.0.
+   */
+  String text(int start, int stop, TomlVersion version) {
+    for (int i = firstNeedFrom(start); i < versionNeeds.size() && versionNeeds.get(i).offset <= stop; i++) {
+      VersionNeed need = versionNeeds.get(i);
+      if (need.version.after(version)) {
+        throw new IllegalArgumentException(
+            need.what
+                + " originally at line "
+                + need.position.line()
+                + ", column "
+                + need.position.column()
+                + " needs TOML "
+                + need.version.number()
+                + " and cannot be written for TOML "
+                + version.number());
+      }
+    }
+    return text(start, stop);
+  }
+
+  /**
+   * Record that a construct written in this source needs a version of TOML, so that a writer copying the text holding
+   * it for an earlier version refuses to. The parser calls this where it accepts the construct; the constructs are
+   * whole tokens, which no copied range splits.
+   *
+   * @param offset The offset the construct starts at.
+   * @param version The earliest version of TOML that allows the construct.
+   * @param what The construct, as a sentence names it: {@code "The escape sequence '\e'"}.
+   * @param position Where the construct was written, for the message.
+   */
+  void requireVersion(int offset, TomlVersion version, String what, TomlPosition position) {
+    // Nested constructs are recorded out of offset order: an inline table's line breaks before the values between them
+    versionNeeds.add(firstNeedFrom(offset), new VersionNeed(offset, version, what, position));
+  }
+
+  /** The index of the first recorded construct at or after an offset, which is the size of the list if none is. */
+  private int firstNeedFrom(int offset) {
+    int low = 0;
+    int high = versionNeeds.size();
+    while (low < high) {
+      int mid = (low + high) >>> 1;
+      if (versionNeeds.get(mid).offset < offset) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low;
+  }
+
+  /** A construct written in this source that an earlier version of TOML cannot write. */
+  private static final class VersionNeed {
+
+    final int offset;
+    final TomlVersion version;
+    final String what;
+    final TomlPosition position;
+
+    VersionNeed(int offset, TomlVersion version, String what, TomlPosition position) {
+      this.offset = offset;
+      this.version = version;
+      this.what = what;
+      this.position = position;
+    }
   }
 
   /**

@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -38,6 +39,7 @@ class SourcePreservingSerializerTest {
 
   // New lines are written with the separator these options ask for; the lines of the document keep the one they had
   private static final TomlWriteOptions LF = TomlWriteOptions.defaults().withLineSeparator("\n");
+  private static final TomlWriteOptions TOML_100 = LF.withVersion(TomlVersion.V1_0_0);
 
   private static final String INLINE_TABLE_OVER_LINES =
       "An inline table holding a comment cannot be written for TOML 1.0.0, which allows no line break inside an inline table";
@@ -166,6 +168,195 @@ class SourcePreservingSerializerTest {
     requireArray(result, "a").setCommentAfter(0, "note");
 
     assertEquals("a = [\n  1,  # note\n  2\n]\n", result.toToml(LF.withVersion(TomlVersion.V1_0_0)));
+  }
+
+  @Test
+  void throwsForAnEditedInlineTableTheDocumentWroteOverLinesForToml100() {
+    TomlParseResult result = Toml.parse("t = {\n  b = 1,\n  c = 2,\n}\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    requireTable(result, "t").set("c", 3);
+
+    assertEquals("t = {\n  b = 1,\n  c = 3,\n}\n", result.toToml(LF));
+    IllegalArgumentException e =
+        assertThrows(IllegalArgumentException.class, () -> result.toToml(LF.withVersion(TomlVersion.V1_0_0)));
+    assertEquals(
+        "A newline inside an inline table originally at line 1, column 6 needs TOML 1.1.0 and cannot be written for TOML 1.0.0",
+        e.getMessage());
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("toml110Constructs")
+  void refusesToCopyAConstructToml100CannotWrite(
+      String description,
+      String input,
+      String construct,
+      String keepingNotation,
+      String keepingNothing) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    String message = construct + " needs TOML 1.1.0 and cannot be written for TOML 1.0.0";
+
+    assertEquals(input, result.toToml(LF));
+    // Keeping the layout copies the line the construct is on
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> result.toToml(TOML_100));
+    assertEquals(message, e.getMessage());
+    // Keeping the notation copies the literal of each key and scalar, but lays an inline table out anew
+    if (keepingNotation == null) {
+      e = assertThrows(
+          IllegalArgumentException.class,
+          () -> result.toToml(TOML_100.keep(TomlWriteOptions.Keep.NOTATION)));
+      assertEquals(message, e.getMessage());
+    } else {
+      assertWritesForToml100(result, TOML_100.keep(TomlWriteOptions.Keep.NOTATION), keepingNotation);
+    }
+    assertWritesForToml100(result, TOML_100.keep(TomlWriteOptions.Keep.NOTHING), keepingNothing);
+  }
+
+  static Stream<Arguments> toml110Constructs() {
+    return Stream
+        .of(
+            construct(
+                "an escape in a string",
+                "a = \"\\e[0m\"\n",
+                "The escape sequence '\\e' originally at line 1, column 6",
+                null,
+                "a = \"\\u001b[0m\"\n"),
+            construct(
+                "a hex escape in a string",
+                "a = \"\\x41\"\n",
+                "The escape sequence '\\x41' originally at line 1, column 6",
+                null,
+                "a = \"A\"\n"),
+            construct(
+                "an escape in a multi-line string",
+                "a = \"\"\"\n\\e\"\"\"\n",
+                "The escape sequence '\\e' originally at line 2, column 1",
+                null,
+                "a = \"\\u001b\"\n"),
+            construct(
+                "an escape in a key",
+                "\"\\e\" = 1\n",
+                "The escape sequence '\\e' originally at line 1, column 2",
+                null,
+                "\"\\u001b\" = 1\n"),
+            construct(
+                "an escape in a header",
+                "[\"\\e\"]\nx = 1\n",
+                "The escape sequence '\\e' originally at line 1, column 3",
+                null,
+                "[\"\\u001b\"]\nx = 1\n"),
+            construct(
+                "a time without seconds",
+                "a = 07:32\n",
+                "A time without seconds originally at line 1, column 5",
+                null,
+                "a = 07:32:00\n"),
+            construct(
+                "a date-time without seconds",
+                "a = 1979-05-27T07:32Z\n",
+                "A time without seconds originally at line 1, column 16",
+                null,
+                "a = 1979-05-27T07:32:00Z\n"),
+            construct(
+                "a newline inside an inline table",
+                "t = {\n  x = 1 }\n",
+                "A newline inside an inline table originally at line 1, column 6",
+                "t = { x = 1 }\n",
+                "[t]\nx = 1\n"),
+            construct(
+                "a trailing comma in an inline table",
+                "t = { x = 1, }\n",
+                "A trailing comma in an inline table originally at line 1, column 12",
+                "t = { x = 1 }\n",
+                "[t]\nx = 1\n"),
+            construct(
+                "an escape inside an array",
+                "a = [1, \"\\e\"]\n",
+                "The escape sequence '\\e' originally at line 1, column 10",
+                null,
+                "a = [1, \"\\u001b\"]\n"),
+            construct(
+                "a time inside an inline table inside an array",
+                "a = [{ t = 07:32 }]\n",
+                "A time without seconds originally at line 1, column 12",
+                null,
+                "[[a]]\nt = 07:32:00\n"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("editsRemovingAToml110Construct")
+  void writesForToml100OnceTheConstructIsEditedAway(
+      String description,
+      String input,
+      Consumer<TomlParseResult> edit,
+      TomlWriteOptions options,
+      String expected) {
+    TomlParseResult result = Toml.parse(input);
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    assertThrows(IllegalArgumentException.class, () -> result.toToml(options));
+    edit.accept(result);
+
+    assertWritesForToml100(result, options, expected);
+  }
+
+  static Stream<Arguments> editsRemovingAToml110Construct() {
+    return Stream
+        .of(
+            edited(
+                "the value is replaced",
+                "a = 07:32\nb = 1\n",
+                result -> result.set("a", LocalTime.of(7, 32)),
+                TOML_100,
+                "a = 07:32:00\nb = 1\n"),
+            edited("the line is removed", "a = \"\\e\"\nb = 1\n", result -> result.remove("a"), TOML_100, "b = 1\n"),
+            edited(
+                "the value of an entry of an inline table is replaced",
+                "t = { a = \"\\e\", b = 1 }\n",
+                result -> requireTable(result, "t").set("a", "x"),
+                TOML_100,
+                "t = { a = \"x\", b = 1 }\n"),
+            edited(
+                "the entry of an inline table is removed",
+                "t = { a = 07:32, b = 1 }\n",
+                result -> requireTable(result, "t").remove("a"),
+                TOML_100,
+                "t = { b = 1 }\n"),
+            edited(
+                "the element of an array is removed",
+                "a = [07:32, 1]\n",
+                result -> requireArray(result, "a").remove(0),
+                TOML_100,
+                "a = [1]\n"),
+            edited(
+                "the inline table with the trailing comma is reformatted",
+                "t = { x = 1, }\n",
+                result -> requireTable(result, "t").reformat(TomlWriteOptions.Keep.NOTATION),
+                TOML_100,
+                "t = { x = 1 }\n"),
+            edited(
+                "the line with the escape is reformatted keeping nothing",
+                "a = \"\\e\"\nb = 1\n",
+                result -> result.reformat(TomlWriteOptions.Keep.NOTHING),
+                TOML_100,
+                "a = \"\\u001b\"\nb = 1\n"));
+  }
+
+  private static Arguments construct(
+      String description,
+      String input,
+      String construct,
+      String keepingNotation,
+      String keepingNothing) {
+    return Arguments.of(description, input, construct, keepingNotation, keepingNothing);
+  }
+
+  private static void assertWritesForToml100(TomlParseResult result, TomlWriteOptions options, String expected) {
+    String written = result.toToml(options);
+    assertEquals(expected, written);
+
+    TomlParseResult reparsed = Toml.parse(written, TomlVersion.V1_0_0);
+    assertFalse(reparsed.hasErrors(), () -> written + "\n" + joinErrors(reparsed));
+    assertTrue(Toml.equals(result, reparsed), () -> written);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -898,13 +1089,6 @@ class SourcePreservingSerializerTest {
                 result -> requireTable(result, "t").set("c", longArray()),
                 "t = {\n  b = 1,\n  c = [\n    1000000000001,\n    1000000000002,\n    1000000000003,\n"
                     + "    1000000000004,\n    1000000000005,\n    1000000000006,\n  ],\n}\n"),
-            edited(
-                "a value replaced in an inline table laid out over lines stays on one line for TOML 1.0.0",
-                "t = {\n  b = 1,\n  c = 2,\n}\n",
-                result -> requireTable(result, "t").set("c", longArray()),
-                LF.withVersion(TomlVersion.V1_0_0),
-                "t = {\n  b = 1,\n  c = [1000000000001, 1000000000002, 1000000000003, 1000000000004, "
-                    + "1000000000005, 1000000000006],\n}\n"),
             edited(
                 "a value replaced in an inline table on one line stays on the line however long",
                 "t = { b = 1, c = 2 }\n",

@@ -316,28 +316,28 @@ final class Serializer {
     beginLine("");
     StringBuilder text = new StringBuilder(lineIndent);
     if (span.keyParts == keyPath.size()) {
-      text.append(span.source.text(span.keyStart, span.keyStop));
+      text.append(span.source.text(span.keyStart, span.keyStop, version));
     } else {
       appendKeyPath(text, keyPath);
     }
     ValueSpan value = span.writtenValue(parsed.value);
     ValueSpan brackets = (value == null) ? span.writtenBrackets(parsed.value) : null;
     if (value != null) {
-      text.append(span.source.text(span.keyStop + 1, value.stop));
+      text.append(span.source.text(span.keyStop + 1, value.stop, version));
     } else if (brackets != null) {
       // The table or array was edited in place, so it is written within the brackets it was read in
-      text.append(span.source.text(span.keyStop + 1, span.valueStart - 1));
+      text.append(span.source.text(span.keyStop + 1, span.valueStart - 1, version));
       EditedContainerSerializer
           .append(text, (ElementContainer<?>) parsed.value, brackets, EditedContainerSerializer.Context.LINE, options);
     } else {
       // The spacing around the '=' is the line's own; the value it held has been replaced, so it is written anew
-      text.append(span.source.text(span.keyStop + 1, span.valueStart - 1));
+      text.append(span.source.text(span.keyStop + 1, span.valueStart - 1, version));
       int column = text.codePointCount(0, text.length());
       out.append(text);
       text.setLength(0);
       writeEntryValue(parsed.value, lineIndent, column);
     }
-    text.append(span.source.text(span.tailStart, span.newlineStart - 1));
+    text.append(span.source.text(span.tailStart, span.newlineStart - 1, version));
     out.append(text);
     endLine();
     return true;
@@ -630,7 +630,7 @@ final class Serializer {
    * @param value The value.
    * @param literals Whether a value that has a span is written with the text of that span.
    */
-  static void appendInlineValue(StringBuilder text, TomlValue value, boolean literals) {
+  void appendInlineValue(StringBuilder text, TomlValue value, boolean literals) {
     appendInlineEntryValue(value, text, Integer.MAX_VALUE, literals);
   }
 
@@ -643,7 +643,7 @@ final class Serializer {
    * @param literals Whether a value that has a span is written with the text of that span.
    * @return {@code false} if the text grew longer than {@code limit}, in which case the value may be incomplete.
    */
-  private static boolean appendInlineEntryValue(TomlValue value, StringBuilder text, int limit, boolean literals) {
+  private boolean appendInlineEntryValue(TomlValue value, StringBuilder text, int limit, boolean literals) {
     String literal = literals ? literalOf(value) : null;
     if (literal != null) {
       text.append(literal);
@@ -661,7 +661,7 @@ final class Serializer {
    * @param literals Whether a value that has a span is written with the text of that span.
    * @return {@code false} if the text grew longer than {@code limit}, in which case the value may be incomplete.
    */
-  private static boolean appendInline(Object value, StringBuilder text, int limit, boolean literals) {
+  private boolean appendInline(Object value, StringBuilder text, int limit, boolean literals) {
     Optional<TomlType> tomlType = typeFor(value);
     assert tomlType.isPresent();
     switch (tomlType.get()) {
@@ -697,7 +697,7 @@ final class Serializer {
     return text.length() <= limit;
   }
 
-  private static boolean appendInlineArray(TomlArray array, StringBuilder text, int limit, boolean inherited) {
+  private boolean appendInlineArray(TomlArray array, StringBuilder text, int limit, boolean inherited) {
     boolean literals = literalsWithin(array, inherited);
     text.append('[');
     // The array holds no comment, so every element of it is an entry
@@ -714,7 +714,7 @@ final class Serializer {
     return text.length() <= limit;
   }
 
-  private static boolean appendInlineTable(TomlTable table, StringBuilder text, int limit, boolean inherited) {
+  private boolean appendInlineTable(TomlTable table, StringBuilder text, int limit, boolean inherited) {
     boolean literals = literalsWithin(table, inherited);
     List<InlineItem> items = inlineItems(table, literals);
     if (items.isEmpty()) {
@@ -841,10 +841,10 @@ final class Serializer {
    * @param entry The entry the key names.
    * @param literals Whether a key that has a span is written with the text of that span.
    */
-  private static void appendEntryKey(StringBuilder text, List<String> keyPath, TomlEntry entry, boolean literals) {
+  private void appendEntryKey(StringBuilder text, List<String> keyPath, TomlEntry entry, boolean literals) {
     SourceSpan span = literals ? writtenKeySpan(entry, keyPath.size()) : null;
     if (span != null) {
-      text.append(span.source.text(span.keyStart, span.keyStop));
+      text.append(span.source.text(span.keyStart, span.keyStop, version));
     } else {
       appendKeyPath(text, keyPath);
     }
@@ -888,12 +888,12 @@ final class Serializer {
    *         from a document parsed with no source kept.
    */
   @Nullable
-  private static String literalOf(TomlValue value) {
+  private String literalOf(TomlValue value) {
     if (!(value instanceof Value.Scalar)) {
       return null;
     }
     ValueSpan span = ((Value.Scalar) value).writtenSpan();
-    return (span == null) ? null : span.source.text(span.start, span.stop);
+    return (span == null) ? null : span.source.text(span.start, span.stop, version);
   }
 
   /**

@@ -139,6 +139,18 @@ final class EditedContainerSerializer {
     this.lineIndent = indentOfLastLine(out);
   }
 
+  /**
+   * A range of the document's text, for writing.
+   *
+   * @param start The first offset, inclusive.
+   * @param stop The last offset, inclusive.
+   * @return The text.
+   * @throws IllegalArgumentException If the range holds a construct the version written cannot write.
+   */
+  private String text(int start, int stop) {
+    return source.text(start, stop, options.version());
+  }
+
   private void write(ElementContainer<?> container, Context context) throws IOException {
     boolean table = container instanceof LinkedTomlTable;
     List<Item> items = new ArrayList<>();
@@ -157,11 +169,11 @@ final class EditedContainerSerializer {
     }
     layout(items, table);
 
-    // The value of an entry of an inline table laid out over lines follows the width rule of an array element, where
-    // the version allows line breaks inside an inline table
-    boolean entriesOnOneLine = !multiLine || !options.version().after(TomlVersion.V1_0_0);
-    Context itemContext = (table && entriesOnOneLine) ? Context.ENTRY : Context.ELEMENT;
-    out.append(source.text(brackets.start, brackets.start));
+    // The value of an entry of an inline table laid out over lines follows the width rule of an array element. For
+    // TOML 1.0.0 an inline table is never laid out over lines here: a line break the document wrote inside one is
+    // refused when its text is read above, and a comment inside one was refused by layout()
+    Context itemContext = (table && !multiLine) ? Context.ENTRY : Context.ELEMENT;
+    out.append(text(brackets.start, brackets.start));
     Item previous = null;
     boolean afterComment = false;
     for (int i = 0; i < items.size(); i++) {
@@ -283,7 +295,7 @@ final class EditedContainerSerializer {
    *         TOML 1.0.0.
    */
   private void layout(List<Item> items, boolean table) {
-    boolean sourceLines = holdsNewline(source.text(brackets.trailerStart, brackets.stop - 1));
+    boolean sourceLines = holdsNewline(text(brackets.trailerStart, brackets.stop - 1));
     boolean ownLines = false;
     String indent = null;
     SourceSpan lastEntry = null;
@@ -306,7 +318,7 @@ final class EditedContainerSerializer {
     multiLine = sourceLines || ownLines;
     copyLayout = (multiLine == sourceLines);
     elementIndent = (indent != null) ? indent : (lineIndent + ELEMENT_INDENT);
-    trailingComma = (lastEntry != null) && endsWithComma(source.text(lastEntry.tailStart, brackets.stop - 1));
+    trailingComma = (lastEntry != null) && endsWithComma(text(lastEntry.tailStart, brackets.stop - 1));
   }
 
   /**
@@ -320,10 +332,10 @@ final class EditedContainerSerializer {
    */
   private String textAround(SourceSpan span) {
     if (span.tailStart < 0) {
-      return source.text(span.start, span.stop);
+      return text(span.start, span.stop);
     }
     int ownStart = (span.keyStart >= 0) ? span.keyStart : span.valueStart;
-    return source.text(span.start, ownStart - 1) + source.text(span.tailStart, span.stop);
+    return text(span.start, ownStart - 1) + text(span.tailStart, span.stop);
   }
 
   /**
@@ -357,7 +369,7 @@ final class EditedContainerSerializer {
     }
     boolean adjacent = (previous == null) ? (item.span.start == (brackets.start + 1))
         : (previous.span != null && (previous.span.stop + 1) == item.span.start);
-    return adjacent ? source.text(item.span.start, firstToken(item.span) - 1) : null;
+    return adjacent ? text(item.span.start, firstToken(item.span) - 1) : null;
   }
 
   /**
@@ -405,11 +417,11 @@ final class EditedContainerSerializer {
       from = firstToken(span);
     }
     if (span.writtenValue(entry.value) != null) {
-      out.append(source.text(from, span.tailStart - 1));
+      out.append(text(from, span.tailStart - 1));
       return;
     }
     // The spacing around the '=' is the entry's own; the value it held is written anew
-    out.append(source.text(from, span.valueStart - 1));
+    out.append(text(from, span.valueStart - 1));
     ValueSpan nested = span.writtenBrackets(entry.value);
     if (nested != null) {
       append(out, (ElementContainer<?>) entry.value, nested, context, options);
@@ -448,8 +460,8 @@ final class EditedContainerSerializer {
     // The comma the document wrote after the last element of the container is written after the last element written
     boolean comma = entryFollows || trailingComma;
     String tail = (!comma && span.commaOffset >= 0)
-        ? (source.text(span.tailStart, span.commaOffset - 1) + source.text(span.commaOffset + 1, span.stop))
-        : source.text(span.tailStart, span.stop);
+        ? (text(span.tailStart, span.commaOffset - 1) + text(span.commaOffset + 1, span.stop))
+        : text(span.tailStart, span.stop);
     out.append(tail);
     if (holdsComma(tail)) {
       commaOwed = false;
@@ -507,7 +519,7 @@ final class EditedContainerSerializer {
   /** Write an unattached comment, from the document where it wrote one and from the model where it did not. */
   private void appendComment(Item item) {
     if (item.span != null) {
-      out.append(source.text(item.span.aboveStart, item.span.stop));
+      out.append(text(item.span.aboveStart, item.span.stop));
       return;
     }
     List<String> rawLines = ((TomlComment) item.element).rawLines();
@@ -530,7 +542,7 @@ final class EditedContainerSerializer {
     }
     boolean adjacent =
         copyLayout && previous != null && previous.span != null && (previous.span.stop + 1) == brackets.trailerStart;
-    String trailer = source.text(brackets.trailerStart, brackets.stop - 1);
+    String trailer = text(brackets.trailerStart, brackets.stop - 1);
     if (adjacent) {
       out.append(trailer);
     } else if (multiLine) {
@@ -542,7 +554,7 @@ final class EditedContainerSerializer {
       // The whitespace the document wrote before its closing bracket, which is not in the span of the element before it
       out.append(trailer);
     }
-    out.append(source.text(brackets.stop, brackets.stop));
+    out.append(text(brackets.stop, brackets.stop));
   }
 
   /** Write the key of an entry of an inline table, as the keys of a dotted key. */
@@ -565,17 +577,17 @@ final class EditedContainerSerializer {
    */
   private void appendValue(TomlValue value, Context context, TomlWriteOptions valueOptions) throws IOException {
     boolean literals = valueOptions.keep() != TomlWriteOptions.Keep.NOTHING;
+    Serializer serializer = Serializer.defaultStyle(out, valueOptions);
     if (context == Context.ENTRY) {
-      // The inline table is on one line, or the version does not allow line breaks inside it, so the value is written
-      // on the one line regardless of the maximum line width. The value holds no comments: an inline table holding a
-      // comment is written over lines, where its entries are in the ELEMENT context, or the write throws for TOML 1.0.0
-      Serializer.appendInlineValue(out, value, literals);
+      // The inline table is on one line, so the value is written on the one line regardless of the maximum line width.
+      // The value holds no comments: an inline table holding a comment is written over lines, where its entries are in
+      // the ELEMENT context, or the write throws for TOML 1.0.0
+      serializer.appendInlineValue(out, value, literals);
       return;
     }
     int lineStart = lastLineStart(out);
     String indent = indentOfLastLine(out);
     int column = out.codePointCount(lineStart, out.length());
-    Serializer serializer = Serializer.defaultStyle(out, valueOptions);
     if (context == Context.LINE) {
       serializer.writeEntryValue(value, indent, column);
     } else {
@@ -587,6 +599,8 @@ final class EditedContainerSerializer {
   private String openingSpacing() {
     StringBuilder spacing = new StringBuilder();
     for (int offset = brackets.start + 1; offset < brackets.stop; offset++) {
+      // The scan ends at the first character that is not spacing, which is not written from here, so it is read
+      // without the check the version puts on copied text
       String character = source.text(offset, offset);
       if (!" ".equals(character) && !"\t".equals(character)) {
         break;
@@ -606,12 +620,12 @@ final class EditedContainerSerializer {
     }
     // The comment is written after the comma, wherever the document had it, so only a comma before it is skipped
     int from = (span.commaOffset >= 0 && span.commaOffset < span.afterStart) ? (span.commaOffset + 1) : span.tailStart;
-    return source.text(from, span.afterStart - 1);
+    return text(from, span.afterStart - 1);
   }
 
   /** The newline ending an entry's line, or {@code ""} if its tail does not reach one. */
   private String newlineOf(SourceSpan span) {
-    String tail = source.text(span.tailStart, span.stop);
+    String tail = text(span.tailStart, span.stop);
     if (tail.endsWith("\r\n")) {
       return "\r\n";
     }
@@ -627,9 +641,9 @@ final class EditedContainerSerializer {
    */
   @Nullable
   private String startingIndent(SourceSpan span) {
-    String leading = source.text(span.start, firstToken(span) - 1);
+    String leading = text(span.start, firstToken(span) - 1);
     int lineStart = lastLineStart(leading);
-    if (lineStart == 0 && !(span.start > 0 && "\n".equals(source.text(span.start - 1, span.start - 1)))) {
+    if (lineStart == 0 && !(span.start > 0 && "\n".equals(text(span.start - 1, span.start - 1)))) {
       return null;
     }
     String indent = leading.substring(lineStart);

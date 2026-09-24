@@ -55,7 +55,8 @@ public interface TomlValue extends TomlElement {
    * The value keeps the notation it was written in. Stored in a table or an array through the editing API, it is
    * written with the text it was parsed from, as a value read from a document is, unless the document is written
    * keeping nothing ({@link TomlWriteOptions.Keep#NOTHING}); an inline table is written as an inline table, and an
-   * array of tables as an array, rather than under {@code [x]} or {@code [[x]]} headers.
+   * array of tables as an array, rather than under {@code [x]} or {@code [[x]]} headers. Text that only TOML 1.1.0
+   * allows is not written for TOML 1.0.0; see {@link TomlWriteOptions#withVersion(TomlVersion)}.
    *
    * <p>
    * A comment or a line break before or after the value is rejected. A comment inside an inline table or an array is
