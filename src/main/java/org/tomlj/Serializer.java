@@ -1025,7 +1025,9 @@ final class Serializer {
    *
    * <p>
    * Where the notation is kept, a table read as an inline table, and an array read between brackets, are written on the
-   * entry's line as they were read, wherever the value was read from: the document being written or another one.
+   * entry's line as they were read, wherever the value was read from: the document being written, another one, or the
+   * text {@link TomlValue#parse} was given. So are a table made with {@link MutableTomlTable#createInline()} and an
+   * array made with {@link MutableTomlArray#createInline()}.
    *
    * @param entry The entry.
    * @param keepNotation Whether the form a value was read in is kept.

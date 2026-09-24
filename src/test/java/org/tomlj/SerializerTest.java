@@ -696,6 +696,59 @@ class SerializerTest {
   }
 
   @Test
+  void shouldWriteATableMadeInlineOnItsEntrysLineUnlessNothingIsKept() {
+    MutableTomlTable doc = MutableTomlTable.create();
+    doc.set("point", MutableTomlTable.createInline().set("x", 1).set("y", 2));
+    doc.set("empty", MutableTomlTable.createInline());
+    MutableTomlTable nested = MutableTomlTable.createInline();
+    nested.set("a", MutableTomlTable.createInline().set("b", 1));
+    nested.set("c", MutableTomlTable.create().set("d", 2));
+    doc.getOrCreateTable("section").set("nested", nested);
+
+    TomlWriteOptions options = TomlWriteOptions.defaults().withLineSeparator("\n");
+    assertSerializes(
+        doc,
+        options,
+        "point = { x = 1, y = 2 }\nempty = {}\n\n[section]\nnested = { a = { b = 1 }, c.d = 2 }\n");
+    assertSerializes(
+        doc,
+        options.keep(TomlWriteOptions.Keep.NOTHING),
+        "[point]\nx = 1\ny = 2\n\n[empty]\n\n[section.nested.a]\nb = 1\n\n[section.nested.c]\nd = 2\n");
+  }
+
+  @Test
+  void shouldWriteAnArrayMadeInlineBetweenBracketsWhateverItHolds() {
+    MutableTomlTable doc = MutableTomlTable.create();
+    MutableTomlArray points = MutableTomlArray.createInline();
+    points.add(MutableTomlTable.create().set("x", 1));
+    points.add(MutableTomlTable.create().set("x", 2));
+    doc.set("points", points);
+    MutableTomlArray sections = MutableTomlArray.create();
+    sections.add(MutableTomlTable.create().set("x", 3));
+    doc.set("sections", sections);
+
+    TomlWriteOptions options = TomlWriteOptions.defaults().withLineSeparator("\n");
+    assertSerializes(doc, options, "points = [{ x = 1 }, { x = 2 }]\n\n[[sections]]\nx = 3\n");
+    assertSerializes(
+        doc,
+        options.keep(TomlWriteOptions.Keep.NOTHING),
+        "[[points]]\nx = 1\n\n[[points]]\nx = 2\n\n[[sections]]\nx = 3\n");
+  }
+
+  @Test
+  void shouldWriteATableMadeInlineHoldingACommentOverLinesForToml110() {
+    MutableTomlTable doc = MutableTomlTable.create();
+    MutableTomlTable point = MutableTomlTable.createInline();
+    point.set("x", 1);
+    point.setCommentAbove("x", "the x");
+    doc.set("point", point);
+
+    TomlWriteOptions options = TomlWriteOptions.defaults().withLineSeparator("\n");
+    assertSerializes(doc, options.withVersion(TomlVersion.V1_1_0), "point = {\n  # the x\n  x = 1,\n}\n");
+    assertThrows(IllegalArgumentException.class, () -> doc.toToml(options.withVersion(TomlVersion.V1_0_0)));
+  }
+
+  @Test
   void shouldWriteAnInlineTableHoldingCommentsAsASection() {
     TomlTable table = parse("a = {\n  # unattached\n\n  b = 1,  # after\n}\n");
     assertSerializes(

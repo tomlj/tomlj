@@ -35,6 +35,10 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
   // Nullable: an array created through the editing API has no input position.
   private final @Nullable TomlPosition position;
 
+  // Whether the bracketed form was asked for through createInline(), which a writer keeping the notation honours as it
+  // honours the brackets a document wrote; see hasInlineForm().
+  private boolean inlineRequested;
+
   /**
    * Create an array for an array written in a document, or through the editing API.
    *
@@ -47,19 +51,32 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
     this.position = position;
   }
 
+  /**
+   * Create an empty array through the editing API, to be written between brackets; see
+   * {@link MutableTomlArray#createInline()}.
+   *
+   * @return A new, empty array.
+   */
+  static ListTomlArray createInline() {
+    ListTomlArray array = new ListTomlArray(false, null);
+    array.inlineRequested = true;
+    return array;
+  }
+
   boolean isTableArray() {
     return isTableArray;
   }
 
   /**
    * Whether this array is written between brackets on the line of the entry holding it where the notation is kept,
-   * whatever it holds: it was read between brackets from a document whose source was kept. Otherwise an array whose
-   * elements are all tables is written as {@code [[x]]} headers.
+   * whatever it holds: it was read between brackets from a document whose source was kept, or asked for through
+   * {@link MutableTomlArray#createInline()}. Otherwise an array whose elements are all tables is written as
+   * {@code [[x]]} headers.
    *
    * @return {@code true} if a writer keeping the notation writes this array between brackets.
    */
   boolean hasInlineForm() {
-    return bracketSpan != null;
+    return bracketSpan != null || inlineRequested;
   }
 
   @Override
@@ -347,6 +364,9 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
     if (array instanceof ElementContainer) {
       copy.bracketSpan = ((ElementContainer<?>) array).bracketSpan;
       copy.keep = ((ElementContainer<?>) array).keep;
+    }
+    if (array instanceof ListTomlArray) {
+      copy.inlineRequested = ((ListTomlArray) array).inlineRequested;
     }
     for (TomlElement element : array.elements()) {
       if (element instanceof TomlComment) {

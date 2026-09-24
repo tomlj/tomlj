@@ -150,6 +150,20 @@ class MutableTomlArrayTest {
   }
 
   @Test
+  void shouldCreateAnEmptyUnmodifiedInlineArrayWhoseCopiesAreInlineToo() {
+    MutableTomlArray array = MutableTomlArray.createInline();
+    assertTrue(array.isEmpty());
+    assertFalse(array.isModified());
+    assertTrue(((ListTomlArray) array).hasInlineForm());
+
+    MutableTomlTable doc = MutableTomlTable.create();
+    doc.set("a", array);
+    assertTrue(((ListTomlArray) doc.get("a")).hasInlineForm());
+    assertTrue(((ListTomlArray) MutableTomlArray.copyOf(array)).hasInlineForm());
+    assertFalse(((ListTomlArray) MutableTomlArray.create()).hasInlineForm());
+  }
+
+  @Test
   void shouldCreateFromValues() {
     MutableTomlArray array = MutableTomlArray.of(1, "two", 3.0);
     assertEquals(List.of(1L, "two", 3.0), array.toList());

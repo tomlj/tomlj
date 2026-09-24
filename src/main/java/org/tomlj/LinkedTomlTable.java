@@ -42,6 +42,10 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
 
   private final boolean inline;
 
+  // Whether the inline form was asked for through createInline(), which a writer keeping the notation honours as it
+  // honours the braces a document wrote; see hasInlineForm().
+  private boolean inlineRequested;
+
   // Where the [a.b] header that defined this table, or the [[a.b]] header that opened this element table, was written
   // in the document. Null for a table no header names, for one built through the editing API, and for a copy: a copy is
   // not in a document, so it has no header.
@@ -74,6 +78,17 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
     return new LinkedTomlTable(position, true);
   }
 
+  /**
+   * Create an empty inline table through the editing API; see {@link MutableTomlTable#createInline()}.
+   *
+   * @return A new, empty inline table.
+   */
+  static LinkedTomlTable createInline() {
+    LinkedTomlTable table = new LinkedTomlTable(null, true);
+    table.inlineRequested = true;
+    return table;
+  }
+
   boolean isDefined() {
     return position != null;
   }
@@ -90,13 +105,13 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
 
   /**
    * Whether the inline form of this table is written where the notation is kept: it was read between braces from a
-   * document whose source was kept. A table read from a document parsed with no source is inline, but records nothing
-   * of how it was written.
+   * document whose source was kept, or asked for through {@link MutableTomlTable#createInline()}. A table read from a
+   * document parsed with no source is inline, but records nothing of how it was written.
    *
    * @return {@code true} if a writer keeping the notation writes this table with braces.
    */
   boolean hasInlineForm() {
-    return bracketSpan != null;
+    return bracketSpan != null || inlineRequested;
   }
 
   /**
@@ -819,6 +834,9 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
     if (table instanceof ElementContainer) {
       copy.bracketSpan = ((ElementContainer<?>) table).bracketSpan;
       copy.keep = ((ElementContainer<?>) table).keep;
+    }
+    if (table instanceof LinkedTomlTable) {
+      copy.inlineRequested = ((LinkedTomlTable) table).inlineRequested;
     }
     for (TomlElement element : table.elements()) {
       if (element instanceof TomlComment) {

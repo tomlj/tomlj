@@ -18,6 +18,12 @@ doc.getOrCreateTable("database").set("ports", MutableTomlArray.of(8001, 8002));
 String toml = doc.toToml();
 ```
 
+`MutableTomlTable.createInline()` makes a table that is written between braces on its entry's
+line, `point = { x = 1, y = 2 }`, rather than under a `[point]` header, and
+`MutableTomlArray.createInline()` an array that is written between brackets whatever it holds,
+where an array of tables made with `create()` is written as `[[x]]` headers. Both are written in the
+default style when the options keep nothing.
+
 ## Editing a parse result
 
 A parse result is itself a `MutableTomlTable`, so a document can be parsed, changed and written

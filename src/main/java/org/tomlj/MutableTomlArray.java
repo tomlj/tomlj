@@ -66,6 +66,20 @@ public interface MutableTomlArray extends TomlArray {
   }
 
   /**
+   * Create a new, empty array to be written between brackets.
+   *
+   * <p>
+   * The array is written between brackets on the line of the entry holding it, as <code>a = [{ x = 1 }]</code>,
+   * whatever it holds, unless the document is written keeping nothing ({@link TomlWriteOptions.Keep#NOTHING}). An array
+   * made with {@link #create()} whose elements are all tables is written as {@code [[a]]} headers instead.
+   *
+   * @return A new, empty array.
+   */
+  static MutableTomlArray createInline() {
+    return ListTomlArray.createInline();
+  }
+
+  /**
    * Create an array from a sequence of values.
    *
    * @param values The values, each converted as {@link #add(Object)} converts one.

@@ -136,7 +136,9 @@ under a `[a.b]` header naming its path from the root, unless it holds only sub-t
 tables, whose headers imply it. Each table of an array of tables is written under a `[[a]]` header,
 unless the array or its entry holds a comment: `[[a]]` sections have no place for it, so such an
 array is written on a `key = value` line as an array of inline tables. A table or array nested
-inside an array or an inline table is written inline, `{ k = v }` or `[1, 2]`.
+inside an array or an inline table is written inline, `{ k = v }` or `[1, 2]`. A table made with
+`MutableTomlTable.createInline()`, and an array made with `MutableTomlArray.createInline()`, are
+written on their entry's line wherever they are, unless the options keep nothing.
 
 An array is written on one line, `[1, 2, 3]`, when that whole line fits within the maximum line
 width, and otherwise with each element on its own line, indented two spaces beyond the line the

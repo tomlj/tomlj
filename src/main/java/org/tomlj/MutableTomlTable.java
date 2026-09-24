@@ -73,6 +73,20 @@ public interface MutableTomlTable extends TomlTable {
   }
 
   /**
+   * Create a new, empty inline table.
+   *
+   * <p>
+   * The table is written with braces on the line of the entry holding it, as <code>t = { a = 1 }</code>, rather than
+   * under a {@code [t]} header, unless the document is written keeping nothing ({@link TomlWriteOptions.Keep#NOTHING}).
+   * A table made with {@link #create()} is written in whichever form the default style chooses for it.
+   *
+   * @return A new, empty inline table.
+   */
+  static MutableTomlTable createInline() {
+    return LinkedTomlTable.createInline();
+  }
+
+  /**
    * Get the table at a key, creating it, and any intermediate table that does not already exist, if necessary.
    *
    * @param dottedKey A dotted key (e.g. {@code "server.address"}).

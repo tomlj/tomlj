@@ -71,6 +71,20 @@ class MutableTomlTableTest {
   }
 
   @Test
+  void shouldCreateAnEmptyUnmodifiedInlineTableWhoseCopiesAreInlineToo() {
+    MutableTomlTable table = MutableTomlTable.createInline();
+    assertTrue(table.isEmpty());
+    assertFalse(table.isModified());
+    assertTrue(((LinkedTomlTable) table).hasInlineForm());
+
+    MutableTomlTable doc = MutableTomlTable.create();
+    doc.set("t", table);
+    assertTrue(((LinkedTomlTable) doc.get("t")).hasInlineForm());
+    assertTrue(((LinkedTomlTable) MutableTomlTable.copyOf(table)).hasInlineForm());
+    assertFalse(((LinkedTomlTable) MutableTomlTable.create()).hasInlineForm());
+  }
+
+  @Test
   void shouldCreateIntermediateTablesWhenSetting() {
     MutableTomlTable table = MutableTomlTable.create();
     table.set("a.b.c", 1L);

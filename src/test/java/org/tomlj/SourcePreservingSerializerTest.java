@@ -574,6 +574,21 @@ class SourcePreservingSerializerTest {
                 result -> result.set("a", MutableTomlTable.create().set("k", 1)),
                 "b = 2\n\n[a]  # note\nk = 1\n"),
             edited(
+                "a value replaced by a table made inline keeps its line",
+                "a = 1  # note\nb = 2\n",
+                result -> result.set("a", MutableTomlTable.createInline().set("k", 1)),
+                "a = { k = 1 }  # note\nb = 2\n"),
+            edited(
+                "a table made inline added to a section goes on a line of it",
+                "[t]\na = 1\n[u]\nb = 2\n",
+                result -> {
+                  requireTable(result, "t").set("p", MutableTomlTable.createInline().set("x", 1));
+                  MutableTomlArray points = MutableTomlArray.createInline();
+                  points.add(MutableTomlTable.create().set("y", 2));
+                  requireTable(result, "u").set("q", points);
+                },
+                "[t]\na = 1\np = { x = 1 }\n[u]\nb = 2\nq = [{ y = 2 }]\n"),
+            edited(
                 "a value replaced by an array of tables leaves its line and is written as sections",
                 "a = 1\nb = 2\n",
                 result -> result.set("a", MutableTomlArray.of(MutableTomlTable.create().set("k", 1))),
