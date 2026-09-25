@@ -35,6 +35,7 @@ class TomlWriteOptionsTest {
     assertEquals(System.lineSeparator(), options.lineSeparator());
     assertEquals(TomlVersion.LATEST, options.version());
     assertFalse(options.entriesAlignedWithHeaders());
+    assertFalse(options.spaceInsideArrays());
   }
 
   @Test
@@ -94,12 +95,12 @@ class TomlWriteOptionsTest {
 
   @Test
   void withEntriesAlignedWithHeadersReturnsANewInstanceLeavingTheOriginalUnchangedAndKeepsTheOtherOptions() {
-    TomlWriteOptions original = TomlWriteOptions.defaults().withIndent(2).withMaxLineWidth(100);
+    TomlWriteOptions original = TomlWriteOptions.defaults().withIndent(2).withSpaceInsideArrays(true);
     TomlWriteOptions updated = original.withEntriesAlignedWithHeaders(true);
 
     assertTrue(updated.entriesAlignedWithHeaders());
     assertEquals(2, updated.indent());
-    assertEquals(100, updated.maxLineWidth());
+    assertTrue(updated.spaceInsideArrays());
     assertFalse(original.entriesAlignedWithHeaders());
     assertFalse(updated.withEntriesAlignedWithHeaders(false).entriesAlignedWithHeaders());
   }
@@ -115,6 +116,18 @@ class TomlWriteOptionsTest {
     assertEquals(0, aligned.entryIndent(0));
     assertEquals(0, aligned.entryIndent(1));
     assertEquals(4, aligned.entryIndent(3));
+  }
+
+  @Test
+  void withSpaceInsideArraysReturnsANewInstanceLeavingTheOriginalUnchangedAndKeepsTheOtherOptions() {
+    TomlWriteOptions original = TomlWriteOptions.defaults().withIndent(2).withEntriesAlignedWithHeaders(true);
+    TomlWriteOptions updated = original.withSpaceInsideArrays(true);
+
+    assertTrue(updated.spaceInsideArrays());
+    assertEquals(2, updated.indent());
+    assertTrue(updated.entriesAlignedWithHeaders());
+    assertFalse(original.spaceInsideArrays());
+    assertFalse(updated.withSpaceInsideArrays(false).spaceInsideArrays());
   }
 
   @Test
@@ -201,9 +214,11 @@ class TomlWriteOptionsTest {
         .withMaxLineWidth(100)
         .withLineSeparator("\r\n")
         .withVersion(TomlVersion.V1_0_0)
-        .withEntriesAlignedWithHeaders(true);
+        .withEntriesAlignedWithHeaders(true)
+        .withSpaceInsideArrays(true);
     TomlWriteOptions b = TomlWriteOptions
         .defaults()
+        .withSpaceInsideArrays(true)
         .withEntriesAlignedWithHeaders(true)
         .withVersion(TomlVersion.V1_0_0)
         .withLineSeparator("\r\n")
@@ -244,6 +259,11 @@ class TomlWriteOptionsTest {
   }
 
   @Test
+  void optionsDifferingOnlyInArraySpacingAreNotEqual() {
+    assertDifferent(TomlWriteOptions.defaults(), TomlWriteOptions.defaults().withSpaceInsideArrays(true));
+  }
+
+  @Test
   void optionsDifferingOnlyInWhatTheyKeepAreNotEqual() {
     assertDifferent(TomlWriteOptions.defaults(), TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING));
     assertDifferent(
@@ -259,14 +279,15 @@ class TomlWriteOptionsTest {
         .withMaxLineWidth(100)
         .withLineSeparator("\r\n")
         .withVersion(TomlVersion.V1_0_0)
-        .withEntriesAlignedWithHeaders(true);
+        .withEntriesAlignedWithHeaders(true)
+        .withSpaceInsideArrays(true);
     assertEquals(
         "TomlWriteOptions{keep=LAYOUT, indent=2, maxLineWidth=100, lineSeparator=\"\\r\\n\", version=V1_0_0, "
-            + "entriesAlignedWithHeaders=true}",
+            + "entriesAlignedWithHeaders=true, spaceInsideArrays=true}",
         options.toString());
     assertEquals(
         "TomlWriteOptions{keep=NOTHING, indent=0, maxLineWidth=80, lineSeparator=\"\\n\", version=LATEST, "
-            + "entriesAlignedWithHeaders=false}",
+            + "entriesAlignedWithHeaders=false, spaceInsideArrays=false}",
         TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING).withLineSeparator("\n").toString());
   }
 

@@ -173,6 +173,9 @@ inline table holding a comment cannot be written, and `toToml` throws `IllegalAr
 * **`withEntriesAlignedWithHeaders(aligned)`** indents the lines of a section like its header,
   `(n - 1) * spaces`, rather than one level beyond it. The lines of the root, and of a section whose
   header path has one key, are then not indented. The default is `false`.
+* **`withSpaceInsideArrays(spaced)`** writes an array on one line with a space inside each bracket,
+  `[ 1, 2 ]`. The spaces count towards the maximum line width. An empty array is written `[]`, and
+  an array written over lines is not affected. The default is `false`.
 * **`withMaxLineWidth(columns)`** is the widest a line may be, counted in code points, for an array
   or an inline table to be written on one line. The width includes the indentation, the key before
   the value and the comma after an element of an enclosing multi-line array. A long key or string is

@@ -514,7 +514,12 @@ class SourcePreservingSerializerTest {
                 "the entries of a table are indented like its header when the options align them",
                 "[t]\na = 1\n[t.u]\nb = 2\n[[q]]\nz = 1\n",
                 notation.withIndent(2).withEntriesAlignedWithHeaders(true),
-                "[t]\na = 1\n\n  [t.u]\n  b = 2\n\n[[q]]\nz = 1\n"));
+                "[t]\na = 1\n\n  [t.u]\n  b = 2\n\n[[q]]\nz = 1\n"),
+            notationKept(
+                "an array is written with a space inside its brackets when the options ask for it",
+                "a = [1,0x2]\nb = []\n",
+                notation.withSpaceInsideArrays(true),
+                "a = [ 1, 0x2 ]\nb = []\n"));
   }
 
   @ParameterizedTest

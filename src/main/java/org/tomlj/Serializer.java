@@ -699,9 +699,10 @@ final class Serializer {
 
   private boolean appendInlineArray(TomlArray array, StringBuilder text, int limit, boolean inherited) {
     boolean literals = literalsWithin(array, inherited);
-    text.append('[');
     // The array holds no comment, so every element of it is an entry
     List<TomlElement> elements = array.elements();
+    boolean spaced = options.spaceInsideArrays() && !elements.isEmpty();
+    text.append(spaced ? "[ " : "[");
     for (int i = 0; i < elements.size(); i++) {
       if (i > 0) {
         text.append(", ");
@@ -710,7 +711,7 @@ final class Serializer {
         return false;
       }
     }
-    text.append(']');
+    text.append(spaced ? " ]" : "]");
     return text.length() <= limit;
   }
 

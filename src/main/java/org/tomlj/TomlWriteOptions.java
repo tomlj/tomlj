@@ -92,6 +92,7 @@ public final class TomlWriteOptions {
   private final String lineSeparator;
   private final TomlVersion version;
   private final boolean alignEntries;
+  private final boolean spaceInsideArrays;
 
   private TomlWriteOptions(
       Keep keep,
@@ -99,13 +100,15 @@ public final class TomlWriteOptions {
       int maxLineWidth,
       @Nullable String lineSeparator,
       TomlVersion version,
-      boolean alignEntries) {
+      boolean alignEntries,
+      boolean spaceInsideArrays) {
     this.keep = keep;
     this.indent = indent;
     this.maxLineWidth = maxLineWidth;
     this.lineSeparator = lineSeparator;
     this.version = version;
     this.alignEntries = alignEntries;
+    this.spaceInsideArrays = spaceInsideArrays;
   }
 
   /**
@@ -116,7 +119,7 @@ public final class TomlWriteOptions {
    * @return The default options.
    */
   public static TomlWriteOptions defaults() {
-    return new TomlWriteOptions(Keep.LAYOUT, 0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST, false);
+    return new TomlWriteOptions(Keep.LAYOUT, 0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST, false, false);
   }
 
   /**
@@ -127,7 +130,7 @@ public final class TomlWriteOptions {
    */
   public TomlWriteOptions keep(Keep keep) {
     requireNonNull(keep);
-    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries, spaceInsideArrays);
   }
 
   /**
@@ -166,7 +169,7 @@ public final class TomlWriteOptions {
     if (spaces < 0) {
       throw new IllegalArgumentException("indent must not be negative: " + spaces);
     }
-    return new TomlWriteOptions(keep, spaces, maxLineWidth, lineSeparator, version, alignEntries);
+    return new TomlWriteOptions(keep, spaces, maxLineWidth, lineSeparator, version, alignEntries, spaceInsideArrays);
   }
 
   /**
@@ -197,7 +200,7 @@ public final class TomlWriteOptions {
    * @return A new set of options with the given alignment.
    */
   public TomlWriteOptions withEntriesAlignedWithHeaders(boolean aligned) {
-    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, aligned);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, aligned, spaceInsideArrays);
   }
 
   /**
@@ -216,7 +219,7 @@ public final class TomlWriteOptions {
     if (!separator.equals("\n") && !separator.equals("\r\n")) {
       throw new IllegalArgumentException("lineSeparator must be \"\\n\" or \"\\r\\n\"");
     }
-    return new TomlWriteOptions(keep, indent, maxLineWidth, separator, version, alignEntries);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, separator, version, alignEntries, spaceInsideArrays);
   }
 
   /**
@@ -246,7 +249,22 @@ public final class TomlWriteOptions {
     if (columns < 0) {
       throw new IllegalArgumentException("maxLineWidth must not be negative: " + columns);
     }
-    return new TomlWriteOptions(keep, indent, columns, lineSeparator, version, alignEntries);
+    return new TomlWriteOptions(keep, indent, columns, lineSeparator, version, alignEntries, spaceInsideArrays);
+  }
+
+  /**
+   * Create a copy of these options that writes an array on one line with a space inside each bracket, {@code [ 1, 2 ]},
+   * or without, {@code [1, 2]}.
+   *
+   * <p>
+   * The spaces count towards the width of the line, see {@link #withMaxLineWidth(int)}. An empty array is written
+   * {@code []} either way, and an array written over several lines is not affected. The default is {@code false}.
+   *
+   * @param spaced Whether an array written on one line has a space inside each bracket.
+   * @return A new set of options with the given array spacing.
+   */
+  public TomlWriteOptions withSpaceInsideArrays(boolean spaced) {
+    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries, spaced);
   }
 
   /**
@@ -286,7 +304,7 @@ public final class TomlWriteOptions {
    */
   public TomlWriteOptions withVersion(TomlVersion version) {
     requireNonNull(version);
-    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries, spaceInsideArrays);
   }
 
   /**
@@ -317,6 +335,16 @@ public final class TomlWriteOptions {
    */
   int entryIndent(int depth) {
     return (alignEntries ? Math.max(depth - 1, 0) : depth) * indent;
+  }
+
+  /**
+   * Whether an array written on one line has a space inside each bracket.
+   *
+   * @return {@code true} if an array written on one line has a space inside each bracket.
+   * @see #withSpaceInsideArrays(boolean)
+   */
+  public boolean spaceInsideArrays() {
+    return spaceInsideArrays;
   }
 
   /**
@@ -373,12 +401,13 @@ public final class TomlWriteOptions {
         && this.maxLineWidth == other.maxLineWidth
         && Objects.equals(this.lineSeparator, other.lineSeparator)
         && this.version == other.version
-        && this.alignEntries == other.alignEntries;
+        && this.alignEntries == other.alignEntries
+        && this.spaceInsideArrays == other.spaceInsideArrays;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(keep, indent, maxLineWidth, lineSeparator, version, alignEntries);
+    return Objects.hash(keep, indent, maxLineWidth, lineSeparator, version, alignEntries, spaceInsideArrays);
   }
 
   @Override
@@ -395,6 +424,8 @@ public final class TomlWriteOptions {
         + version
         + ", entriesAlignedWithHeaders="
         + alignEntries
+        + ", spaceInsideArrays="
+        + spaceInsideArrays
         + '}';
   }
 }
