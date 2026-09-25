@@ -317,6 +317,7 @@ class SerializerTest {
     TomlWriteOptions toml10Options = TomlWriteOptions.defaults().withVersion(TomlVersion.V1_0_0);
     TomlWriteOptions toml11Options = TomlWriteOptions.defaults().withVersion(TomlVersion.V1_1_0);
     TomlWriteOptions aligned = TomlWriteOptions.defaults().withIndent(2).withEntriesAlignedWithHeaders(true);
+    TomlWriteOptions spaced = TomlWriteOptions.defaults().withSpaceInsideArrays(true);
     return Stream.of(
         parsed("an indent of 2", document, TomlWriteOptions.defaults().withIndent(2), """
             title = "Example"
@@ -587,7 +588,29 @@ class SerializerTest {
             """.formatted("x".repeat(69)), aligned, """
             [t]
             list = ["%s"]
-            """.formatted("x".repeat(69)))
+            """.formatted("x".repeat(69))),
+        parsed("arrays with a space inside their brackets", """
+            a = [1, 2]
+            b = []
+            c = [[1], [], { d = [2] }]
+            """, spaced, """
+            a = [ 1, 2 ]
+            b = []
+            c = [ [ 1 ], [], { d = [ 2 ] } ]
+            """),
+        parsed("a spaced array at the width limit", """
+            list = ["%s"]
+            """.formatted("x".repeat(67)), spaced, """
+            list = [ "%s" ]
+            """.formatted("x".repeat(67))),
+        parsed("a spaced array over the width limit", """
+            list = ["%s", [1]]
+            """.formatted("x".repeat(68)), spaced, """
+            list = [
+              "%s",
+              [ 1 ],
+            ]
+            """.formatted("x".repeat(68)))
     );
     // @formatter:on
   }
