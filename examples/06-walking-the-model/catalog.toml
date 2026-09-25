@@ -1,0 +1,19 @@
+name = "Spring catalog"
+published = 2026-03-01T09:30:00-05:00
+review-at = 17:00:00
+
+[discounts]
+members = 0.1
+"early bird" = { until = 2026-03-15, rate = 0.2 }
+
+[[product]]
+sku = "A-100"
+price = 12.5
+tags = ["garden", "tools"]
+in-stock = true
+
+[[product]]
+sku = "B-200"
+price = 40.0
+sizes = [[30, 40], [50]]
+in-stock = false

@@ -1,0 +1,21 @@
+title = "Inventory service"
+
+[server]
+host = "0.0.0.0"
+port = 8443
+timeout = 2.5
+
+[database]
+url = "postgres://db.internal:5432/inventory"
+pool.min = 2
+pool.max = 16
+
+[[warehouse]]
+name = "North"
+opened = 2019-04-01
+bins = [101, 102, 103]
+
+[[warehouse]]
+name = "South"
+opened = 2021-10-15
+bins = [201, 202]

@@ -1,0 +1,21 @@
+# Settings for the build agent.
+# Copy this file to agent.local.toml to override it.
+
+# The name shown in the dashboard.
+name = "agent-1"
+
+# How many jobs run at once.
+# More than the number of cores rarely helps.
+concurrency = 4 # per machine
+
+# Where downloaded artifacts are kept.
+[cache]
+dir = "/var/cache/agent"
+max-size = "10GB" # older files are removed first
+
+# Mirrors are tried in order.
+mirrors = [
+  # the primary mirror
+  "https://a.example",
+  "https://b.example", # slow, used as a fallback
+]

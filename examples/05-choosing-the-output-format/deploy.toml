@@ -1,0 +1,14 @@
+# Deployment targets.
+[targets]
+regions=["us-east-1","eu-west-1","ap-southeast-2","sa-east-1","ca-central-1","me-south-1"]   # all live
+retries   =  0x03
+  owner = 'ops team'
+
+
+[targets.canary]
+  weight=5
+  hosts = [ "c1", "c2" ]
+
+[alerts]
+email = { to = "ops@example.com", cc = "lead@example.com" }
+quiet-from = 22:00   # no alerts overnight

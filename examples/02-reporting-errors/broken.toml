@@ -1,0 +1,11 @@
+name = "broken"
+version = 1.2.3
+
+[server]
+port = 8080
+port = 8081
+host = "example.com
+
+[client]
+timeout = 30
+retries = [1, 2, 3

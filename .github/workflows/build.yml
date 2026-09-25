@@ -14,6 +14,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: "Build, test, check licenses, and generate javadoc"
         run: ./gradlew build checkLicense javadoc
+      - name: "Build and run the examples"
+        run: ./gradlew -p examples check
       - name: "Upload test reports"
         if: failure()
         uses: actions/upload-artifact@v7

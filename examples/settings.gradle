@@ -1,0 +1,16 @@
+rootProject.name = 'tomlj-examples'
+
+// Build the examples against the library in the parent directory, in place of the published org.tomlj:tomlj.
+includeBuild('..') {
+  dependencySubstitution {
+    substitute module('org.tomlj:tomlj') using project(':')
+  }
+}
+
+include '01-reading-a-document'
+include '02-reporting-errors'
+include '03-building-a-document'
+include '04-editing-in-place'
+include '05-choosing-the-output-format'
+include '06-walking-the-model'
+include '07-reading-comments'

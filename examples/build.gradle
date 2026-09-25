@@ -1,0 +1,33 @@
+subprojects {
+  apply plugin: 'application'
+
+  repositories {
+    mavenCentral()
+  }
+
+  dependencies {
+    // settings.gradle replaces this dependency with the library in the parent directory. The published
+    // org.tomlj:tomlj is the shaded jar, so the examples ask that build for its shaded variant.
+    implementation('org.tomlj:tomlj:2.0.1') {
+      attributes {
+        attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.SHADOWED))
+      }
+    }
+  }
+
+  tasks.withType(JavaCompile) {
+    options.release = 17
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:all', '-Werror']
+  }
+
+  // Each example reads its input files from its own directory.
+  tasks.named('run') {
+    workingDir = projectDir
+  }
+
+  // Running every example is part of the check, so an example that no longer works fails the build.
+  tasks.named('check') {
+    dependsOn tasks.named('run')
+  }
+}
