@@ -847,18 +847,21 @@ class TomlTest {
         // An unterminated value ends at the end of the line before the one the lexer left it for, so it is reported
         // against the line it was left unclosed on rather than against the first line that belongs to the document.
         Arguments.of("a = [1,\n  2\nb = 3\n", List.of(
-            "Unexpected end of line, expected ], a comma, or a newline; the array opened at line 1, column 5 is unclosed (line 2, column 4)")),
+            "Unexpected end of line, expected ] or a comma; the array opened at line 1, column 5 is unclosed (line 2, column 4)")),
         Arguments.of("a = [1,\n  2\n[tbl]\nb = 3\n", List.of(
-            "Unexpected end of line, expected ], a comma, or a newline; the array opened at line 1, column 5 is unclosed (line 2, column 4)")),
+            "Unexpected end of line, expected ] or a comma; the array opened at line 1, column 5 is unclosed (line 2, column 4)")),
+        // No newline can close a value the document has left, so none is named as expected.
+        Arguments.of("retries = [1, 2\ntimeout = 30\n", List.of(
+            "Unexpected end of line, expected ] or a comma (line 1, column 16)")),
         // Where nothing closes the value, the error names where it was opened: the bracket or brace is missing from
         // that line rather than from the line the error is reported on. A value still open at the end of the input is
         // named the same way.
         Arguments.of("a = { x = 1,\n  y = 2\n[tbl]\nb = 3\n", List.of(
-            "Unexpected end of line, expected }, a comma, or a newline; the inline table opened at line 1, column 5 is unclosed (line 2, column 8)")),
+            "Unexpected end of line, expected } or a comma; the inline table opened at line 1, column 5 is unclosed (line 2, column 8)")),
         Arguments.of("a = [\n  1,\n  2\n", List.of(
-            "Unexpected end of input, expected ], a comma, or a newline; the array opened at line 1, column 5 is unclosed (line 4, column 1)")),
+            "Unexpected end of input, expected ] or a comma; the array opened at line 1, column 5 is unclosed (line 4, column 1)")),
         Arguments.of("a = { x = 1,\n  y = 2\n", List.of(
-            "Unexpected end of input, expected }, a comma, or a newline; the inline table opened at line 1, column 5 is unclosed (line 3, column 1)")),
+            "Unexpected end of input, expected } or a comma; the inline table opened at line 1, column 5 is unclosed (line 3, column 1)")),
         Arguments.of("@@ x\na = 1\n$$ y\nb = 2\n", List.of(
             "Unexpected '@', expected a key, a table key, a newline, or end-of-input (line 1, column 1)",
             "Unexpected '$', expected a key, a table key, a newline, or end-of-input (line 3, column 1)")),
@@ -1037,8 +1040,8 @@ class TomlTest {
 
         Arguments.of("foo = \"Carriage return in comment\" # \ra=1", 1, 38, "Unexpected '\\r', expected a newline or end-of-input"),
 
-        Arguments.of("foo = [", 1, 8, "Unexpected end of input, expected ], a value, or a newline"),
-        Arguments.of("foo = [ 1\n", 2, 1, "Unexpected end of input, expected ], a comma, or a newline; the array opened at line 1, column 7 is unclosed"),
+        Arguments.of("foo = [", 1, 8, "Unexpected end of input, expected ] or a value"),
+        Arguments.of("foo = [ 1\n", 2, 1, "Unexpected end of input, expected ] or a comma; the array opened at line 1, column 7 is unclosed"),
         Arguments.of("foo = [ 1, 'bar ]\n", 1, 18, "Unexpected end of line, expected '"),
 
         Arguments.of("foo = 1\nfoo = 2\n", 2, 1, "foo previously defined at line 1, column 1"),
@@ -1051,7 +1054,7 @@ class TomlTest {
         Arguments.of("[foo]\nbar='baz'\n[foo]\nbaz=1", 3, 1, "foo previously defined at line 1, column 1"),
         Arguments.of("[foo]\nbar='baz'\n[foo.bar]\nbaz=1", 3, 1, "foo.bar previously defined at line 2, column 1"),
 
-        Arguments.of("foo = {", 1, 8, "Unexpected end of input, expected a key, }, or a newline"),
+        Arguments.of("foo = {", 1, 8, "Unexpected end of input, expected a key or }"),
         Arguments.of("foo = { bar = 1\nbaz = 2 }", 2, 1, "Unexpected 'baz', expected }, a comma, or a newline"),
         Arguments.of("foo = { bar = 1 baz = 2 }", 1, 17, "Unexpected 'baz', expected }, a comma, or a newline"),
         Arguments.of("foo = { bar =\n1 }", 1, 14, "Unexpected end of line, expected a value"),

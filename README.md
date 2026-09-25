@@ -23,7 +23,7 @@ where that was opened:
 
 ```java
 Toml.parse("deps = [\n  \"a\",\n  \"b\"\n").errors();
-// Unexpected end of input, expected ], a comma, or a newline;
+// Unexpected end of input, expected ] or a comma;
 //   the array opened at line 1, column 8 is unclosed (line 4, column 1)
 ```
 
