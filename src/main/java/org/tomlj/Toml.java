@@ -33,9 +33,6 @@ import java.util.regex.Pattern;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.IntStream;
-import org.checkerframework.checker.nullness.qual.NonNull;
-import org.checkerframework.framework.qual.DefaultQualifier;
-import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * Methods for parsing data stored in Tom's Obvious, Minimal Language (TOML).
@@ -45,8 +42,6 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * The limit bounds the stack depth needed to parse and serialize a document; change it with
  * {@link TomlParseOptions#withMaxNestingDepth(int)}.
  */
-@DefaultQualifier(value = NonNull.class ,
-    locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public final class Toml {
   private static final Pattern simpleKeyPattern = Pattern.compile("^[A-Za-z0-9_-]+$");
 

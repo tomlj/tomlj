@@ -18,9 +18,6 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
-import org.checkerframework.framework.qual.DefaultQualifier;
-import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * A value written in a document: under a key in a table, or in an array.
@@ -31,8 +28,6 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * {@link TomlArray#elements()}. A value never carries comments of its own: the comments written around it belong to the
  * entry that holds it, read through {@link TomlEntry#comments()}.
  */
-@DefaultQualifier(value = NonNull.class ,
-    locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public interface TomlValue extends TomlElement {
 
   /**

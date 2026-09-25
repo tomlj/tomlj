@@ -18,9 +18,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
-import org.checkerframework.framework.qual.DefaultQualifier;
-import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * A {@link TomlEntry} whose value and attached comments can be edited in place.
@@ -33,8 +30,6 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * <p>
  * Not safe for use from multiple threads without external synchronization.
  */
-@DefaultQualifier(value = NonNull.class ,
-    locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public interface MutableTomlEntry extends TomlEntry {
 
   /**

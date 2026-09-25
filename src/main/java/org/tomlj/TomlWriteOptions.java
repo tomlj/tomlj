@@ -16,10 +16,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Objects;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import org.checkerframework.framework.qual.DefaultQualifier;
-import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * Options controlling how {@link TomlTable#toToml(TomlWriteOptions)} and {@link TomlArray#toToml(TomlWriteOptions)}
@@ -39,8 +36,6 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * or read from a document parsed with {@link TomlParseOptions#withoutSource()} - is written as {@link Keep#NOTHING}
  * writes it, in the default style.
  */
-@DefaultQualifier(value = NonNull.class ,
-    locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public final class TomlWriteOptions {
 
   /**

@@ -308,7 +308,8 @@ shadowJar {
 // unit tests untouched. The test compiles against the main classes (shadowJar depends on every compile
 // task, so compiling against the jar would be a cycle) and runs with the shaded jar and JUnit only: no
 // main classes and no ANTLR runtime. JUnit is declared directly rather than through testImplementation,
-// which would bring the ANTLR runtime along.
+// which would bring the ANTLR runtime along. checker-qual is left off the compile classpath, as it is for
+// a project using the shaded jar, so an annotation javac cannot read without it fails the -Werror build.
 sourceSets {
   shadedTest {
     compileClasspath += sourceSets.main.output
@@ -317,7 +318,6 @@ sourceSets {
 }
 
 dependencies {
-  shadedTestCompileOnly 'org.checkerframework:checker-qual'
   shadedTestImplementation 'org.junit.jupiter:junit-jupiter-api'
   shadedTestRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
   shadedTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
