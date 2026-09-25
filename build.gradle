@@ -19,7 +19,7 @@ description = 'A parser and serializer for Tom\'s Obvious, Minimal Language (TOM
 //////
 // Version numbering
 
-def versionNumber = '2.0.0'
+def versionNumber = '2.0.1'
 version = versionNumber + buildTag()
 
 static String buildTag() {
