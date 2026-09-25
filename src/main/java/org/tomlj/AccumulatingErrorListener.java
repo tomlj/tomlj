@@ -31,6 +31,8 @@ import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.IntervalSet;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.TerminalNode;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 final class AccumulatingErrorListener extends BaseErrorListener implements ErrorReporter {
@@ -215,7 +217,39 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     if (expectedTokens.contains(TomlLexer.NewLine) && context instanceof TomlParser.TomlContext) {
       return getExpected(expectedTokens.or(END_OF_INPUT));
     }
-    return getExpected(expectedTokens);
+    return getExpected(withElementAfterComma(expectedTokens, context));
+  }
+
+  /**
+   * The expected tokens, with those that start an element where an array or inline table has just matched a comma.
+   * Either an element or the closing delimiter may follow the comma, but where the element cannot start, the parser has
+   * already matched the comma as a trailing one, and expects only the delimiter.
+   */
+  private static IntervalSet withElementAfterComma(IntervalSet expectedTokens, @Nullable RuleContext context) {
+    for (RuleContext ancestor = context; ancestor != null; ancestor = ancestor.parent) {
+      if (ancestor instanceof TomlParser.ArrayContext || ancestor instanceof TomlParser.InlineTableContext) {
+        if (!endsWithComma((ParserRuleContext) ancestor)) {
+          return expectedTokens;
+        }
+        return expectedTokens.or(ancestor instanceof TomlParser.ArrayContext ? VALUE_START : KEY_START);
+      }
+    }
+    return expectedTokens;
+  }
+
+  /**
+   * Check whether the last part of an array or inline table that the parser has matched, not counting the line breaks
+   * after it, is a comma.
+   */
+  private static boolean endsWithComma(ParserRuleContext value) {
+    for (int i = value.getChildCount() - 1; i >= 0; i--) {
+      ParseTree child = value.getChild(i);
+      if (child instanceof TomlParser.LineBreakContext) {
+        continue;
+      }
+      return child instanceof TerminalNode && ((TerminalNode) child).getSymbol().getType() == TomlLexer.Comma;
+    }
+    return false;
   }
 
   /**
