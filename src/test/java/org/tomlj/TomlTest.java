@@ -907,18 +907,18 @@ class TomlTest {
         // written as that value's content, so the lines up to the bracket or brace that closes it are passed over
         // rather than reported one by one as expressions the document got wrong.
         Arguments.of("a = [\n  1,\n  @,\n]\nb = 1\n", List.of(
-            "Unexpected '@', expected ] or a newline (line 3, column 3)")),
+            "Unexpected '@', expected ], a value, or a newline (line 3, column 3)")),
         Arguments.of("a = {\n  x = 1,\n  @,\n}\nb = 2\n", List.of(
-            "Unexpected '@', expected } or a newline (line 3, column 3)")),
+            "Unexpected '@', expected a key, }, or a newline (line 3, column 3)")),
         // A quoted element of the abandoned value is a key nothing assigns to, so parsing that line would report the
         // element as the document's mistake. It is passed over like every other line the value was given up on.
         Arguments.of("a = [\n  1,\n  @,\n  \"x\",\n]\nb = 1\n", List.of(
-            "Unexpected '@', expected ] or a newline (line 3, column 3)")),
+            "Unexpected '@', expected ], a value, or a newline (line 3, column 3)")),
         Arguments.of("a = [\n  1,\n  @,\n  'x',\n]\nb = 1\n", List.of(
-            "Unexpected '@', expected ] or a newline (line 3, column 3)")),
+            "Unexpected '@', expected ], a value, or a newline (line 3, column 3)")),
         // A mistake of the document's own, written after the value that was given up on, is still reported.
         Arguments.of("a = [\n  1,\n  @,\n  2,\n]\n@@ junk\nb = 1\n", List.of(
-            "Unexpected '@', expected ] or a newline (line 3, column 3)",
+            "Unexpected '@', expected ], a value, or a newline (line 3, column 3)",
             "Unexpected '@', expected a key, a table key, a newline, or end-of-input (line 6, column 1)")),
         // A header the parser cannot complete is reported once, rather than again where the key it took ran out.
         Arguments.of("[#]\na = 1\n", List.of(
@@ -1055,6 +1055,8 @@ class TomlTest {
         Arguments.of("foo = \"Carriage return in comment\" # \ra=1", 1, 38, "Unexpected '\\r', expected a newline or end-of-input"),
 
         Arguments.of("foo = [", 1, 8, "Unexpected end of input, expected ] or a value"),
+        Arguments.of("foo = [1, @]", 1, 11, "Unexpected '@', expected ], a value, or a newline"),
+        Arguments.of("foo = [1,", 1, 10, "Unexpected end of input, expected ] or a value"),
         Arguments.of("foo = [ 1\n", 2, 1, "Unexpected end of input, expected ] or a comma; the array opened at line 1, column 7 is unclosed"),
         Arguments.of("foo = [ 1, 'bar ]\n", 1, 18, "Unexpected end of line, expected '"),
 
@@ -1069,10 +1071,11 @@ class TomlTest {
         Arguments.of("[foo]\nbar='baz'\n[foo.bar]\nbaz=1", 3, 1, "foo.bar previously defined at line 2, column 1"),
 
         Arguments.of("foo = {", 1, 8, "Unexpected end of input, expected a key or }"),
+        Arguments.of("foo = { bar = 1,", 1, 17, "Unexpected end of input, expected a key or }"),
         Arguments.of("foo = { bar = 1\nbaz = 2 }", 2, 1, "Unexpected 'baz', expected }, a comma, or a newline"),
         Arguments.of("foo = { bar = 1 baz = 2 }", 1, 17, "Unexpected 'baz', expected }, a comma, or a newline"),
         Arguments.of("foo = { bar =\n1 }", 1, 14, "Unexpected end of line, expected a value"),
-        Arguments.of("foo = { bar = 1,, }", 1, 17, "Unexpected ',', expected } or a newline"),
+        Arguments.of("foo = { bar = 1,, }", 1, 17, "Unexpected ',', expected a key, }, or a newline"),
 
         Arguments.of("[foo]\nbar=1\n[[foo]]\nbar=2\n", 3, 1, "foo is not an array (previously defined at line 1, column 1)"),
         Arguments.of("foo = [1]\n[[foo]]\nbar=2\n", 2, 1, "foo previously defined as a literal array at line 1, column 1"),
