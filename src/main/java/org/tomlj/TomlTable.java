@@ -52,6 +52,11 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * {@link Toml#joinKeyPath(List)} converts a key path into a dotted key.
  *
  * <p>
+ * The key sets, the entry sets and {@link #toMap()} list the keys in the order {@link #elements()} lists their entries.
+ * The dotted and path sets list the paths within a table where the table's key is, after the table's own path when
+ * tables are included.
+ *
+ * <p>
  * The comments of a document are kept, and are read from the table or array they were written in; see
  * {@link TomlComment}.
  *
