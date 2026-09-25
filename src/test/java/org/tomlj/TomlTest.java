@@ -815,6 +815,15 @@ class TomlTest {
         Arguments.of("a = { x = 1, y = " + "[".repeat(130) + "]".repeat(130) + ", z = 2 }\nb = 1\n", Set.of("b")),
         Arguments.of("a = [1, " + "[".repeat(130) + "]".repeat(130) + ", 2]\nb = 1\n", Set.of("b")),
 
+        // An unclosed value ends at its last line, and the next line the lexer reads as the document's is parsed, past any
+        // comment or blank lines between.
+        Arguments.of("a = [1, 2 # c\nb = 1\n", Set.of("b")),
+        Arguments.of("a = [1, 2\n# c\nb = 1\n", Set.of("b")),
+        Arguments.of("a = [1, 2\n\n# c\n\nb = 1\n", Set.of("b")),
+        Arguments.of("a = [1,\n  2 # c\nb = 3\n", Set.of("b")),
+        Arguments.of("a = [1, 2 # c\n[tbl]\nb = 1\n", Set.of("tbl.b")),
+        Arguments.of("a = { x = 1 # c\n\n[tbl]\nb = 1\n", Set.of("tbl.b")),
+
         // A line that cannot be parsed is skipped, so parsing resumes on the next line.
         Arguments.of("a = 1\n@\nb = 2\nc = 3\n", Set.of("a", "b", "c")),
         Arguments.of("@@ x\na = 1\n", Set.of("a")),
@@ -853,6 +862,11 @@ class TomlTest {
         // No newline can close a value the document has left, so none is named as expected.
         Arguments.of("retries = [1, 2\ntimeout = 30\n", List.of(
             "Unexpected end of line, expected ] or a comma (line 1, column 16)")),
+        // A comment and blank lines after the value's last line are the document's, so the error is at the end of that line.
+        Arguments.of("retries = [1, 2 # c\n\ntimeout = 30\n", List.of(
+            "Unexpected end of line, expected ] or a comma (line 1, column 20)")),
+        Arguments.of("a = [1,\n  2 # c\n# d\nb = 3\n", List.of(
+            "Unexpected end of line, expected ] or a comma; the array opened at line 1, column 5 is unclosed (line 2, column 8)")),
         // Where nothing closes the value, the error names where it was opened: the bracket or brace is missing from
         // that line rather than from the line the error is reported on. A value still open at the end of the input is
         // named the same way.
