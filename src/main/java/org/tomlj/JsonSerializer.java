@@ -165,6 +165,11 @@ final class JsonSerializer {
         }
         break;
       case FLOAT:
+        if (!Double.isFinite((Double) value) && !options.contains(ALL_VALUES_AS_STRINGS)) {
+          // JSON has no literal for NaN or infinity.
+          appendable.append("null");
+          break;
+        }
         if (options.contains(ALL_VALUES_AS_STRINGS)) {
           appendable.append('"');
         }

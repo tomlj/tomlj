@@ -19,6 +19,9 @@ import java.util.EnumSet;
  * <p>
  * These options are suitable for use with `toJson` methods, e.g. {@link TomlTable#toJson(JsonOptions...)},
  * {@link TomlArray#toJson(JsonOptions...)}.
+ * <p>
+ * JSON has no literal for NaN or infinity, so a float that is one is written as {@code null}, or with
+ * {@link #ALL_VALUES_AS_STRINGS} as {@code "nan"}, {@code "+inf"} or {@code "-inf"}.
  */
 public enum JsonOptions {
   /**

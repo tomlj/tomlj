@@ -1317,6 +1317,17 @@ class TomlTest {
   }
 
   @Test
+  void writesNanAndInfinityAsNullInJson() {
+    TomlParseResult result = Toml.parse("a = nan\nb = inf\nc = -inf\nd = [nan, 1.5]\n");
+    assertFalse(result.hasErrors(), () -> joinErrors(result));
+    String expected = "{\n  \"a\" : null,\n  \"b\" : null,\n  \"c\" : null,\n  \"d\" : [\n    null,\n    1.5\n  ]\n}\n";
+    assertEquals(expected.replace("\n", System.lineSeparator()), result.toJson());
+    String asStrings =
+        "{\n  \"a\" : \"nan\",\n  \"b\" : \"+inf\",\n  \"c\" : \"-inf\",\n  \"d\" : [\n    \"nan\",\n    \"1.5\"\n  ]\n}\n";
+    assertEquals(asStrings.replace("\n", System.lineSeparator()), result.toJson(JsonOptions.ALL_VALUES_AS_STRINGS));
+  }
+
+  @Test
   void testQuotesInJson() {
     TomlParseResult result1 = Toml.parse("key = \"this is 'a test' with single quotes\"");
     assertFalse(result1.hasErrors(), () -> joinErrors(result1));
