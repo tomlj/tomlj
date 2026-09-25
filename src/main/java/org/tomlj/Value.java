@@ -12,6 +12,8 @@
  */
 package org.tomlj;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 /**
  * Anything a key or an array slot holds: a scalar, a table or an array.
  *
@@ -30,15 +32,59 @@ abstract class Value implements TomlValue {
   public abstract Object get();
 
   /**
+   * Where this value was written in the document it was read from, unless it was edited or reformatted since.
+   *
+   * @return The span of the literal, or of the brackets of a table or array that has not been edited since, or
+   *         {@code null} if this value was built through the editing API, or read from a document parsed with no source
+   *         kept.
+   */
+  @Nullable
+  abstract ValueSpan writtenSpan();
+
+  /**
    * Wrap a value read from the document as a {@code Value}, for an entry to hold.
    *
    * @param value The value: a scalar such as a {@code Long} or {@code String}, or a {@link LinkedTomlTable} /
    *        {@link ListTomlArray}, which is already a {@link Value}.
-   * @param position The position of the value in the document.
+   * @param position The position of the value in the document, or {@code null} if the value did not come from one.
    * @return {@code value} itself if it is already a {@link Value}, otherwise a new {@link Scalar} wrapping it.
    */
-  static Value of(Object value, TomlPosition position) {
+  static Value of(Object value, @Nullable TomlPosition position) {
     return (value instanceof Value) ? (Value) value : new Scalar(value, position);
+  }
+
+  /**
+   * Wrap a scalar with the text it is to be written as, which a writer keeping the notation copies as it copies the
+   * literal a document wrote.
+   *
+   * @param value The scalar.
+   * @param text The literal, which must read back as {@code value}.
+   * @return A new {@link Scalar} with no position, whose span covers all of {@code text}.
+   */
+  static Scalar withText(Object value, String text) {
+    Scalar scalar = new Scalar(value, null);
+    scalar.span = ValueSpan.scalar(new Source(text), 0, text.codePointCount(0, text.length()) - 1);
+    return scalar;
+  }
+
+  /**
+   * Wrap a copy of a {@link TomlValue}, keeping the record of where the original was written.
+   *
+   * @param original The value being copied.
+   * @param normalized The value to wrap, as {@link TomlValues#normalize} gives it: a copy for a table or an array, the
+   *        scalar itself otherwise.
+   * @return {@code normalized} itself if it is already a {@link Value}, otherwise a new {@link Scalar} with no
+   *         position, sharing {@code original}'s span if it has one.
+   */
+  static Value copyOf(TomlValue original, Object normalized) {
+    if (normalized instanceof Value) {
+      return (Value) normalized;
+    }
+    Scalar copy = new Scalar(normalized, null);
+    if (original instanceof Scalar) {
+      copy.span = ((Scalar) original).span;
+    }
+    return copy;
   }
 
   /**
@@ -47,9 +93,16 @@ abstract class Value implements TomlValue {
   static final class Scalar extends Value {
 
     private final Object value;
-    private final TomlPosition position;
 
-    Scalar(Object value, TomlPosition position) {
+    // Nullable: a scalar set through the editing API has no input position.
+    private final @Nullable TomlPosition position;
+
+    // Where the literal of this scalar was written in the document it was read from. Null for a scalar set through the
+    // editing API, and for one read from a document parsed with no source kept.
+    @Nullable
+    ValueSpan span;
+
+    Scalar(Object value, @Nullable TomlPosition position) {
       this.value = value;
       this.position = position;
     }
@@ -60,6 +113,13 @@ abstract class Value implements TomlValue {
     }
 
     @Override
+    @Nullable
+    ValueSpan writtenSpan() {
+      return span;
+    }
+
+    @Override
+    @Nullable
     public TomlPosition position() {
       return position;
     }

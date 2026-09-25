@@ -81,8 +81,7 @@ public final class Toml {
    * @return The parse result.
    */
   public static TomlParseResult parse(String input, TomlParseOptions options) {
-    CharStream stream = CharStreams.fromString(input);
-    return Parser.parse(stream, options);
+    return Parser.parse(input, options);
   }
 
   /**
@@ -194,8 +193,7 @@ public final class Toml {
    * @throws IOException If an IO error occurs.
    */
   public static TomlParseResult parse(Reader reader, TomlParseOptions options) throws IOException {
-    CharStream stream = CharStreams.fromString(readFully(reader));
-    return Parser.parse(stream, options);
+    return Parser.parse(readFully(reader), options);
   }
 
   // CharStreams.fromReader duplicates a surrogate pair that a read splits across its 4096-char buffer, so read the

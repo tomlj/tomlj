@@ -54,6 +54,9 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * <p>
  * The comments of a document are kept, and are read from the table or array they were written in; see
  * {@link TomlComment}.
+ *
+ * <p>
+ * A table that can be edited is a {@link MutableTomlTable}; a parse result is one.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
@@ -1466,14 +1469,40 @@ public interface TomlTable {
   }
 
   /**
-   * Return a representation of this table using TOML.
+   * Return a representation of this table using TOML, written with the default options.
+   *
+   * <p>
+   * A {@link TomlParseResult} is written keeping its layout: the text it was parsed from is written back, with only
+   * what the editing API changed written anew; any other table, including a table of a parse result rather than the
+   * result itself, is written in the default style, keeping the literal form each of its values was parsed with.
    *
    * @return A TOML representation of this table.
+   * @see TomlWriteOptions#defaults()
+   * @see TomlWriteOptions
    */
   default String toToml() {
+    return toToml(TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Return a representation of this table using TOML.
+   *
+   * <p>
+   * A {@link TomlParseResult} keeps as much of its existing structure and format as {@code options} ask for; see
+   * {@link TomlWriteOptions.Keep}. Any other table is written in the default style, keeping the literal form of each
+   * value unless the options ask for {@link TomlWriteOptions.Keep#NOTHING}. See {@link #toToml()}.
+   *
+   * @param options The options to write with.
+   * @return A TOML representation of this table.
+   * @throws IllegalArgumentException If the version the options write for cannot write this table: TOML 1.0.0 and an
+   *         inline table holding a comment, or text copied from a document that only TOML 1.1.0 allows; see
+   *         {@link TomlWriteOptions#withVersion(TomlVersion)}.
+   * @see TomlWriteOptions
+   */
+  default String toToml(TomlWriteOptions options) {
     StringBuilder builder = new StringBuilder();
     try {
-      toToml(builder);
+      toToml(builder, options);
     } catch (IOException e) {
       // not reachable
       throw new UncheckedIOException(e);
@@ -1482,12 +1511,35 @@ public interface TomlTable {
   }
 
   /**
-   * Append a TOML representation of this table to the appendable output.
+   * Append a TOML representation of this table to the appendable output, written with the default options.
+   *
+   * <p>
+   * Written as {@link #toToml()} writes it.
    *
    * @param appendable The appendable output.
    * @throws IOException If an IO error occurs.
+   * @see TomlWriteOptions#defaults()
+   * @see TomlWriteOptions
    */
   default void toToml(Appendable appendable) throws IOException {
-    Serializer.toToml(this, appendable);
+    toToml(appendable, TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Append a TOML representation of this table to the appendable output.
+   *
+   * <p>
+   * Written as {@link #toToml(TomlWriteOptions)} writes it.
+   *
+   * @param appendable The appendable output.
+   * @param options The options to write with.
+   * @throws IOException If an IO error occurs.
+   * @throws IllegalArgumentException If the version the options write for cannot write this table: TOML 1.0.0 and an
+   *         inline table holding a comment, or text copied from a document that only TOML 1.1.0 allows; see
+   *         {@link TomlWriteOptions#withVersion(TomlVersion)}.
+   * @see TomlWriteOptions
+   */
+  default void toToml(Appendable appendable, TomlWriteOptions options) throws IOException {
+    Serializer.toToml(this, appendable, options);
   }
 }

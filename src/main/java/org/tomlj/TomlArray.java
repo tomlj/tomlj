@@ -27,6 +27,9 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * An array of TOML values.
+ *
+ * <p>
+ * An array that can be edited is a {@link MutableTomlArray}; the arrays of a parse result are.
  */
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
@@ -337,9 +340,10 @@ public interface TomlArray {
    * This is a shortcut for {@link #entry(int)}, returning its position.
    *
    * @param index The array index.
-   * @return The input position.
+   * @return The input position, or {@code null} if the entry was not read from a document.
    * @throws IndexOutOfBoundsException If the index is out of bounds.
    */
+  @Nullable
   default TomlPosition inputPositionOf(int index) {
     return entry(index).position();
   }
@@ -472,14 +476,37 @@ public interface TomlArray {
   }
 
   /**
-   * Return a representation of this array using TOML.
+   * Return a representation of this array using TOML, written with the default options.
+   *
+   * <p>
+   * An array is always written in the default style, whether or not it was parsed, keeping the literal form each of its
+   * values was parsed with.
    *
    * @return A TOML representation of this array.
+   * @see TomlWriteOptions#defaults()
+   * @see TomlWriteOptions
    */
   default String toToml() {
+    return toToml(TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Return a representation of this array using TOML.
+   *
+   * <p>
+   * An array is always written in the default style, whether or not it was parsed; see {@link #toToml()}.
+   *
+   * @param options The options to write with.
+   * @return A TOML representation of this array.
+   * @throws IllegalArgumentException If the version the options write for cannot write this array: TOML 1.0.0 and an
+   *         inline table holding a comment, or text copied from a document that only TOML 1.1.0 allows; see
+   *         {@link TomlWriteOptions#withVersion(TomlVersion)}.
+   * @see TomlWriteOptions
+   */
+  default String toToml(TomlWriteOptions options) {
     StringBuilder builder = new StringBuilder();
     try {
-      toToml(builder);
+      toToml(builder, options);
     } catch (IOException e) {
       // not reachable
       throw new UncheckedIOException(e);
@@ -488,12 +515,35 @@ public interface TomlArray {
   }
 
   /**
-   * Append a TOML representation of this array to the appendable output.
+   * Append a TOML representation of this array to the appendable output, written with the default options.
+   *
+   * <p>
+   * Written as {@link #toToml()} writes it.
    *
    * @param appendable The appendable output.
    * @throws IOException If an IO error occurs.
+   * @see TomlWriteOptions#defaults()
+   * @see TomlWriteOptions
    */
   default void toToml(Appendable appendable) throws IOException {
-    Serializer.toToml(this, appendable);
+    toToml(appendable, TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Append a TOML representation of this array to the appendable output.
+   *
+   * <p>
+   * Written as {@link #toToml(TomlWriteOptions)} writes it.
+   *
+   * @param appendable The appendable output.
+   * @param options The options to write with.
+   * @throws IOException If an IO error occurs.
+   * @throws IllegalArgumentException If the version the options write for cannot write this array: TOML 1.0.0 and an
+   *         inline table holding a comment, or text copied from a document that only TOML 1.1.0 allows; see
+   *         {@link TomlWriteOptions#withVersion(TomlVersion)}.
+   * @see TomlWriteOptions
+   */
+  default void toToml(Appendable appendable, TomlWriteOptions options) throws IOException {
+    Serializer.toToml(this, appendable, options);
   }
 }

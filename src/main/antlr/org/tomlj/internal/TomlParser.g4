@@ -29,6 +29,9 @@ expression
 // Key string parser
 tomlKey : key EOF;
 
+// Value string parser
+tomlValue : val EOF;
+
 
 // Key-Value pairs
 keyval locals [int nesting] : key Equals val;

@@ -22,8 +22,13 @@ import java.util.List;
  * with the next expression, so a document with errors still yields the values that could be parsed. Callers should
  * check {@link #hasErrors()} before relying on the result. A key/value pair containing a syntax error is omitted from
  * the result.
+ *
+ * <p>
+ * A parse result is a {@link MutableTomlTable}, so a parsed document can be changed and written back out with
+ * {@link #toToml()}, written back from the text it was parsed from; see {@link TomlWriteOptions}. {@link #errors()}
+ * reports only what was found while parsing, and is unaffected by any change made afterwards.
  */
-public interface TomlParseResult extends TomlTable {
+public interface TomlParseResult extends MutableTomlTable {
 
   /**
    * {@code true} if the TOML document contained errors.

@@ -50,6 +50,10 @@ if (port > 65535) {
   a default.
 * **Comments are kept.** Every comment in a document is parsed into the model, attached to an entry
   or unattached in the table or array it was written in. See [Comments](#comments).
+* **Documents can be built and edited.** A parse result is a `MutableTomlTable`: set, insert and
+  remove values and comments, or build a document from scratch, and write it out with `toToml()`.
+  `toToml()` writes a parsed document as its source text, changed only where the document was
+  edited. See [Building and editing documents](#building-and-editing-documents).
 * **No dependencies.** The jar carries its own copy of the ANTLR runtime, relocated under TomlJ's
   own package, so there is nothing else to add and no clash with ANTLR elsewhere in your project.
   Works on Java 9 and later.
@@ -103,23 +107,71 @@ for (TomlComment comment : result.comments("port")) {
 ```
 
 The unattached comment is read through `elements()`, which lists a table's entries and unattached
-comments together, in document order:
+comments together, in document order. Comments are set and removed through the editing API, and
+`toToml()` writes every comment back where it was read from. [docs/comments.md](docs/comments.md)
+states the rules in full: how a comment's text is read, which table an unattached comment belongs
+to, how comments are edited and written, and the cases at their edges.
+
+### Building and editing documents
+
+`MutableTomlTable` and `MutableTomlArray` extend `TomlTable` and `TomlArray` with mutators. A
+document can be built from scratch and written out with `toToml()`:
 
 ```java
-for (TomlElement element : result.elements()) {
-  if (element instanceof TomlKeyValue) {
-    TomlKeyValue pair = (TomlKeyValue) element;
-    System.out.println(pair.key() + " = " + pair.value().get());
-  } else {
-    System.out.println("# " + ((TomlComment) element).text());
-  }
-}
+MutableTomlTable doc = MutableTomlTable.create();
+doc.set("title", "Example");
+doc.set("owner.name", "Tom");
+doc.getOrCreateTable("database").set("ports", MutableTomlArray.of(8001, 8002));
+String toml = doc.toToml();
 ```
 
-A comment's text is what follows `# `, one string per line in `lines()`. The comments on a `[[x]]`
-header are attached to the table it opens, so they are read with `getArray("x").comments(0)`.
-`toToml()` does not write comments yet. [docs/comments.md](docs/comments.md) states the rules in
-full, with the cases at their edges.
+A parse result is itself a `MutableTomlTable`, so a document can be parsed, changed and written
+back:
+
+```java
+TomlParseResult result = Toml.parse(source);
+result.set("owner.name", "Chris");
+result.remove("title");
+Files.writeString(source, result.toToml());
+```
+
+`set` and `add` put a new entry after the last element, and `insertBefore` and `insertAfter` put one
+next to an existing entry. A value parsed from its TOML text, `TomlValue.parse("0xFF")`, or made
+with a notation factory, `TomlValue.hex(255)`, is written back in that notation, and a table made
+with `MutableTomlTable.createInline()` is written between braces on its entry's line. Comments are
+set and removed by placement: a run above an entry, the comment after it, or an unattached comment
+of a table or array.
+[docs/editing.md](docs/editing.md) describes the mutators in full: the values they accept, where a
+new entry goes, and how comments are edited.
+
+### Writing TOML
+
+`toToml()` writes a parse result from the text it was read from: an unedited document comes back
+byte for byte, and an edit changes only the lines it touches. `toToml(TomlWriteOptions)` chooses how
+much of that is kept, with `keep(TomlWriteOptions.Keep)`: `LAYOUT`, the default, keeps every line
+as it was read; `NOTATION` keeps the form of each key, value and table, the order of lines and the
+comments, and lays the document out anew; `NOTHING` writes the whole document in the default
+style, as a document built through the editing API is written. `withIndent`, `withMaxLineWidth`,
+`withLineSeparator` and `withVersion` shape whatever is written anew:
+
+```java
+TomlWriteOptions options = TomlWriteOptions.defaults()
+    .keep(TomlWriteOptions.Keep.NOTATION)
+    .withIndent(2);
+String reindented = result.toToml(options);
+```
+
+`reformat(TomlWriteOptions.Keep)` on a `MutableTomlTable` or `MutableTomlArray` does the same for
+one table or array and everything nested in it:
+
+```java
+result.getTable("server").reformat(TomlWriteOptions.Keep.NOTHING);
+```
+
+Keeping the text takes memory, and an application that only reads a document never uses it. Parse
+with `TomlParseOptions.defaults().withoutSource()` to keep no source text; such a result is written
+in the default style. [docs/writing.md](docs/writing.md) describes writing in full: where each kind
+of edit lands, what each amount keeps, the default style and the options.
 
 ### Specification version
 

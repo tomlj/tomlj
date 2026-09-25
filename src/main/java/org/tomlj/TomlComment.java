@@ -54,8 +54,13 @@ public final class TomlComment implements TomlElement {
   // Each line as written after the '#', kept verbatim so that a writer can reproduce it; lines() strips one leading
   // space.
   private final List<String> rawLines;
-  private final TomlPosition position;
+  private final @Nullable TomlPosition position;
   private final Placement placement;
+
+  // Where an unattached comment was written in the document it was read from, including the blank lines above it. Null
+  // for an attached comment, whose offsets are on the span of the entry it is attached to, for a comment built through
+  // the editing API, and for one read from a document parsed with no source kept.
+  private final @Nullable SourceSpan span;
 
   /**
    * Record a comment from the tokens the lexer matched for it.
@@ -73,7 +78,7 @@ public final class TomlComment implements TomlElement {
     }
     Token first = tokens.get(0);
     TomlPosition position = TomlPosition.positionAt(first.getLine(), first.getCharPositionInLine() + 1);
-    return new TomlComment(rawLines, position, placement);
+    return new TomlComment(rawLines, position, placement, null);
   }
 
   /**
@@ -97,6 +102,29 @@ public final class TomlComment implements TomlElement {
   }
 
   /**
+   * Copy each comment without its position, as {@link #withoutPosition()} gives it, keeping the ABOVE comment before
+   * the AFTER one.
+   *
+   * @param comments Attached comments, at most one of each placement, as {@link TomlEntry#comments()} lists them.
+   * @return The copies, as {@link #withoutNulls} lists them.
+   * @throws IllegalArgumentException If a comment is unattached.
+   */
+  static List<TomlComment> copyWithoutPositions(List<TomlComment> comments) {
+    TomlComment above = null;
+    TomlComment after = null;
+    for (TomlComment comment : comments) {
+      if (comment.placement == Placement.ABOVE) {
+        above = comment.withoutPosition();
+      } else if (comment.placement == Placement.AFTER) {
+        after = comment.withoutPosition();
+      } else {
+        throw new IllegalArgumentException("comment must have a placement of ABOVE or AFTER");
+      }
+    }
+    return withoutNulls(above, after);
+  }
+
+  /**
    * Check that a placement is one an entry holds a comment at.
    *
    * @param placement The placement.
@@ -112,10 +140,131 @@ public final class TomlComment implements TomlElement {
     return placement;
   }
 
-  private TomlComment(List<String> rawLines, TomlPosition position, Placement placement) {
+  private TomlComment(
+      List<String> rawLines,
+      @Nullable TomlPosition position,
+      Placement placement,
+      @Nullable SourceSpan span) {
     this.rawLines = rawLines;
     this.position = position;
     this.placement = requireNonNull(placement);
+    this.span = span;
+  }
+
+  /**
+   * Build a comment from lines of text, as the editing API accepts them.
+   *
+   * <p>
+   * A line holding a newline is split there, so the text of a whole run can be given as one line. Each line is then
+   * validated against the grammar's comment rule: a control character other than tab, DEL, or a lone surrogate is
+   * rejected, since none of those can be written as part of a comment; a surrogate pair is one character and is
+   * accepted.
+   *
+   * @param lines The text of each line, as {@link #lines()} would return it, or holding newlines where the run breaks.
+   * @param placement Where the comment sits relative to the entry it is attached to, or {@link Placement#UNATTACHED}.
+   * @return A comment with no position.
+   * @throws NullPointerException If {@code lines}, a line, or {@code placement} is {@code null}.
+   * @throws IllegalArgumentException If {@code lines} is empty, a line cannot be written as a TOML comment, or
+   *         {@code placement} is {@link Placement#AFTER} and {@code lines} has more than one line once split.
+   */
+  static TomlComment ofLines(List<String> lines, Placement placement) {
+    requireNonNull(lines);
+    if (lines.isEmpty()) {
+      throw new IllegalArgumentException("A comment needs at least one line");
+    }
+    List<String> rawLines = new ArrayList<>(lines.size());
+    for (String text : lines) {
+      requireNonNull(text);
+      for (String line : text.split("\n", -1)) {
+        validateLine(line);
+        rawLines.add(line.isEmpty() ? "" : (" " + line));
+      }
+    }
+    if (placement == Placement.AFTER && rawLines.size() > 1) {
+      throw new IllegalArgumentException("A comment after an entry has one line");
+    }
+    return new TomlComment(rawLines, null, placement, null);
+  }
+
+  // Rejects a character the lexer's comment rule cannot match: a control character other than tab, DEL, or a lone
+  // surrogate. A surrogate pair decodes to one code point outside this range, so it passes.
+  private static void validateLine(String line) {
+    int length = line.length();
+    for (int i = 0; i < length;) {
+      int codePoint = line.codePointAt(i);
+      if (isRejected(codePoint)) {
+        throw new IllegalArgumentException("A comment cannot contain " + String.format("U+%04X", codePoint));
+      }
+      i += Character.charCount(codePoint);
+    }
+  }
+
+  private static boolean isRejected(int codePoint) {
+    return codePoint <= 0x08
+        || (codePoint >= 0x0A && codePoint <= 0x1F)
+        || codePoint == 0x7F
+        || (codePoint >= 0xD800 && codePoint <= 0xDFFF);
+  }
+
+  /**
+   * This comment with a record of where it was written.
+   *
+   * @param span Where the comment, and the blank lines above it, were written.
+   * @return A comment with the same lines, position and placement, reading that span.
+   */
+  TomlComment withSpan(SourceSpan span) {
+    return new TomlComment(rawLines, position, placement, span);
+  }
+
+  /**
+   * This comment without its position: itself if it has none, otherwise a copy with the same lines and placement.
+   *
+   * <p>
+   * The editing API stores a fresh entity, with no position, when it attaches a comment read from a document. The copy
+   * drops where the comment was written along with its position, since a comment stored by the editing API has no
+   * position or span.
+   *
+   * @return A comment with the same lines and placement, no position, and no record of where it was written.
+   */
+  TomlComment withoutPosition() {
+    return (position == null && span == null) ? this : new TomlComment(rawLines, null, placement, null);
+  }
+
+  /**
+   * Where this comment was written in the document it was read from.
+   *
+   * @return The span, or {@code null} if this comment is attached, was built through the editing API, or was read from
+   *         a document parsed with no source kept.
+   */
+  @Nullable
+  SourceSpan span() {
+    return span;
+  }
+
+  /**
+   * Check that this comment is unattached.
+   *
+   * @return This comment.
+   * @throws IllegalArgumentException If this comment is attached.
+   */
+  TomlComment requireUnattached() {
+    if (placement != Placement.UNATTACHED) {
+      throw new IllegalArgumentException("comment must be unattached");
+    }
+    return this;
+  }
+
+  /**
+   * The text of each line as written after the {@code #}, one entry per line of the run, in document order.
+   *
+   * <p>
+   * Unlike {@link #lines()}, no leading space is stripped, so a writer reproduces the line by writing {@code #}
+   * followed by the entry.
+   *
+   * @return The raw text of each line, in document order. Unmodifiable.
+   */
+  List<String> rawLines() {
+    return Collections.unmodifiableList(rawLines);
   }
 
   /**

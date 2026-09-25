@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.Objects;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.framework.qual.DefaultQualifier;
@@ -33,6 +34,134 @@ import org.checkerframework.framework.qual.TypeUseLocation;
 @DefaultQualifier(value = NonNull.class ,
     locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public interface TomlValue extends TomlElement {
+
+  /**
+   * Parse the text of one value, written as it is after the {@code =} of a {@code key = value} line, in the latest
+   * version of TOML.
+   *
+   * @param text The value, e.g. {@code 0xFF}, {@code 'C:\path'} or <code>{ a = 1 }</code>.
+   * @return The value, which keeps the notation it was written in; see {@link #parse(String, TomlVersion)}.
+   * @throws NullPointerException If {@code text} is {@code null}.
+   * @throws IllegalArgumentException If {@code text} is not one TOML value.
+   */
+  static TomlValue parse(String text) {
+    return parse(text, TomlVersion.LATEST);
+  }
+
+  /**
+   * Parse the text of one value, written as it is after the {@code =} of a {@code key = value} line.
+   *
+   * <p>
+   * The value keeps the notation it was written in. Stored in a table or an array through the editing API, it is
+   * written with the text it was parsed from, as a value read from a document is, unless the document is written
+   * keeping nothing ({@link TomlWriteOptions.Keep#NOTHING}); an inline table is written as an inline table, and an
+   * array of tables as an array, rather than under {@code [x]} or {@code [[x]]} headers. Text that only TOML 1.1.0
+   * allows is not written for TOML 1.0.0; see {@link TomlWriteOptions#withVersion(TomlVersion)}.
+   *
+   * <p>
+   * A comment or a line break before or after the value is rejected. A comment inside an inline table or an array is
+   * part of the value and is kept.
+   *
+   * @param text The value, e.g. {@code 0xFF}, {@code 'C:\path'} or <code>{ a = 1 }</code>.
+   * @param version The version of TOML the value is written in.
+   * @return The value.
+   * @throws NullPointerException If {@code text} or {@code version} is {@code null}.
+   * @throws IllegalArgumentException If {@code text} is not one TOML value.
+   */
+  static TomlValue parse(String text, TomlVersion version) {
+    Objects.requireNonNull(text);
+    Objects.requireNonNull(version);
+    return Parser.parseValue(text, version);
+  }
+
+  /**
+   * An integer to be written in hexadecimal with uppercase digits, as {@code 0xFF}.
+   *
+   * <p>
+   * The value carries the notation with it: stored in a table or an array through the editing API, it is written in
+   * that notation unless the document is written keeping nothing ({@link TomlWriteOptions.Keep#NOTHING}).
+   * {@link #parse(String)} gives a value any notation TOML has.
+   *
+   * @param value The integer.
+   * @return The value.
+   * @throws IllegalArgumentException If {@code value} is negative, since TOML writes no sign before {@code 0x}.
+   * @see #hexLowercase(long)
+   */
+  static TomlValue hex(long value) {
+    return TomlValues.inBase(value, "0x", 16, true);
+  }
+
+  /**
+   * An integer to be written in hexadecimal with lowercase digits, as {@code 0xff}; see {@link #hex(long)}.
+   *
+   * @param value The integer.
+   * @return The value.
+   * @throws IllegalArgumentException If {@code value} is negative, since TOML writes no sign before {@code 0x}.
+   */
+  static TomlValue hexLowercase(long value) {
+    return TomlValues.inBase(value, "0x", 16, false);
+  }
+
+  /**
+   * An integer to be written in octal, as {@code 0o755}; see {@link #hex(long)}.
+   *
+   * @param value The integer.
+   * @return The value.
+   * @throws IllegalArgumentException If {@code value} is negative, since TOML writes no sign before {@code 0o}.
+   */
+  static TomlValue octal(long value) {
+    return TomlValues.inBase(value, "0o", 8, false);
+  }
+
+  /**
+   * An integer to be written in binary, as {@code 0b1010}; see {@link #hex(long)}.
+   *
+   * @param value The integer.
+   * @return The value.
+   * @throws IllegalArgumentException If {@code value} is negative, since TOML writes no sign before {@code 0b}.
+   */
+  static TomlValue binary(long value) {
+    return TomlValues.inBase(value, "0b", 2, false);
+  }
+
+  /**
+   * An integer to be written in decimal with its digits grouped in threes, as {@code 1_000_000}; see
+   * {@link #hex(long)}.
+   *
+   * @param value The integer.
+   * @return The value.
+   */
+  static TomlValue grouped(long value) {
+    return TomlValues.grouped(value);
+  }
+
+  /**
+   * A string to be written as a literal string, between apostrophes with nothing escaped, as {@code 'C:\Users'}; see
+   * {@link #hex(long)}.
+   *
+   * @param value The string.
+   * @return The value.
+   * @throws NullPointerException If {@code value} is {@code null}.
+   * @throws IllegalArgumentException If {@code value} holds an apostrophe, a newline or a control character other than
+   *         tab, none of which a literal string can hold, or an unpaired surrogate.
+   */
+  static TomlValue literal(String value) {
+    return TomlValues.literal(value);
+  }
+
+  /**
+   * A string to be written as a multi-line literal string, between triple apostrophes with nothing escaped, its
+   * newlines written as line breaks; see {@link #hex(long)}.
+   *
+   * @param value The string.
+   * @return The value.
+   * @throws NullPointerException If {@code value} is {@code null}.
+   * @throws IllegalArgumentException If {@code value} holds three apostrophes in a row, or a control character other
+   *         than tab and newline, none of which a multi-line literal string can hold, or an unpaired surrogate.
+   */
+  static TomlValue multilineLiteral(String value) {
+    return TomlValues.multilineLiteral(value);
+  }
 
   /**
    * Get the value.

@@ -13,6 +13,7 @@
 package org.tomlj;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -49,9 +50,9 @@ import org.junit.jupiter.api.TestFactory;
  * passed in the {@code org.tomlj.tomlTestDir} system property. Each {@code files-toml-<version>} list names the cases
  * that apply to a TOML specification version. Valid cases must parse without errors and match the expected tagged JSON
  * document, compared using the same rules as the official {@code toml-test} runner: floats numerically, date/times as
- * instants, everything else as strings. Valid cases must also survive a round trip: their {@code toToml()} output must
- * parse without errors at the same version and match the same expected document. Invalid cases must produce at least
- * one error.
+ * instants, everything else as strings. A valid case must also be written back byte for byte by {@code toToml()}, since
+ * nothing has edited it, and written keeping its notation or keeping nothing it must parse without errors at the same
+ * version and match the same expected document and comments. Invalid cases must produce at least one error.
  */
 class TomlTestSuiteTest {
 
@@ -130,12 +131,26 @@ class TomlTestSuiteTest {
     Object expected = new JsonReader(Files.readString(json, UTF_8)).read();
     assertMatches(expected, result, "");
 
-    String serialized = result.toToml();
+    // An unedited document is written back as it was read, byte for byte
+    assertEquals(new String(Files.readAllBytes(toml), UTF_8), result.toToml(), () -> "Not written back unchanged");
+
+    String serialized =
+        result.toToml(TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING).withVersion(version));
     TomlParseResult reparsed = Toml.parse(serialized, version);
     assertFalse(
         reparsed.hasErrors(),
         () -> "Unexpected errors after serializing to TOML: " + reparsed.errors() + "\n" + serialized);
     assertMatches(expected, reparsed, "After serializing to TOML: ");
+    TomlAssertions.assertSameComments(result, reparsed);
+
+    String notationKept =
+        result.toToml(TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTATION).withVersion(version));
+    TomlParseResult notationKeptReparsed = Toml.parse(notationKept, version);
+    assertFalse(
+        notationKeptReparsed.hasErrors(),
+        () -> "Unexpected errors after keeping the notation: " + notationKeptReparsed.errors() + "\n" + notationKept);
+    assertMatches(expected, notationKeptReparsed, "After keeping the notation: ");
+    TomlAssertions.assertSameComments(result, notationKeptReparsed);
   }
 
   private static void assertMatches(Object expected, TomlParseResult result, String context) {
