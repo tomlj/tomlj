@@ -1,0 +1,23 @@
+# Build manifest for the inventory service.
+
+[package]
+name    = "inventory"
+version = "1.4.2"
+authors = ["Ana <ana@example.com>"]
+edition = "2021"   # change with care
+
+[dependencies]
+serde   = { version = "1.0", features = ["derive"] }
+tokio   = "1.38"
+anyhow  = "1"      # error handling
+log     = '0.4'
+
+[features]
+default = [
+    "metrics",
+    "tracing",  # structured logs
+]
+
+# Local overrides. Remove before a release.
+[patch]
+tokio = { path = "../tokio" }

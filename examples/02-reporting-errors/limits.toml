@@ -1,0 +1,7 @@
+[server]
+host = "example.com"
+port = 70000
+
+[client]
+retries = 3
+timeout = -5

@@ -111,6 +111,7 @@ spotless {
   java {
     target project.fileTree(rootDir) {
       include 'src/**/*.java'
+      include 'examples/*/src/**/*.java'
       exclude '**/generated-src/**/*.*'
     }
     removeUnusedImports()

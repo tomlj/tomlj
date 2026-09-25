@@ -63,6 +63,9 @@ if (port > 65535) {
 
 ## Usage
 
+The [examples](examples) directory has complete programs, from reading a configuration file to
+editing a document in place.
+
 You can parse a `String`, `Path`, `InputStream`, `Reader` or `ReadableByteChannel`. Check
 `hasErrors()` before using the result:
 
