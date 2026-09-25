@@ -70,15 +70,20 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
       // document, since nothing closes the value. Ending the value here leaves the rest of the document to the document
       // rule instead. A line that cannot continue the value is reported and skipped, as the rule's own recovery stops
       // at the end of a line; a line the lexer has already left the value for is kept whole, as the value ends before
-      // the newline that starts it and the document rule matches that newline.
+      // the comment or newline that ends its last line, and the document rule matches those and the blank lines and
+      // comment lines between.
       // Only a value the lexer has left is known to be unclosed: a line that cannot continue a value ends it here, but
       // a closing bracket or brace may still follow, as in an array whose element is a stray character.
-      Token opened = recognizer.getInputStream().LA(1) == TomlParser.NewLine ? value.getStart() : null;
-      if (opened == null) {
+      TokenStream input = recognizer.getInputStream();
+      if (!isTrivia(input.LA(1))) {
         // The lexer is still reading the value, so the lines that follow hold what is left of it.
         leftoverEnd = endOfLeftover(recognizer);
+        throw new UnterminatedValueException(recognizer, input.LT(1), null);
       }
-      throw new UnterminatedValueException(recognizer, opened);
+      // The value ends before the comment and newline ending its last line, which the document rule then matches, and
+      // the error is reported at that newline.
+      Token lineEnd = input.LA(1) == TomlParser.NewLine ? input.LT(1) : input.LT(2);
+      throw new UnterminatedValueException(recognizer, lineEnd, value.getStart());
     }
     // Also resets the state the default strategy keeps for reporting what a later rule expected.
     super.sync(recognizer);
@@ -91,11 +96,15 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
   @Nullable
   private ParserRuleContext unterminatedValue(Parser recognizer) {
     TokenStream input = recognizer.getInputStream();
-    boolean beforeNewLine = input.LA(1) == TomlParser.NewLine;
-    if (beforeNewLine) {
-      // Checked while recovering from an error inside the value as well: the lexer has read the line that follows as
-      // the document's, so the value ends here regardless of what went wrong inside it.
-      if (!startsDocumentLine(input.LA(2))) {
+    int afterTrivia = 1;
+    while (isTrivia(input.LA(afterTrivia))) {
+      afterTrivia++;
+    }
+    boolean beforeLineEnd = afterTrivia > 1;
+    if (beforeLineEnd) {
+      // Checked while recovering from an error inside the value as well: the lexer has read the next line that is not
+      // a comment or blank as the document's, so the value ends here regardless of what went wrong inside it.
+      if (!startsDocumentLine(input.LA(afterTrivia))) {
         return null;
       }
     } else {
@@ -117,10 +126,10 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
     if (value == null) {
       return null;
     }
-    if (beforeNewLine) {
+    if (beforeLineEnd) {
       // An inline table holds key/value pairs of its own, so only a table header ends one; the lexer leaves it for
       // nothing else.
-      if (input.LA(2) == TomlParser.UnquotedKey && value instanceof TomlParser.InlineTableContext) {
+      if (input.LA(afterTrivia) == TomlParser.UnquotedKey && value instanceof TomlParser.InlineTableContext) {
         return null;
       }
       return value;
@@ -157,6 +166,13 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
       }
       lineStart = type == TomlParser.NewLine;
     }
+  }
+
+  /**
+   * Check whether a token type is a comment or a newline, which the lexer reads the same inside a value or out of one.
+   */
+  private static boolean isTrivia(int type) {
+    return type == TomlParser.Comment || type == TomlParser.NewLine;
   }
 
   /**
@@ -225,8 +241,9 @@ final class LineRecoveryStrategy extends DefaultErrorStrategy {
     @Nullable
     private final transient Token opened;
 
-    UnterminatedValueException(Parser recognizer, @Nullable Token opened) {
+    UnterminatedValueException(Parser recognizer, Token reportedAt, @Nullable Token opened) {
       super(recognizer);
+      setOffendingToken(reportedAt);
       this.opened = opened;
     }
 
