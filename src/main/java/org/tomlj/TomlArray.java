@@ -20,10 +20,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.*;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import org.checkerframework.framework.qual.DefaultQualifier;
-import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * An array of TOML values.
@@ -31,8 +28,6 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * <p>
  * An array that can be edited is a {@link MutableTomlArray}; the arrays of a parse result are.
  */
-@DefaultQualifier(value = NonNull.class ,
-    locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public interface TomlArray {
 
   /**

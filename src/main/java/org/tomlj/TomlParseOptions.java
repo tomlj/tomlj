@@ -16,15 +16,10 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Objects;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
-import org.checkerframework.framework.qual.DefaultQualifier;
-import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * Options controlling how a TOML document is parsed.
  */
-@DefaultQualifier(value = NonNull.class ,
-    locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public final class TomlParseOptions {
 
   /**

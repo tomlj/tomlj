@@ -20,10 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import org.checkerframework.framework.qual.DefaultQualifier;
-import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * A {@link TomlTable} whose values can be edited in place.
@@ -59,8 +56,6 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * <p>
  * Not safe for use from multiple threads without external synchronization.
  */
-@DefaultQualifier(value = NonNull.class ,
-    locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public interface MutableTomlTable extends TomlTable {
 
   /**

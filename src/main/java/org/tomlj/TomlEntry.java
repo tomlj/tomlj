@@ -14,10 +14,7 @@ package org.tomlj;
 
 import java.util.List;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import org.checkerframework.framework.qual.DefaultQualifier;
-import org.checkerframework.framework.qual.TypeUseLocation;
 
 /**
  * An entry of a table or array: the slot a container indexes, with the value it holds and the comments attached to it.
@@ -26,8 +23,6 @@ import org.checkerframework.framework.qual.TypeUseLocation;
  * A table's entries are {@link TomlKeyValue}s; an array's entries are plain {@code TomlEntry}s. The other kind of
  * element a container's {@code elements()} holds is an unattached {@link TomlComment}, which is not an entry.
  */
-@DefaultQualifier(value = NonNull.class ,
-    locations = {TypeUseLocation.RETURN, TypeUseLocation.PARAMETER, TypeUseLocation.FIELD})
 public interface TomlEntry extends TomlElement {
 
   /**
