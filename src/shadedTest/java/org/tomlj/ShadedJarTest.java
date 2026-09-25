@@ -36,7 +36,7 @@ class ShadedJarTest {
     TomlParseResult result = Toml.parse("deps = [\n  \"a\",\n  \"b\"\n");
     assertEquals(1, result.errors().size());
     assertEquals(
-        "Unexpected end of input, expected ], a comma, or a newline; the array opened at line 1, column 8 is unclosed",
+        "Unexpected end of input, expected ] or a comma; the array opened at line 1, column 8 is unclosed",
         result.errors().get(0).getMessage());
   }
 

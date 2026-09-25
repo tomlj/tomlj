@@ -93,15 +93,20 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     Token opened = openingOfUnclosedValue(e, offendingSymbol, recognizer);
 
     if (e instanceof InputMismatchException || e instanceof NoViableAltException) {
-      String message = getMessage(e.getOffendingToken(), getExpected(e.getExpectedTokens(), e.getCtx()), opened);
+      String message = getMessage(
+          e.getOffendingToken(),
+          getExpected(withoutLineEnd(e.getExpectedTokens(), opened), e.getCtx()),
+          opened);
       reportError(message, position);
       return;
     }
 
     if (offendingSymbol instanceof Token && recognizer instanceof Parser) {
       Parser parser = (Parser) recognizer;
-      String message =
-          getMessage((Token) offendingSymbol, getExpected(parser.getExpectedTokens(), parser.getContext()), opened);
+      String message = getMessage(
+          (Token) offendingSymbol,
+          getExpected(withoutLineEnd(parser.getExpectedTokens(), opened), parser.getContext()),
+          opened);
       reportError(message, position);
       return;
     }
@@ -171,6 +176,14 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
       }
     }
     return null;
+  }
+
+  /**
+   * The expected tokens, without the newline where the error ends an unclosed value. An array or inline table may hold
+   * a newline, but once the lexer has left the value or the input has ended, no newline can close it.
+   */
+  private static IntervalSet withoutLineEnd(IntervalSet expectedTokens, @Nullable Token opened) {
+    return (opened == null) ? expectedTokens : expectedTokens.subtract(IntervalSet.of(TomlLexer.NewLine));
   }
 
   private static String getTokenName(Token token) {
