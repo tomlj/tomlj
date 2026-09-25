@@ -437,3 +437,9 @@ signing {
 tasks.withType(Sign) {
   onlyIf { System.getenv('ENABLE_SIGNING') == 'true' }
 }
+
+// Both publications carry the same sources and javadoc jars, so both sign tasks write the same
+// signature files, and each publication uploads them.
+tasks.withType(AbstractPublishToMaven).configureEach {
+  dependsOn tasks.withType(Sign)
+}
