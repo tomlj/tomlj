@@ -170,6 +170,9 @@ inline table holding a comment cannot be written, and `toToml` throws `IllegalAr
   dotted-key lines included. The lines of the root are not indented, and the path of a table in an
   array of tables is the path of the array. The elements of a multi-line array are indented two
   spaces beyond the line the array starts on regardless. The default is no indentation.
+* **`withEntriesAlignedWithHeaders(aligned)`** indents the lines of a section like its header,
+  `(n - 1) * spaces`, rather than one level beyond it. The lines of the root, and of a section whose
+  header path has one key, are then not indented. The default is `false`.
 * **`withMaxLineWidth(columns)`** is the widest a line may be, counted in code points, for an array
   or an inline table to be written on one line. The width includes the indentation, the key before
   the value and the comma after an element of an enclosing multi-line array. A long key or string is

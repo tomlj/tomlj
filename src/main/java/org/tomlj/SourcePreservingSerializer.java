@@ -201,7 +201,7 @@ final class SourcePreservingSerializer {
     SourceSpan[] commentSpans = new SourceSpan[count];
     // When only the notation is kept, the lines of this table are written at the indentation the options give the
     // section around it, and the header of a table written in it at the indentation of the lines it is written among
-    String lineIndent = notationOnly ? spaces(sectionPath.size() * options.indent()) : "";
+    String lineIndent = notationOnly ? spaces(options.entryIndent(sectionPath.size())) : "";
     String headerIndent = spaces((sectionPath.size() + relative.size()) * options.indent());
 
     for (int i = 0; i < count; i++) {
@@ -580,7 +580,7 @@ final class SourcePreservingSerializer {
 
       // When only the notation is kept, every line of a section is indented alike, regardless of the indentation of the
       // neighbouring line
-      String lineIndent = (indent != null && !notationOnly) ? indent : spaces(sectionPath.size() * options.indent());
+      String lineIndent = (indent != null && !notationOnly) ? indent : spaces(options.entryIndent(sectionPath.size()));
       if (isComment) {
         chunks
             .add(new CommentChunk((TomlComment) element, lineIndent, anchor, rank, blankAbove, trailing, tableOptions));

@@ -509,7 +509,12 @@ class SourcePreservingSerializerTest {
                   result.set("aot", other.get("aot"));
                 },
                 notation,
-                "x = 1\nt = { a = 0x1 }\naot = [{ b = 2 }]\n"));
+                "x = 1\nt = { a = 0x1 }\naot = [{ b = 2 }]\n"),
+            notationKept(
+                "the entries of a table are indented like its header when the options align them",
+                "[t]\na = 1\n[t.u]\nb = 2\n[[q]]\nz = 1\n",
+                notation.withIndent(2).withEntriesAlignedWithHeaders(true),
+                "[t]\na = 1\n\n  [t.u]\n  b = 2\n\n[[q]]\nz = 1\n"));
   }
 
   @ParameterizedTest

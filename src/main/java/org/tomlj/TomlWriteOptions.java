@@ -91,18 +91,21 @@ public final class TomlWriteOptions {
   @Nullable
   private final String lineSeparator;
   private final TomlVersion version;
+  private final boolean alignEntries;
 
   private TomlWriteOptions(
       Keep keep,
       int indent,
       int maxLineWidth,
       @Nullable String lineSeparator,
-      TomlVersion version) {
+      TomlVersion version,
+      boolean alignEntries) {
     this.keep = keep;
     this.indent = indent;
     this.maxLineWidth = maxLineWidth;
     this.lineSeparator = lineSeparator;
     this.version = version;
+    this.alignEntries = alignEntries;
   }
 
   /**
@@ -113,7 +116,7 @@ public final class TomlWriteOptions {
    * @return The default options.
    */
   public static TomlWriteOptions defaults() {
-    return new TomlWriteOptions(Keep.LAYOUT, 0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST);
+    return new TomlWriteOptions(Keep.LAYOUT, 0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST, false);
   }
 
   /**
@@ -124,7 +127,7 @@ public final class TomlWriteOptions {
    */
   public TomlWriteOptions keep(Keep keep) {
     requireNonNull(keep);
-    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries);
   }
 
   /**
@@ -149,6 +152,9 @@ public final class TomlWriteOptions {
    * }</pre>
    *
    * <p>
+   * {@link #withEntriesAlignedWithHeaders(boolean)} indents the entries of a table like its header instead.
+   *
+   * <p>
    * Regardless of the indent, the elements of a multi-line array are indented two spaces beyond the line the array
    * starts on.
    *
@@ -160,7 +166,38 @@ public final class TomlWriteOptions {
     if (spaces < 0) {
       throw new IllegalArgumentException("indent must not be negative: " + spaces);
     }
-    return new TomlWriteOptions(keep, spaces, maxLineWidth, lineSeparator, version);
+    return new TomlWriteOptions(keep, spaces, maxLineWidth, lineSeparator, version, alignEntries);
+  }
+
+  /**
+   * Create a copy of these options that indents the entries of a table like its header, or one level beyond it.
+   *
+   * <p>
+   * With entries aligned, the entries of a table whose path has {@code n} keys are indented by
+   * {@code (n - 1) * spaces}, the same as its header, rather than by {@code n * spaces}. For example, with an indent of
+   * 2:
+   *
+   * <pre>{@code
+   * title = "Example"
+   *
+   * [server]
+   * host = "localhost"
+   *
+   *   [server.tls]
+   *   enabled = true
+   *
+   * [[products]]
+   * sku = 1
+   * }</pre>
+   *
+   * <p>
+   * The default is {@code false}, which indents entries one level beyond their header; see {@link #withIndent(int)}.
+   *
+   * @param aligned Whether the entries of a table are indented like its header.
+   * @return A new set of options with the given alignment.
+   */
+  public TomlWriteOptions withEntriesAlignedWithHeaders(boolean aligned) {
+    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, aligned);
   }
 
   /**
@@ -179,7 +216,7 @@ public final class TomlWriteOptions {
     if (!separator.equals("\n") && !separator.equals("\r\n")) {
       throw new IllegalArgumentException("lineSeparator must be \"\\n\" or \"\\r\\n\"");
     }
-    return new TomlWriteOptions(keep, indent, maxLineWidth, separator, version);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, separator, version, alignEntries);
   }
 
   /**
@@ -209,7 +246,7 @@ public final class TomlWriteOptions {
     if (columns < 0) {
       throw new IllegalArgumentException("maxLineWidth must not be negative: " + columns);
     }
-    return new TomlWriteOptions(keep, indent, columns, lineSeparator, version);
+    return new TomlWriteOptions(keep, indent, columns, lineSeparator, version, alignEntries);
   }
 
   /**
@@ -249,7 +286,7 @@ public final class TomlWriteOptions {
    */
   public TomlWriteOptions withVersion(TomlVersion version) {
     requireNonNull(version);
-    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version);
+    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries);
   }
 
   /**
@@ -260,6 +297,26 @@ public final class TomlWriteOptions {
    */
   public int indent() {
     return indent;
+  }
+
+  /**
+   * Whether the entries of a table are indented like its header.
+   *
+   * @return {@code true} if the entries of a table are indented like its header, {@code false} if one level beyond it.
+   * @see #withEntriesAlignedWithHeaders(boolean)
+   */
+  public boolean entriesAlignedWithHeaders() {
+    return alignEntries;
+  }
+
+  /**
+   * The width of the indentation of the entries of a table.
+   *
+   * @param depth The number of keys in the path of the table, or of the array holding it.
+   * @return The width of the indentation, in spaces.
+   */
+  int entryIndent(int depth) {
+    return (alignEntries ? Math.max(depth - 1, 0) : depth) * indent;
   }
 
   /**
@@ -315,12 +372,13 @@ public final class TomlWriteOptions {
         && this.indent == other.indent
         && this.maxLineWidth == other.maxLineWidth
         && Objects.equals(this.lineSeparator, other.lineSeparator)
-        && this.version == other.version;
+        && this.version == other.version
+        && this.alignEntries == other.alignEntries;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(keep, indent, maxLineWidth, lineSeparator, version);
+    return Objects.hash(keep, indent, maxLineWidth, lineSeparator, version, alignEntries);
   }
 
   @Override
@@ -335,6 +393,8 @@ public final class TomlWriteOptions {
         + lineSeparator().replace("\r", "\\r").replace("\n", "\\n")
         + "\", version="
         + version
+        + ", entriesAlignedWithHeaders="
+        + alignEntries
         + '}';
   }
 }
