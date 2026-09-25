@@ -58,7 +58,8 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * headers and comments in the same order, but writes each of them from its parts rather than from the text around them:
  * the indentation of its section, the comments of the model, the key and the literal each value was written with, and
  * an array or inline table laid out anew. A line keeps one blank line above it where the document wrote any, a header
- * always gets one, and the blank lines a document ends with are dropped.
+ * gets one unless the options leave it out between nested headers, and the blank lines a document ends with are
+ * dropped.
  *
  * <p>
  * A table or array reformatted by {@link MutableTomlTable#reformat(TomlWriteOptions.Keep)} is written at its position
@@ -106,6 +107,9 @@ final class SourcePreservingSerializer {
   // Whether the last thing written was an unattached comment of the document, which the line after it is separated from
   // by a blank line, since a run written directly above a line is attached ABOVE it
   private boolean afterComment;
+  // The path of the header the chunk written last ends with, or null if it does not end with a header
+  @Nullable
+  private List<String> lastHeader;
 
   static void toToml(ParsedTomlTable table, Appendable appendable, TomlWriteOptions options) throws IOException {
     new SourcePreservingSerializer(table, appendable, options).write();
@@ -156,6 +160,7 @@ final class SourcePreservingSerializer {
                 .thenComparingInt(chunk -> chunk.order));
     for (Chunk chunk : chunks) {
       chunk.write();
+      lastHeader = chunk.headerPath();
     }
     // Keeping only the notation ends the document with the last line written, so the blank lines below it are dropped
     if (rootOptions.keep() != TomlWriteOptions.Keep.NOTATION && root.trailerStart() >= 0) {
@@ -259,7 +264,7 @@ final class SourcePreservingSerializer {
         } else if (headerWritten) {
           Group group = new Group(section);
           subtrees[i] = group;
-          addHeader(header, pair, group, headerIndent, subOptions);
+          addHeader(header, pair, path(sectionPath, relative, key), group, headerIndent, subOptions);
           collectTable(
               subTable,
               path(sectionPath, relative, key),
@@ -297,7 +302,7 @@ final class SourcePreservingSerializer {
             }
             if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
               Group group = new Group(arrayGroup);
-              addHeader(header, indexed, group, headerIndent, arrayOptions);
+              addHeader(header, indexed, arrayPath, group, headerIndent, arrayOptions);
               collectTable(
                   (LinkedTomlTable) indexed.value,
                   arrayPath,
@@ -608,10 +613,11 @@ final class SourcePreservingSerializer {
   private void addHeader(
       SourceSpan header,
       Entry entry,
+      List<String> headerPath,
       Group group,
       String headerIndent,
       TomlWriteOptions tableOptions) {
-    chunks.add(new LineChunk(header, entry, Collections.emptyList(), headerIndent, false, tableOptions));
+    chunks.add(new LineChunk(header, entry, headerPath, headerIndent, false, tableOptions));
     group.addLine(header.stop);
   }
 
@@ -823,6 +829,17 @@ final class SourcePreservingSerializer {
   }
 
   /**
+   * Whether a header written anew is separated from what precedes it by a blank line: always, unless it directly
+   * follows the header of a table containing it and the options leave out the blank line there.
+   *
+   * @param path The path of the header.
+   * @param headerOptions The options the header is written with.
+   */
+  private boolean separateHeader(List<String> path, TomlWriteOptions headerOptions) {
+    return headerOptions.blankLineBetweenNestedHeaders() || !Serializer.isNestedHeader(lastHeader, path);
+  }
+
+  /**
    * Write the pending blank line, if there is one.
    *
    * @return {@code true} if a blank line was written, in which case the blank lines a chunk of the document opens with
@@ -953,6 +970,12 @@ final class SourcePreservingSerializer {
     abstract int anchor();
 
     abstract void write() throws IOException;
+
+    /** The path of the header this chunk ends with, or {@code null} if it does not end with one. */
+    @Nullable
+    List<String> headerPath() {
+      return null;
+    }
   }
 
   /**
@@ -967,7 +990,10 @@ final class SourcePreservingSerializer {
     @Nullable
     private final Entry entry;
 
-    /** The key the line is written with, relative to the section it is written in. Empty for a header. */
+    /**
+     * The key the line is written with, relative to the section it is written in, or for a header, the path of its
+     * table from the root.
+     */
     private final List<String> keyPath;
 
     /** The indentation this line is written at when only the notation is kept. */
@@ -998,6 +1024,12 @@ final class SourcePreservingSerializer {
     @Override
     int anchor() {
       return span.start;
+    }
+
+    @Override
+    @Nullable
+    List<String> headerPath() {
+      return (span.kind == SourceSpan.Kind.HEADER) ? keyPath : null;
     }
 
     @Override
@@ -1073,13 +1105,18 @@ final class SourcePreservingSerializer {
      * Write the line from its parts, in the layout the options set: the indentation of its section, the comments the
      * model holds, the key and, for a header, the text the document wrote them as, and the value laid out anew around
      * the literal each scalar was written with. A line keeps one blank line above it where the document wrote any, and
-     * a header is always separated from what precedes it.
+     * a header is separated from what precedes it, unless it directly follows the header of a table containing it and
+     * the options leave out the blank line there.
      */
     private void writeFromParts() throws IOException {
       Entry lineEntry = entry;
       assert lineEntry != null : "an unattached comment is written from the model";
       boolean header = (span.kind == SourceSpan.Kind.HEADER);
-      if (header || afterComment || text(span.start, firstToken(span) - 1).indexOf('\n') >= 0) {
+      if (header) {
+        if (separateHeader(keyPath, lineOptions)) {
+          requestBlankLine();
+        }
+      } else if (afterComment || text(span.start, firstToken(span) - 1).indexOf('\n') >= 0) {
         requestBlankLine();
       }
       startLine();
@@ -1304,7 +1341,9 @@ final class SourcePreservingSerializer {
     @Override
     void write() throws IOException {
       startLine();
-      requestBlankLine();
+      if (separateHeader(path, blockOptions)) {
+        requestBlankLine();
+      }
       flushBlankLine();
       StringBuilder text = new StringBuilder();
       Serializer block = Serializer.blockStyle(text, blockOptions);

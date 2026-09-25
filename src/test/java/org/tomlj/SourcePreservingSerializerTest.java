@@ -516,6 +516,11 @@ class SourcePreservingSerializerTest {
                 notation.withIndent(2).withEntriesAlignedWithHeaders(true),
                 "[t]\na = 1\n\n  [t.u]\n  b = 2\n\n[[q]]\nz = 1\n"),
             notationKept(
+                "a header directly after the header of its parent loses its blank line when the options leave it out",
+                "[t]\n\n\n[t.u]\nb = 2\n[t.v]\nc = 3\n[[q]]\n[q.r]\nd = 4\n",
+                notation.withBlankLineBetweenNestedHeaders(false),
+                "[t]\n[t.u]\nb = 2\n\n[t.v]\nc = 3\n\n[[q]]\n[q.r]\nd = 4\n"),
+            notationKept(
                 "an array is written with a space inside its brackets when the options ask for it",
                 "a = [1,0x2]\nb = []\n",
                 notation.withSpaceInsideArrays(true),
@@ -1194,7 +1199,19 @@ class SourcePreservingSerializerTest {
                 "a new table in an empty document",
                 "",
                 result -> result.getOrCreateTable("t").set("k", 1),
-                "[t]\nk = 1\n"));
+                "[t]\nk = 1\n"),
+            edited(
+                "a new table directly after the header of its parent loses its blank line when the options leave it out",
+                "# g\n[g]\n",
+                result -> result.getOrCreateTable("g.e").set("k", 1),
+                LF.withBlankLineBetweenNestedHeaders(false),
+                "# g\n[g]\n[g.e]\nk = 1\n"),
+            edited(
+                "a header the document wrote keeps its blank lines when the options leave out the blank line",
+                "[t]\n\n[t.u]\nb = 2\n",
+                result -> result.set("t.u.b", 3),
+                LF.withBlankLineBetweenNestedHeaders(false),
+                "[t]\n\n[t.u]\nb = 3\n"));
   }
 
   @ParameterizedTest(name = "{0}")

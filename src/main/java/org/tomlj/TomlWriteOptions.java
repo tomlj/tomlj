@@ -93,6 +93,7 @@ public final class TomlWriteOptions {
   private final TomlVersion version;
   private final boolean alignEntries;
   private final boolean spaceInsideArrays;
+  private final boolean blankLineBetweenNestedHeaders;
 
   private TomlWriteOptions(
       Keep keep,
@@ -101,7 +102,8 @@ public final class TomlWriteOptions {
       @Nullable String lineSeparator,
       TomlVersion version,
       boolean alignEntries,
-      boolean spaceInsideArrays) {
+      boolean spaceInsideArrays,
+      boolean blankLineBetweenNestedHeaders) {
     this.keep = keep;
     this.indent = indent;
     this.maxLineWidth = maxLineWidth;
@@ -109,6 +111,7 @@ public final class TomlWriteOptions {
     this.version = version;
     this.alignEntries = alignEntries;
     this.spaceInsideArrays = spaceInsideArrays;
+    this.blankLineBetweenNestedHeaders = blankLineBetweenNestedHeaders;
   }
 
   /**
@@ -119,7 +122,7 @@ public final class TomlWriteOptions {
    * @return The default options.
    */
   public static TomlWriteOptions defaults() {
-    return new TomlWriteOptions(Keep.LAYOUT, 0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST, false, false);
+    return new TomlWriteOptions(Keep.LAYOUT, 0, DEFAULT_MAX_LINE_WIDTH, null, TomlVersion.LATEST, false, false, true);
   }
 
   /**
@@ -130,7 +133,15 @@ public final class TomlWriteOptions {
    */
   public TomlWriteOptions keep(Keep keep) {
     requireNonNull(keep);
-    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries, spaceInsideArrays);
+    return new TomlWriteOptions(
+        keep,
+        indent,
+        maxLineWidth,
+        lineSeparator,
+        version,
+        alignEntries,
+        spaceInsideArrays,
+        blankLineBetweenNestedHeaders);
   }
 
   /**
@@ -169,7 +180,15 @@ public final class TomlWriteOptions {
     if (spaces < 0) {
       throw new IllegalArgumentException("indent must not be negative: " + spaces);
     }
-    return new TomlWriteOptions(keep, spaces, maxLineWidth, lineSeparator, version, alignEntries, spaceInsideArrays);
+    return new TomlWriteOptions(
+        keep,
+        spaces,
+        maxLineWidth,
+        lineSeparator,
+        version,
+        alignEntries,
+        spaceInsideArrays,
+        blankLineBetweenNestedHeaders);
   }
 
   /**
@@ -200,7 +219,15 @@ public final class TomlWriteOptions {
    * @return A new set of options with the given alignment.
    */
   public TomlWriteOptions withEntriesAlignedWithHeaders(boolean aligned) {
-    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, aligned, spaceInsideArrays);
+    return new TomlWriteOptions(
+        keep,
+        indent,
+        maxLineWidth,
+        lineSeparator,
+        version,
+        aligned,
+        spaceInsideArrays,
+        blankLineBetweenNestedHeaders);
   }
 
   /**
@@ -219,7 +246,15 @@ public final class TomlWriteOptions {
     if (!separator.equals("\n") && !separator.equals("\r\n")) {
       throw new IllegalArgumentException("lineSeparator must be \"\\n\" or \"\\r\\n\"");
     }
-    return new TomlWriteOptions(keep, indent, maxLineWidth, separator, version, alignEntries, spaceInsideArrays);
+    return new TomlWriteOptions(
+        keep,
+        indent,
+        maxLineWidth,
+        separator,
+        version,
+        alignEntries,
+        spaceInsideArrays,
+        blankLineBetweenNestedHeaders);
   }
 
   /**
@@ -249,7 +284,15 @@ public final class TomlWriteOptions {
     if (columns < 0) {
       throw new IllegalArgumentException("maxLineWidth must not be negative: " + columns);
     }
-    return new TomlWriteOptions(keep, indent, columns, lineSeparator, version, alignEntries, spaceInsideArrays);
+    return new TomlWriteOptions(
+        keep,
+        indent,
+        columns,
+        lineSeparator,
+        version,
+        alignEntries,
+        spaceInsideArrays,
+        blankLineBetweenNestedHeaders);
   }
 
   /**
@@ -264,7 +307,53 @@ public final class TomlWriteOptions {
    * @return A new set of options with the given array spacing.
    */
   public TomlWriteOptions withSpaceInsideArrays(boolean spaced) {
-    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries, spaced);
+    return new TomlWriteOptions(
+        keep,
+        indent,
+        maxLineWidth,
+        lineSeparator,
+        version,
+        alignEntries,
+        spaced,
+        blankLineBetweenNestedHeaders);
+  }
+
+  /**
+   * Create a copy of these options that does or does not write a blank line between a table header and the header of a
+   * table within it that directly follows it.
+   *
+   * <p>
+   * A header is written with a blank line above it. Without that blank line between nested headers, a header that
+   * directly follows the header of a table containing it, with no entry or unattached comment between them, is written
+   * on the next line:
+   *
+   * <pre>{@code
+   * [servers]
+   * [servers.alpha]
+   * ip = "10.0.0.1"
+   *
+   * [servers.beta]
+   * ip = "10.0.0.2"
+   * }</pre>
+   *
+   * <p>
+   * The blank line is left out only where these options lay out the header: in {@link Keep#LAYOUT}, a header the
+   * document wrote keeps the blank lines it had. The default is {@code true}.
+   *
+   * @param blankLine Whether a blank line separates a header from the header of a table within it that directly follows
+   *        it.
+   * @return A new set of options with the given blank line setting.
+   */
+  public TomlWriteOptions withBlankLineBetweenNestedHeaders(boolean blankLine) {
+    return new TomlWriteOptions(
+        keep,
+        indent,
+        maxLineWidth,
+        lineSeparator,
+        version,
+        alignEntries,
+        spaceInsideArrays,
+        blankLine);
   }
 
   /**
@@ -304,7 +393,15 @@ public final class TomlWriteOptions {
    */
   public TomlWriteOptions withVersion(TomlVersion version) {
     requireNonNull(version);
-    return new TomlWriteOptions(keep, indent, maxLineWidth, lineSeparator, version, alignEntries, spaceInsideArrays);
+    return new TomlWriteOptions(
+        keep,
+        indent,
+        maxLineWidth,
+        lineSeparator,
+        version,
+        alignEntries,
+        spaceInsideArrays,
+        blankLineBetweenNestedHeaders);
   }
 
   /**
@@ -345,6 +442,16 @@ public final class TomlWriteOptions {
    */
   public boolean spaceInsideArrays() {
     return spaceInsideArrays;
+  }
+
+  /**
+   * Whether a blank line separates a header from the header of a table within it that directly follows it.
+   *
+   * @return {@code true} if a blank line separates the two headers.
+   * @see #withBlankLineBetweenNestedHeaders(boolean)
+   */
+  public boolean blankLineBetweenNestedHeaders() {
+    return blankLineBetweenNestedHeaders;
   }
 
   /**
@@ -402,12 +509,22 @@ public final class TomlWriteOptions {
         && Objects.equals(this.lineSeparator, other.lineSeparator)
         && this.version == other.version
         && this.alignEntries == other.alignEntries
-        && this.spaceInsideArrays == other.spaceInsideArrays;
+        && this.spaceInsideArrays == other.spaceInsideArrays
+        && this.blankLineBetweenNestedHeaders == other.blankLineBetweenNestedHeaders;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(keep, indent, maxLineWidth, lineSeparator, version, alignEntries, spaceInsideArrays);
+    return Objects
+        .hash(
+            keep,
+            indent,
+            maxLineWidth,
+            lineSeparator,
+            version,
+            alignEntries,
+            spaceInsideArrays,
+            blankLineBetweenNestedHeaders);
   }
 
   @Override
@@ -426,6 +543,8 @@ public final class TomlWriteOptions {
         + alignEntries
         + ", spaceInsideArrays="
         + spaceInsideArrays
+        + ", blankLineBetweenNestedHeaders="
+        + blankLineBetweenNestedHeaders
         + '}';
   }
 }

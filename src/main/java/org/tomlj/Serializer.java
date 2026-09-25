@@ -92,6 +92,9 @@ final class Serializer {
   private boolean written = false;
   // A pending blank line, written only once something follows it, so that the document never ends with one
   private boolean blankLineOwed = false;
+  // The path of the header on the line written last, or null if that line was not a header
+  @Nullable
+  private List<String> lastHeader = null;
 
   private Serializer(Appendable out, TomlWriteOptions options, boolean copySourceLines) {
     this.out = out;
@@ -241,7 +244,9 @@ final class Serializer {
 
   private void writeHeader(String open, List<String> path, String close, List<TomlComment> comments)
       throws IOException {
-    blankLine();
+    if (options.blankLineBetweenNestedHeaders() || !isNestedHeader(lastHeader, path)) {
+      blankLine();
+    }
     String headerIndent = indentFor(path.size() - 1);
     writeCommentAbove(comments, headerIndent);
     beginLine(headerIndent);
@@ -250,6 +255,18 @@ final class Serializer {
     out.append(header.append(close));
     writeCommentAfter(comments);
     endLine();
+    lastHeader = new ArrayList<>(path);
+  }
+
+  /**
+   * Whether a header names a table within the table of the header before it.
+   *
+   * @param previous The path of the header on the line before, or {@code null} if that line is not a header.
+   * @param path The path of the header.
+   * @return {@code true} if {@code previous} is a header whose path {@code path} extends.
+   */
+  static boolean isNestedHeader(@Nullable List<String> previous, List<String> path) {
+    return previous != null && previous.size() < path.size() && previous.equals(path.subList(0, previous.size()));
   }
 
   /**
@@ -582,6 +599,7 @@ final class Serializer {
   }
 
   private void beginLine(String lineIndent) throws IOException {
+    lastHeader = null;
     if (blankLineOwed) {
       out.append(lineSeparator);
       blankLineOwed = false;

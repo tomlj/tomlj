@@ -318,6 +318,7 @@ class SerializerTest {
     TomlWriteOptions toml11Options = TomlWriteOptions.defaults().withVersion(TomlVersion.V1_1_0);
     TomlWriteOptions aligned = TomlWriteOptions.defaults().withIndent(2).withEntriesAlignedWithHeaders(true);
     TomlWriteOptions spaced = TomlWriteOptions.defaults().withSpaceInsideArrays(true);
+    TomlWriteOptions unnested = TomlWriteOptions.defaults().withBlankLineBetweenNestedHeaders(false);
     return Stream.of(
         parsed("an indent of 2", document, TomlWriteOptions.defaults().withIndent(2), """
             title = "Example"
@@ -610,7 +611,87 @@ class SerializerTest {
               "%s",
               [ 1 ],
             ]
-            """.formatted("x".repeat(68)))
+            """.formatted("x".repeat(68))),
+        parsed("no blank line between nested headers", """
+            # a
+            [a]
+
+            # b
+            [a.b]
+            c = 1
+
+            [a.d]
+            e = 2
+
+            # x
+            [x]
+
+            [x.y.z]
+            w = 1
+
+            [[f]]
+            g = 3
+
+            [[f]]
+
+            [f.h]
+            i = 4
+
+            [[f.j]]
+            k = 5
+            """, unnested, """
+            # a
+            [a]
+            # b
+            [a.b]
+            c = 1
+
+            [a.d]
+            e = 2
+
+            # x
+            [x]
+            [x.y.z]
+            w = 1
+
+            [[f]]
+            g = 3
+
+            [[f]]
+            [f.h]
+            i = 4
+
+            [[f.j]]
+            k = 5
+            """),
+        unchanged("a header after an unattached comment of its parent keeps its blank line", """
+            # a
+            [a]
+            # unattached
+
+            [a.b]
+            c = 1
+            """, unnested),
+        parsed("aligned entries, spaced arrays and no blank line between nested headers together", """
+            [[servers]]
+            name = "alpha"
+
+            # Settings shared by every client
+            [clients]
+
+            [clients.defaults]
+            timeout = 30
+            hosts = ["alpha", "omega"]
+            """, aligned.withSpaceInsideArrays(true).withBlankLineBetweenNestedHeaders(false), """
+            [[servers]]
+            name = "alpha"
+
+            # Settings shared by every client
+            [clients]
+              [clients.defaults]
+              timeout = 30
+              hosts = [ "alpha", "omega" ]
+            """)
     );
     // @formatter:on
   }

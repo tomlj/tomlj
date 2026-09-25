@@ -118,8 +118,8 @@ line written anew ends with a newline.
 With `NOTATION`, the document is walked in the same order and every line, header and comment is
 written from its parts: the key and the literal each value was written with, the comments the model
 holds, and the indentation, spacing and layout the options give. A line keeps one blank line above
-it where the document wrote any, a header always gets one, and the blank lines a document ends with
-are dropped. An unattached comment is laid out as the default style lays it out, with a blank line
+it where the document wrote any, a header gets one unless the options leave it out between nested
+headers, and the blank lines a document ends with are dropped. An unattached comment is laid out as the default style lays it out, with a blank line
 below it, and in a table one above it unless it comes after the last line of the table, regardless
 of the blank lines the document had around it. A comment after a value is separated from it by two
 spaces, and the run above a line is indented like the line. An array or inline table is laid out
@@ -176,6 +176,10 @@ inline table holding a comment cannot be written, and `toToml` throws `IllegalAr
 * **`withSpaceInsideArrays(spaced)`** writes an array on one line with a space inside each bracket,
   `[ 1, 2 ]`. The spaces count towards the maximum line width. An empty array is written `[]`, and
   an array written over lines is not affected. The default is `false`.
+* **`withBlankLineBetweenNestedHeaders(blankLine)`** decides whether a header that directly follows
+  the header of a table containing it, with no line or unattached comment between them, has a blank
+  line above it, as every other header has. Under `LAYOUT`, a header the document wrote keeps the
+  blank lines it had. The default is `true`.
 * **`withMaxLineWidth(columns)`** is the widest a line may be, counted in code points, for an array
   or an inline table to be written on one line. The width includes the indentation, the key before
   the value and the comma after an element of an enclosing multi-line array. A long key or string is
@@ -202,6 +206,20 @@ TomlWriteOptions options = TomlWriteOptions.defaults()
     .keep(TomlWriteOptions.Keep.NOTATION)
     .withIndent(2);
 String reindented = result.toToml(options);
+```
+
+With `withIndent(2)`, `withEntriesAlignedWithHeaders(true)`, `withSpaceInsideArrays(true)` and
+`withBlankLineBetweenNestedHeaders(false)`, a document is written as:
+
+```toml
+[[servers]]
+name = "alpha"
+
+# Settings shared by every client
+[clients]
+  [clients.defaults]
+  timeout = 30
+  hosts = [ "alpha", "omega" ]
 ```
 
 ## Reformatting one table or array
