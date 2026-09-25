@@ -14,7 +14,7 @@ plugins {
   id 'com.gradleup.shadow' version '9.6.1'
 }
 
-description = 'A parser for Tom\'s Obvious, Minimal Language (TOML).'
+description = 'A parser and serializer for Tom\'s Obvious, Minimal Language (TOML).'
 
 //////
 // Version numbering

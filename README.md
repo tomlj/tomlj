@@ -1,7 +1,7 @@
-# TomlJ: A Java parser for Tom's Obvious, Minimal Language (TOML)
+# TomlJ: A Java parser and serializer for Tom's Obvious, Minimal Language (TOML)
 
-TomlJ is a complete [TOML](https://toml.io/) parser for Java, built on the
-[ANTLR](https://github.com/antlr/antlr4/) parser-generator and runtime library.
+TomlJ is a complete [TOML](https://toml.io/) parser and serializer for Java, built on the
+venerable [ANTLR](https://github.com/antlr/antlr4/) parser-generator and runtime library.
 
 ```java
 TomlParseResult result = Toml.parse(Paths.get("config.toml"));
@@ -36,7 +36,7 @@ if (port > 65535) {
 }
 ```
 
-## Also worth knowing
+## Other highlights
 
 * **Complete, and tested against the spec.** TomlJ supports TOML 1.1.0. Every build runs the
   official [toml-test](https://github.com/toml-lang/toml-test) suite for 1.0.0 and 1.1.0: valid
@@ -46,14 +46,17 @@ if (port > 65535) {
 * **A typed getter for every TOML type**, returning `String`, `Long`, `Double`, `Boolean`,
   `TomlArray` or `TomlTable`, and the four date and time types as `java.time`'s `OffsetDateTime`,
   `LocalDateTime`, `LocalDate` and `LocalTime`. Each getter returns `null` if the key is missing,
-  throws `TomlInvalidTypeException` if the value is a different type, and has an overload that takes
+  throws `TomlInvalidTypeException` if the value is the wrong type, and has an overload that takes
   a default.
 * **Comments are kept.** Every comment in a document is parsed into the model, attached to an entry
   or unattached in the table or array it was written in. See [Comments](#comments).
 * **Documents can be built and edited.** A parse result is a `MutableTomlTable`: set, insert and
   remove values and comments, or build a document from scratch, and write it out with `toToml()`.
-  `toToml()` writes a parsed document as its source text, changed only where the document was
-  edited. See [Building and editing documents](#building-and-editing-documents).
+  See [Building and editing documents](#building-and-editing-documents).
+* **Edited documents keep their format and layout.** `toToml()` writes a document identical to
+  the parsed source except where it was edited: comments, blank lines, key order, indentation and
+  the notation of each value (`0xFF`, `'literal'`, `{ a = 1 }`) stay as they were written. See
+  [Writing TOML](#writing-toml).
 * **No dependencies.** The jar carries its own copy of the ANTLR runtime, relocated under TomlJ's
   own package, so there is nothing else to add and no clash with ANTLR elsewhere in your project.
   Works on Java 9 and later.
