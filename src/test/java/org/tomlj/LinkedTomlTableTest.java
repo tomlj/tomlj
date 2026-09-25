@@ -22,9 +22,12 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.antlr.v4.runtime.CharStreams;
@@ -157,6 +160,25 @@ class LinkedTomlTableTest {
         new HashSet<>(Arrays.asList("bar", "foo", "foo.baz", "foo.buz", "foo.buz.bar")),
         table.dottedKeySet(true));
     assertEquals(new HashSet<>(Arrays.asList("bar", "foo.baz", "foo.buz.bar")), table.dottedKeySet());
+  }
+
+  @Test
+  void keyAndEntryViewsFollowDocumentOrder() {
+    TomlParseResult result = Toml.parse("z = 1\ny.b = 2\ny.a = 3\nx = 4\n[w]\nv = 5\n[c]\nu = 6\n");
+    assertFalse(result.hasErrors(), () -> result.errors().toString());
+    List<String> keys = Arrays.asList("z", "y", "x", "w", "c");
+    List<String> dottedKeys = Arrays.asList("z", "y.b", "y.a", "x", "w.v", "c.u");
+    List<String> dottedKeysAndTables = Arrays.asList("z", "y", "y.b", "y.a", "x", "w", "w.v", "c", "c.u");
+    assertEquals(keys, new ArrayList<>(result.keySet()));
+    assertEquals(keys, new ArrayList<>(result.toMap().keySet()));
+    assertEquals(keys, result.entrySet().stream().map(Map.Entry::getKey).collect(Collectors.toList()));
+    assertEquals(dottedKeys, new ArrayList<>(result.dottedKeySet()));
+    assertEquals(dottedKeysAndTables, new ArrayList<>(result.dottedKeySet(true)));
+    assertEquals(dottedKeys, result.keyPathSet().stream().map(Toml::joinKeyPath).collect(Collectors.toList()));
+    assertEquals(dottedKeys, result.dottedEntrySet().stream().map(Map.Entry::getKey).collect(Collectors.toList()));
+    assertEquals(
+        dottedKeysAndTables,
+        result.entryPathSet(true).stream().map(e -> Toml.joinKeyPath(e.getKey())).collect(Collectors.toList()));
   }
 
   @Test

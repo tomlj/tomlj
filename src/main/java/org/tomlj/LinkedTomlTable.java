@@ -168,7 +168,7 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
       } else {
         return subKeys;
       }
-    }).collect(Collectors.toSet());
+    }).collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   @Override
@@ -254,7 +254,9 @@ class LinkedTomlTable extends ElementContainer<Entry.KeyValue> implements Mutabl
 
   @Override
   public Map<String, Object> toMap() {
-    return properties.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().value().get()));
+    Map<String, Object> map = new LinkedHashMap<>();
+    properties.forEach((key, entry) -> map.put(key, entry.value().get()));
+    return map;
   }
 
   /**
