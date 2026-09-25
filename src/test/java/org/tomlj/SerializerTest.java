@@ -316,6 +316,7 @@ class SerializerTest {
     String longArray = "a = [" + String.join(", ", Collections.nCopies(1000, "[\"xxxxxxxxxx\", 1]")) + "]\n";
     TomlWriteOptions toml10Options = TomlWriteOptions.defaults().withVersion(TomlVersion.V1_0_0);
     TomlWriteOptions toml11Options = TomlWriteOptions.defaults().withVersion(TomlVersion.V1_1_0);
+    TomlWriteOptions aligned = TomlWriteOptions.defaults().withIndent(2).withEntriesAlignedWithHeaders(true);
     return Stream.of(
         parsed("an indent of 2", document, TomlWriteOptions.defaults().withIndent(2), """
             title = "Example"
@@ -544,7 +545,49 @@ class SerializerTest {
               "%s",
               {},
             ]
-            """.formatted("x".repeat(80)))
+            """.formatted("x".repeat(80))),
+        parsed("entries aligned with their headers", document, aligned, """
+            title = "Example"
+
+                [a.b.c]
+                d = 1
+
+            [server]
+            host = "localhost"
+
+              [server.tls]
+              enabled = true
+
+            [[products]]
+            sku = 1
+
+              [products.size]
+              width = 2
+
+            [[products]]
+            sku = 2
+            """),
+        parsed("comments indented like aligned entries", """
+            [a.b]
+            # unattached
+
+            # above
+            c = 1  # after
+            """, aligned, """
+              [a.b]
+
+              # unattached
+
+              # above
+              c = 1  # after
+            """),
+        parsed("an array at the width limit under an entry aligned with its header", """
+            [t]
+            list = ["%s"]
+            """.formatted("x".repeat(69)), aligned, """
+            [t]
+            list = ["%s"]
+            """.formatted("x".repeat(69)))
     );
     // @formatter:on
   }

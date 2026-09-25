@@ -13,9 +13,11 @@
 package org.tomlj;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -32,6 +34,7 @@ class TomlWriteOptionsTest {
     assertEquals(TomlWriteOptions.DEFAULT_MAX_LINE_WIDTH, options.maxLineWidth());
     assertEquals(System.lineSeparator(), options.lineSeparator());
     assertEquals(TomlVersion.LATEST, options.version());
+    assertFalse(options.entriesAlignedWithHeaders());
   }
 
   @Test
@@ -87,6 +90,31 @@ class TomlWriteOptionsTest {
   @Test
   void withIndentRejectsANegativeValue() {
     assertThrows(IllegalArgumentException.class, () -> TomlWriteOptions.defaults().withIndent(-1));
+  }
+
+  @Test
+  void withEntriesAlignedWithHeadersReturnsANewInstanceLeavingTheOriginalUnchangedAndKeepsTheOtherOptions() {
+    TomlWriteOptions original = TomlWriteOptions.defaults().withIndent(2).withMaxLineWidth(100);
+    TomlWriteOptions updated = original.withEntriesAlignedWithHeaders(true);
+
+    assertTrue(updated.entriesAlignedWithHeaders());
+    assertEquals(2, updated.indent());
+    assertEquals(100, updated.maxLineWidth());
+    assertFalse(original.entriesAlignedWithHeaders());
+    assertFalse(updated.withEntriesAlignedWithHeaders(false).entriesAlignedWithHeaders());
+  }
+
+  @Test
+  void entryIndentIsOneLevelBeyondTheHeaderUnlessEntriesAreAligned() {
+    TomlWriteOptions options = TomlWriteOptions.defaults().withIndent(2);
+    assertEquals(0, options.entryIndent(0));
+    assertEquals(2, options.entryIndent(1));
+    assertEquals(6, options.entryIndent(3));
+
+    TomlWriteOptions aligned = options.withEntriesAlignedWithHeaders(true);
+    assertEquals(0, aligned.entryIndent(0));
+    assertEquals(0, aligned.entryIndent(1));
+    assertEquals(4, aligned.entryIndent(3));
   }
 
   @Test
@@ -172,9 +200,11 @@ class TomlWriteOptionsTest {
         .withIndent(2)
         .withMaxLineWidth(100)
         .withLineSeparator("\r\n")
-        .withVersion(TomlVersion.V1_0_0);
+        .withVersion(TomlVersion.V1_0_0)
+        .withEntriesAlignedWithHeaders(true);
     TomlWriteOptions b = TomlWriteOptions
         .defaults()
+        .withEntriesAlignedWithHeaders(true)
         .withVersion(TomlVersion.V1_0_0)
         .withLineSeparator("\r\n")
         .withMaxLineWidth(100)
@@ -209,6 +239,11 @@ class TomlWriteOptionsTest {
   }
 
   @Test
+  void optionsDifferingOnlyInEntryAlignmentAreNotEqual() {
+    assertDifferent(TomlWriteOptions.defaults(), TomlWriteOptions.defaults().withEntriesAlignedWithHeaders(true));
+  }
+
+  @Test
   void optionsDifferingOnlyInWhatTheyKeepAreNotEqual() {
     assertDifferent(TomlWriteOptions.defaults(), TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING));
     assertDifferent(
@@ -223,12 +258,15 @@ class TomlWriteOptionsTest {
         .withIndent(2)
         .withMaxLineWidth(100)
         .withLineSeparator("\r\n")
-        .withVersion(TomlVersion.V1_0_0);
+        .withVersion(TomlVersion.V1_0_0)
+        .withEntriesAlignedWithHeaders(true);
     assertEquals(
-        "TomlWriteOptions{keep=LAYOUT, indent=2, maxLineWidth=100, lineSeparator=\"\\r\\n\", version=V1_0_0}",
+        "TomlWriteOptions{keep=LAYOUT, indent=2, maxLineWidth=100, lineSeparator=\"\\r\\n\", version=V1_0_0, "
+            + "entriesAlignedWithHeaders=true}",
         options.toString());
     assertEquals(
-        "TomlWriteOptions{keep=NOTHING, indent=0, maxLineWidth=80, lineSeparator=\"\\n\", version=LATEST}",
+        "TomlWriteOptions{keep=NOTHING, indent=0, maxLineWidth=80, lineSeparator=\"\\n\", version=LATEST, "
+            + "entriesAlignedWithHeaders=false}",
         TomlWriteOptions.defaults().keep(TomlWriteOptions.Keep.NOTHING).withLineSeparator("\n").toString());
   }
 

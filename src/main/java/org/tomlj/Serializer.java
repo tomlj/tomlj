@@ -169,7 +169,7 @@ final class Serializer {
    */
   private void writeEntries(TomlTable table, List<String> path) throws IOException {
     List<TomlElement> elements = table.elements();
-    String lineIndent = indentFor(path.size());
+    String lineIndent = spaces(options.entryIndent(path.size()));
     int firstSection = path.isEmpty() ? firstSectionIndex(elements, keepNotation) : -1;
     int lastLine = lastLineIndex(elements, keepNotation);
     // Whether the element written last was a run after the last line of this table, which the next such run joins
@@ -590,9 +590,9 @@ final class Serializer {
   }
 
   /**
-   * The indentation of the lines of a table whose path has a number of keys.
+   * The indentation of a number of levels of table nesting.
    *
-   * @param depth The number of keys in the path.
+   * @param depth The number of levels.
    * @return The indentation.
    */
   private String indentFor(int depth) {
