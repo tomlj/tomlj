@@ -159,6 +159,62 @@ public interface TomlValue extends TomlElement {
   }
 
   /**
+   * An integer to be written in the notation another integer was written in, if that notation can hold it: hexadecimal
+   * with the same case of digits, octal, binary, or decimal with its digits grouped, which are grouped in threes.
+   *
+   * <p>
+   * This keeps the notation of a value that is replaced. Where a document has {@code mask = 0xFF},
+   * {@code doc.set("mask", TomlValue.inNotationOf(doc.entry("mask").value(), 171))} writes {@code mask = 0xAB}, where
+   * {@code doc.set("mask", 171)} writes {@code mask = 171}.
+   *
+   * <p>
+   * The value is written in the default notation, as a {@code long} is, if {@code original} is not an integer, was
+   * written in none of these notations, or was written in one that cannot hold {@code value}, such as hexadecimal for a
+   * negative integer. A value read from a document parsed without its source ({@link TomlParseOptions#withoutSource()})
+   * has no record of its notation.
+   *
+   * @param original The value whose notation to write {@code value} in.
+   * @param value The integer.
+   * @return The value.
+   * @throws NullPointerException If {@code original} is {@code null}.
+   * @see #hex(long)
+   */
+  static TomlValue inNotationOf(TomlValue original, long value) {
+    Objects.requireNonNull(original);
+    TomlValue inNotation = TomlValues.inNotationOf(original, value);
+    return (inNotation != null) ? inNotation : Value.of(value, null);
+  }
+
+  /**
+   * A string to be written in the notation another string was written in, if that notation can hold it: a literal or
+   * multi-line literal string.
+   *
+   * <p>
+   * This keeps the notation of a value that is replaced, as {@link #inNotationOf(TomlValue, long)} does for an integer.
+   * Where a document has {@code path = 'C:\Users'},
+   * {@code doc.set("path", TomlValue.inNotationOf(doc.entry("path").value(), "D:\\Data"))} writes
+   * {@code path = 'D:\Data'}.
+   *
+   * <p>
+   * The value is written in the default notation, as a {@code String} is, if {@code original} is not a string, was
+   * written in neither of these notations, or was written in one that cannot hold {@code value}, such as a literal
+   * string for a string with an apostrophe.
+   *
+   * @param original The value whose notation to write {@code value} in.
+   * @param value The string.
+   * @return The value.
+   * @throws NullPointerException If {@code original} or {@code value} is {@code null}.
+   * @throws IllegalArgumentException If {@code value} contains an unpaired surrogate.
+   * @see #literal(String)
+   */
+  static TomlValue inNotationOf(TomlValue original, String value) {
+    Objects.requireNonNull(original);
+    Objects.requireNonNull(value);
+    TomlValue inNotation = TomlValues.inNotationOf(original, value);
+    return (inNotation != null) ? inNotation : Value.of(TomlValues.normalize(value), null);
+  }
+
+  /**
    * Get the value.
    *
    * @return The value: a {@code String}, {@code Long}, {@code Double}, {@code Boolean}, date/time, {@link TomlTable} or

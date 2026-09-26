@@ -407,7 +407,8 @@ A value that differs is written as `from` writes it:
   grouped in threes. So `0xFF` updated to `171` becomes `0xAB`, and `'C:\Users'` updated to
   `D:\Data` becomes `'D:\Data'`. A notation that cannot hold the value, such as a literal string for
   a string with an apostrophe, or hexadecimal for a negative integer, gives way to the notation
-  `from` writes.
+  `from` writes. This is the value `TomlValue.inNotationOf` gives, which the editing API can use
+  too ([editing.md](editing.md)).
 - A key added to a table is added after its other entries.
 
 `update` stops at the first value it cannot write, throwing `IllegalArgumentException`, with the

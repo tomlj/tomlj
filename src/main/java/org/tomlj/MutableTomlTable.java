@@ -1221,7 +1221,8 @@ public interface MutableTomlTable extends TomlTable {
    * fewer.</li>
    * <li>Any other value is replaced, keeping its entry and the comments attached to it. A string or integer that
    * replaces one of the same type keeps its notation when that notation can hold it: a literal or multi-line literal
-   * string, an integer in hexadecimal, octal or binary, or a decimal integer with grouped digits.</li>
+   * string, an integer in hexadecimal, octal or binary, or a decimal integer with grouped digits. This is the value
+   * {@link TomlValue#inNotationOf(TomlValue, long)} and {@link TomlValue#inNotationOf(TomlValue, String)} give.</li>
    * </ul>
    * A key added to a table is added after its other entries.
    *

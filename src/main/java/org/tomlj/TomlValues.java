@@ -20,6 +20,8 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 /**
  * How the editing API ({@link MutableTomlTable}, {@link MutableTomlArray}) accepts a value handed to it.
  *
@@ -184,6 +186,71 @@ final class TomlValues {
     }
     // The newline directly after the opening delimiter is trimmed when read, so it makes the text a line of its own
     return Value.withText(value, "'''\n" + value + "'''");
+  }
+
+  /**
+   * An integer in the notation another integer was written in; see {@link TomlValue#inNotationOf(TomlValue, long)}.
+   *
+   * @param original The value whose notation to write {@code value} in.
+   * @param value The integer.
+   * @return The value, carrying the text, or {@code null} if it is to be written in the default notation.
+   */
+  static @Nullable TomlValue inNotationOf(TomlValue original, long value) {
+    String text = writtenText(original, Long.class);
+    if (text == null) {
+      return null;
+    }
+    try {
+      if (text.startsWith("0x")) {
+        String digits = text.substring(2);
+        boolean uppercase = digits.equals(digits.toUpperCase(Locale.ROOT));
+        return inBase(value, "0x", 16, uppercase);
+      }
+      if (text.startsWith("0o")) {
+        return inBase(value, "0o", 8, false);
+      }
+      if (text.startsWith("0b")) {
+        return inBase(value, "0b", 2, false);
+      }
+    } catch (IllegalArgumentException e) {
+      // A negative integer, which has no notation with a base prefix
+      return null;
+    }
+    return (text.indexOf('_') >= 0) ? grouped(value) : null;
+  }
+
+  /**
+   * A string in the notation another string was written in; see {@link TomlValue#inNotationOf(TomlValue, String)}.
+   *
+   * @param original The value whose notation to write {@code value} in.
+   * @param value The string.
+   * @return The value, carrying the text, or {@code null} if it is to be written in the default notation.
+   */
+  static @Nullable TomlValue inNotationOf(TomlValue original, String value) {
+    String text = writtenText(original, String.class);
+    if (text == null) {
+      return null;
+    }
+    try {
+      if (text.startsWith("'''")) {
+        return multilineLiteral(value);
+      }
+      if (text.startsWith("'")) {
+        return literal(value);
+      }
+    } catch (IllegalArgumentException e) {
+      // A string the notation cannot hold
+    }
+    return null;
+  }
+
+  // The text a scalar of the given type was written as, or null if it is not one or has no record of its text.
+  private static @Nullable String writtenText(TomlValue original, Class<?> type) {
+    if (!(original instanceof Value.Scalar) || !type.isInstance(original.get())) {
+      return null;
+    }
+    ValueSpan span = ((Value.Scalar) original).writtenSpan();
+    return (span != null) ? span.source.text(span.start, span.stop) : null;
   }
 
   // A character no string can hold unescaped: a control character other than tab, or the delete character.
