@@ -1,0 +1,32 @@
+name = "inventory"
+level = "info"
+
+[server]
+host = "0.0.0.0"
+port = 8443
+tls = true
+
+[labels]
+team = "logistics"
+tier = "gold"
+
+# Each plugin reads its own settings.
+[plugins.audit]
+enabled = true
+retain-days = 90
+
+[plugins.metrics]
+enabled = false
+endpoint = "https://metrics.example.com"
+
+[[warehouse]]
+name = "North"
+opened = 2019-04-01
+bins = [101, 102, 103]
+capacity = 12000
+
+[[warehouse]]
+name = "South"
+opened = 2021-10-15
+bins = [201, 202]
+manager = "Ana"

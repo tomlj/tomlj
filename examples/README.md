@@ -2,7 +2,8 @@
 
 Each directory here is a small program that uses TomlJ, with the TOML files it reads. They are
 numbered in the order to learn them: reading a file and handling its errors, then building, editing
-and writing documents, then walking a document of unknown structure and reading its comments.
+and writing documents, then walking a document of unknown structure and reading its comments, then
+binding documents to records and classes.
 
 | Example | Shows |
 |---|---|
@@ -13,6 +14,10 @@ and writing documents, then walking a document of unknown structure and reading 
 | [05-choosing-the-output-format](05-choosing-the-output-format) | Writing a document as it was read, with a new layout, in the default style, or for TOML 1.0.0 |
 | [06-walking-the-model](06-walking-the-model) | Visiting every table, array and value of a document whose structure is not known in advance, and converting it to JSON |
 | [07-reading-comments](07-reading-comments) | Reading the comments attached to entries and the unattached comments of a table |
+| [08-binding-a-document](08-binding-a-document) | Binding a whole document to a tree of records |
+| [09-binding-to-records](09-binding-to-records) | Binding to enums, maps, values that may be missing and a table left unbound, and binding single tables and arrays |
+| [10-binding-with-options](10-binding-with-options) | Binding to a class whose fields hold the defaults, with kebab-case keys, a renamed key, converters and ignored keys |
+| [11-reporting-binding-errors](11-reporting-binding-errors) | Listing every value that could not be bound, with its path and position |
 
 ## Running the examples
 
@@ -109,5 +114,54 @@ its line, are attached to the entry and read with `comment(key, ABOVE)` and `com
 Every other comment is unattached, and is listed among the table's entries by `elements()`. The
 example ends by printing a reference of the settings, described by their comments.
 
-[docs/editing.md](../docs/editing.md), [docs/writing.md](../docs/writing.md) and
-[docs/comments.md](../docs/comments.md) describe editing, writing and comments in full.
+### 08-binding-a-document
+
+Binds `config.toml`, the file `01-reading-a-document` reads with getters, to a tree of records with
+`as(Config.class)`. Each key is bound to the record component of the same name, and each value to
+the component's type: `[server]` to a nested record, `opened` to a `LocalDate`, and each
+`[[warehouse]]` to an element of a `List`. A document whose values do not fit the records makes `as`
+throw a `TomlBindException`, and the example prints its errors, each with its path and position,
+as it prints parse errors.
+
+### 09-binding-to-records
+
+Binds `inventory.toml` to records with more kinds of values: `[labels]` to a `Map<String, String>`,
+and `level = "info"` to the enum constant `INFO`. The package is annotated with JSpecify's
+`@NullMarked`, so a component may be missing only if it is an `Optional`, which is then empty, or
+is annotated `@Nullable`, which is then `null`. `[plugins]` is left unbound: its component is
+declared `TomlTable`, so it holds the table itself, and each plugin reads its own settings from it
+with getters. The example ends by binding single tables and arrays of the document, with a
+`GenericType` for the generic type `Map<String, String>`.
+
+### 10-binding-with-options
+
+Binds `server.toml` to a class, whose field initializers are the defaults for the keys the file
+leaves out. `KeyNaming.KEBAB_CASE` binds the field `listenAddress` to the key `listen-address`,
+`@TomlName` gives one field a key of its own, and converters bind `Duration` and `Path`, which TomlJ
+does not bind itself. The file has a `[metrics]` table for another program: it is reported as an
+unknown key, until `withUnknownKeysIgnored(true)` is added to the options.
+
+### 11-reporting-binding-errors
+
+Binds `pipeline.toml`, which is valid TOML with six values that do not fit the records they are
+bound to: a string for a time, an integer too large for an `int`, a misspelled key, a missing key,
+a string that names no enum constant, and an array for a string. Each error prints with its path,
+such as `step[1].when`, and its position. It then binds `fixed.toml`, where those are corrected,
+and the check in a record's constructor reports the one error left:
+
+```
+pipeline.toml could not be bound:
+  start: expected a local time, found a string (line 2, column 9)
+  retries: 3000000000 is out of range for int (line 3, column 11)
+  timout: unknown key (line 4, column 1)
+  step[1].command: missing (line 10, column 1)
+  step[1].when: "on-sucess" is not one of ALWAYS, ON_SUCCESS, ON_FAILURE (line 12, column 8)
+  step[2].command: expected a string, found an array (line 16, column 11)
+
+fixed.toml could not be bound:
+  step[2]: timeout must be positive, but is -5 (line 14, column 1)
+```
+
+[docs/editing.md](../docs/editing.md), [docs/writing.md](../docs/writing.md),
+[docs/comments.md](../docs/comments.md) and [docs/binding.md](../docs/binding.md) describe editing,
+writing, comments and binding in full.
