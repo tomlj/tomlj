@@ -118,6 +118,28 @@ class TomlBindTest {
     assertEquals(List.of("cache: unknown key (line 1, column 1)"), errors(e));
   }
 
+  static class FinalBase {
+    final String name = "base";
+  }
+
+  static class FinalSettings extends FinalBase {
+    @TomlName("server-host")
+    final String host = "localhost";
+    int port = 8080;
+  }
+
+  @Test
+  void reportsFinalFieldKeysAsFinal() {
+    TomlBindException e = bindFails("name = \"a\"\nserver-host = \"b\"\nport = 1\nhost = \"c\"", FinalSettings.class);
+    assertEquals(
+        List
+            .of(
+                "name: the field for this key is final (line 1, column 1)",
+                "server-host: the field for this key is final (line 2, column 1)",
+                "host: unknown key (line 4, column 1)"),
+        errors(e));
+  }
+
   record Nullability(String plain, @NonNull String checkerNonNull, int primitive, Optional<String> optional) {}
 
   @Test

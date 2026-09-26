@@ -43,6 +43,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -251,6 +252,10 @@ final class ObjectBinder {
 
     void unknownKey(Location keyLocation) {
       errors.add(new TomlBindError(keyLocation.path(), "unknown key", keyLocation.keyPosition()));
+    }
+
+    void finalField(Location keyLocation) {
+      errors.add(new TomlBindError(keyLocation.path(), "the field for this key is final", keyLocation.keyPosition()));
     }
   }
 
@@ -839,6 +844,27 @@ final class ObjectBinder {
     return list;
   }
 
+  /**
+   * The keys of the final fields of a class and its superclasses, which are not bound: a key of one is reported as a
+   * key for a final field rather than as unknown.
+   */
+  private static Set<String> finalFieldKeys(Class<?> type, TomlBindOptions options) {
+    Set<String> keys = new HashSet<>();
+    for (Class<?> raw = type; raw != null && raw != Object.class; raw = raw.getSuperclass()) {
+      for (Field field : raw.getDeclaredFields()) {
+        int modifiers = field.getModifiers();
+        if (Modifier.isFinal(modifiers)
+            && !Modifier.isStatic(modifiers)
+            && !Modifier.isTransient(modifiers)
+            && !field.isSynthetic()) {
+          TomlName tomlName = field.getAnnotation(TomlName.class);
+          keys.add(tomlName != null ? tomlName.value() : options.keyNaming().keyFor(field.getName()));
+        }
+      }
+    }
+    return keys;
+  }
+
   private static Member member(
       String name,
       Type type,
@@ -901,13 +927,19 @@ final class ObjectBinder {
   private static void checkUnknownKeys(
       TomlTable table,
       Map<String, Property> properties,
+      Set<String> finalFieldKeys,
       Location location,
       Context context) {
     if (context.options.ignoresUnknownKeys()) {
       return;
     }
     for (String key : table.keySet()) {
-      if (!properties.containsKey(key)) {
+      if (properties.containsKey(key)) {
+        continue;
+      }
+      if (finalFieldKeys.contains(key)) {
+        context.finalField(location.key(table, key));
+      } else {
         context.unknownKey(location.key(table, key));
       }
     }
@@ -964,7 +996,7 @@ final class ObjectBinder {
           context.missing(location, keyLocation);
         }
       }
-      checkUnknownKeys(table, byKey, location, context);
+      checkUnknownKeys(table, byKey, Collections.emptySet(), location, context);
       if (context.errors.size() > errorCount) {
         return null;
       }
@@ -982,6 +1014,7 @@ final class ObjectBinder {
     private final Class<?> type;
     private List<Property> properties = Collections.emptyList();
     private Map<String, Property> byKey = Collections.emptyMap();
+    private Set<String> finalFieldKeys = Collections.emptySet();
     @Nullable
     private Constructor<?> constructor;
 
@@ -997,6 +1030,7 @@ final class ObjectBinder {
       }
       this.properties = list;
       this.byKey = byKey(list);
+      this.finalFieldKeys = finalFieldKeys(type, options);
       this.constructor = noArg;
     }
 
@@ -1037,7 +1071,7 @@ final class ObjectBinder {
       } catch (IllegalAccessException e) {
         throw new IllegalStateException("Cannot set a field of " + type.getName(), e);
       }
-      checkUnknownKeys(table, byKey, location, context);
+      checkUnknownKeys(table, byKey, finalFieldKeys, location, context);
       return context.errors.size() > errorCount ? null : instance;
     }
   }

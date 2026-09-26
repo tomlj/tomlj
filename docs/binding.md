@@ -74,7 +74,9 @@ that has them.
 
 A table is bound to a class by creating an instance with its constructor without parameters, then
 setting a field for each key. The constructor may be private. Every field of the class and of its
-superclasses is bound, except static, transient and final fields.
+superclasses is bound, except static, transient and final fields. A final field cannot be set, so
+a key for one is reported as an error that says the field is final, where another key would be
+reported as unknown. To bind a class with final fields, make it a record or give it a converter.
 
 A field whose key the table does not have keeps the value the constructor left in it, so the field
 initializers of a class are its defaults:
