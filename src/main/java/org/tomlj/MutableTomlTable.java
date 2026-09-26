@@ -1122,6 +1122,127 @@ public interface MutableTomlTable extends TomlTable {
     return table;
   }
 
+  /**
+   * Create a table holding the members of a record or class, or the entries of a map, with the default options.
+   *
+   * @param value The record, class or map.
+   * @return A new table holding the values of {@code value}.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   * @see #from(Object, TomlBindOptions)
+   */
+  static MutableTomlTable from(Object value) {
+    return from(value, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Create a table holding the members of a record or class, or the entries of a map.
+   *
+   * <pre>{@code
+   * record Server(String host, int port) {}
+   *
+   * record Config(String name, List<Server> servers) {}
+   *
+   * String toml = MutableTomlTable.from(config).toToml();
+   * }</pre>
+   *
+   * <p>
+   * This is the reverse of {@link TomlTable#as(Class, TomlBindOptions)}: the table is bound back to an equal object,
+   * given the same options. Each member of a record or class is written under the key it is bound to, with the members
+   * of a superclass first. {@code value} is written as its own class, and a value within it as the type its member
+   * declares. Each value is written as follows:
+   * <ul>
+   * <li>A {@code String}, {@code boolean}, {@code long}, {@code int}, {@code short}, {@code byte}, {@code double},
+   * {@code OffsetDateTime}, {@code LocalDateTime}, {@code LocalDate} or {@code LocalTime} as itself.</li>
+   * <li>A {@code char} as a string, an enum constant as its name or the value of its {@link TomlName} annotation, and a
+   * {@code float} as the shortest decimal that reads back as it.</li>
+   * <li>A {@code BigInteger} as an integer, and a {@code BigDecimal} as a float, if TOML can hold it exactly.</li>
+   * <li>An {@code Instant} as an offset date-time in UTC, and a {@code ZonedDateTime} as an offset date-time.</li>
+   * <li>A collection or Java array as an array, and a record, class or map as a table.</li>
+   * <li>A {@link TomlTable} or {@link TomlArray} as a copy of it.</li>
+   * <li>A value of a type that has a converter in the options, by the converter that writes it.</li>
+   * <li>A value declared as {@code Object} as the value of its own class.</li>
+   * </ul>
+   * A member that is {@code null}, or an empty {@code Optional}, is left out, as is an entry of a map whose value is.
+   * An element of a collection or array cannot be {@code null}.
+   *
+   * <p>
+   * The table, and the tables and arrays within it, are created with {@link #create()} and
+   * {@link MutableTomlArray#create()}, so the default style of the writer chooses how each is written.
+   *
+   * @param value The record, class or map.
+   * @param options The options to write with.
+   * @return A new table holding the values of {@code value}.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   */
+  static MutableTomlTable from(Object value, TomlBindOptions options) {
+    requireNonNull(value);
+    requireNonNull(options);
+    return ObjectWriter.toTable(value, options);
+  }
+
+  /**
+   * Update this table to hold the members of a record or class, or the entries of a map, with the default options.
+   *
+   * @param value The record, class or map.
+   * @return This table.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   * @see #update(Object, TomlBindOptions)
+   */
+  default MutableTomlTable update(Object value) {
+    return update(value, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Update this table to hold the members of a record or class, or the entries of a map, changing only the values that
+   * differ.
+   *
+   * <pre>{@code
+   * TomlParseResult document = Toml.parse(path);
+   * Config config = document.as(Config.class);
+   * document.update(config.withPort(8443));
+   * Files.writeString(path, document.toToml());
+   * }</pre>
+   *
+   * <p>
+   * Each value is written as {@link #from(Object, TomlBindOptions)} writes it, into the entry already there when there
+   * is one, so the comments, order and layout of the document are kept:
+   * <ul>
+   * <li>A value that binds to a value equal to the one being written, or to one that writes as the same TOML value, is
+   * left as it is, keeping the way it is written: {@code 0x1F} for {@code 31}, {@code "on-success"} for
+   * {@code ON_SUCCESS}, or {@code 1.50} for a {@code BigDecimal} of {@code 1.5}.</li>
+   * <li>A table is updated in place, entry by entry. A key of a record or class that is {@code null} or an empty
+   * {@code Optional} is removed, and a key that names no member is left as it is. A key that a map does not have is
+   * removed.</li>
+   * <li>An array is updated in place: the elements it already holds, in the same order, are left as they are, and
+   * between them its elements are updated in order, and elements are inserted or removed where the list has more or
+   * fewer.</li>
+   * <li>Any other value is replaced, keeping its entry and the comments attached to it. A string or integer that
+   * replaces one of the same type keeps its notation when that notation can hold it: a literal or multi-line literal
+   * string, an integer in hexadecimal, octal or binary, or a decimal integer with grouped digits. This is the value
+   * {@link TomlValue#inNotationOf(TomlValue, long)} and {@link TomlValue#inNotationOf(TomlValue, String)} give.</li>
+   * </ul>
+   * A key added to a table is added after its other entries.
+   *
+   * <p>
+   * An exception leaves the table partly updated: the values before the one that could not be written have been
+   * changed.
+   *
+   * @param value The record, class or map.
+   * @param options The options to write with.
+   * @return This table.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   */
+  default MutableTomlTable update(Object value, TomlBindOptions options) {
+    requireNonNull(value);
+    requireNonNull(options);
+    ObjectWriter.update(this, value, options);
+    return this;
+  }
+
   @Override
   @Nullable
   default MutableTomlKeyValue entry(String dottedKey) {

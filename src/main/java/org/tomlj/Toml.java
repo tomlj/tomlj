@@ -35,7 +35,8 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.IntStream;
 
 /**
- * Methods for parsing data stored in Tom's Obvious, Minimal Language (TOML).
+ * Methods for parsing data stored in Tom's Obvious, Minimal Language (TOML), for binding it to Java objects, and for
+ * writing Java objects as TOML.
  * <p>
  * By default, documents may nest tables and arrays at most {@value TomlParseOptions#DEFAULT_MAX_NESTING_DEPTH} levels
  * deep, not counting the root table, and a value, table or array nested deeper than that is reported as a parse error.
@@ -44,6 +45,9 @@ import org.antlr.v4.runtime.IntStream;
  */
 public final class Toml {
   private static final Pattern simpleKeyPattern = Pattern.compile("^[A-Za-z0-9_-]+$");
+
+  // A document parsed to be bound keeps no source text, which only writing it back would use.
+  private static final TomlParseOptions BINDING = TomlParseOptions.defaults().withoutSource();
 
   private Toml() {}
 
@@ -246,6 +250,238 @@ public final class Toml {
             IntStream.UNKNOWN_SOURCE_NAME,
             -1);
     return Parser.parse(stream, options);
+  }
+
+  /**
+   * Parse a TOML string and bind it to a Java type, with the default options.
+   *
+   * @param input The input to parse.
+   * @param type The type to bind to.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of the document.
+   * @throws TomlParseException If the document has any parse error.
+   * @throws TomlBindException If any value of the document cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   * @see #parseAs(String, Class, TomlBindOptions)
+   */
+  public static <T> T parseAs(String input, Class<T> type) {
+    return parseAs(input, type, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Parse a TOML string and bind it to a Java type.
+   *
+   * <pre>{@code
+   * record Server(String host, int port) {}
+   *
+   * record Config(String name, List<Server> servers) {}
+   *
+   * Config config = Toml.parseAs(input, Config.class, TomlBindOptions.defaults());
+   * }</pre>
+   *
+   * <p>
+   * The document is parsed at the latest version of TOML, with the default nesting limit and without keeping its source
+   * text (see {@link TomlParseOptions#withoutSource()}). A table or array bound to {@code TomlTable}, {@code TomlArray}
+   * or {@code Object} therefore keeps no source text either, and {@code toToml()} writes it in the default style. If
+   * the document has any parse error, nothing is bound and a {@link TomlParseException} holding every parse error is
+   * thrown. Otherwise the document is bound as {@link TomlTable#as(Class, TomlBindOptions)} binds a table.
+   *
+   * <p>
+   * To parse with other options, or to bind a document more than once or in parts, parse it with
+   * {@link #parse(String, TomlParseOptions)} and call {@code as} on the result or on any table or array of it.
+   *
+   * @param input The input to parse.
+   * @param type The type to bind to.
+   * @param options The options to bind with.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of the document.
+   * @throws TomlParseException If the document has any parse error.
+   * @throws TomlBindException If any value of the document cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   */
+  public static <T> T parseAs(String input, Class<T> type, TomlBindOptions options) {
+    requireNonNull(type);
+    requireNonNull(options);
+    return withoutErrors(parse(input, BINDING)).as(type, options);
+  }
+
+  /**
+   * Parse a TOML string and bind it to a generic Java type, with the default options.
+   *
+   * @param input The input to parse.
+   * @param type The type to bind to.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of the document.
+   * @throws TomlParseException If the document has any parse error.
+   * @throws TomlBindException If any value of the document cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   * @see #parseAs(String, Class, TomlBindOptions)
+   */
+  public static <T> T parseAs(String input, GenericType<T> type) {
+    return parseAs(input, type, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Parse a TOML string and bind it to a generic Java type.
+   *
+   * <p>
+   * This parses and binds as {@link #parseAs(String, Class, TomlBindOptions)} does, to a type such as
+   * {@code Map<String, Server>} that a {@code Class} cannot name.
+   *
+   * @param input The input to parse.
+   * @param type The type to bind to.
+   * @param options The options to bind with.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of the document.
+   * @throws TomlParseException If the document has any parse error.
+   * @throws TomlBindException If any value of the document cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   */
+  public static <T> T parseAs(String input, GenericType<T> type, TomlBindOptions options) {
+    requireNonNull(type);
+    requireNonNull(options);
+    return withoutErrors(parse(input, BINDING)).as(type, options);
+  }
+
+  /**
+   * Parse a TOML file and bind it to a Java type, with the default options.
+   *
+   * @param file The input file to parse.
+   * @param type The type to bind to.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of the document.
+   * @throws IOException If an IO error occurs.
+   * @throws TomlParseException If the document has any parse error.
+   * @throws TomlBindException If any value of the document cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   * @see #parseAs(String, Class, TomlBindOptions)
+   */
+  public static <T> T parseAs(Path file, Class<T> type) throws IOException {
+    return parseAs(file, type, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Parse a TOML file and bind it to a Java type.
+   *
+   * <p>
+   * This parses and binds as {@link #parseAs(String, Class, TomlBindOptions)} does.
+   *
+   * @param file The input file to parse.
+   * @param type The type to bind to.
+   * @param options The options to bind with.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of the document.
+   * @throws IOException If an IO error occurs.
+   * @throws TomlParseException If the document has any parse error.
+   * @throws TomlBindException If any value of the document cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   */
+  public static <T> T parseAs(Path file, Class<T> type, TomlBindOptions options) throws IOException {
+    requireNonNull(type);
+    requireNonNull(options);
+    return withoutErrors(parse(file, BINDING)).as(type, options);
+  }
+
+  /**
+   * Parse a TOML file and bind it to a generic Java type, with the default options.
+   *
+   * @param file The input file to parse.
+   * @param type The type to bind to.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of the document.
+   * @throws IOException If an IO error occurs.
+   * @throws TomlParseException If the document has any parse error.
+   * @throws TomlBindException If any value of the document cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   * @see #parseAs(String, Class, TomlBindOptions)
+   */
+  public static <T> T parseAs(Path file, GenericType<T> type) throws IOException {
+    return parseAs(file, type, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Parse a TOML file and bind it to a generic Java type.
+   *
+   * <p>
+   * This parses and binds as {@link #parseAs(String, Class, TomlBindOptions)} does, to a type such as
+   * {@code Map<String, Server>} that a {@code Class} cannot name.
+   *
+   * @param file The input file to parse.
+   * @param type The type to bind to.
+   * @param options The options to bind with.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of the document.
+   * @throws IOException If an IO error occurs.
+   * @throws TomlParseException If the document has any parse error.
+   * @throws TomlBindException If any value of the document cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   */
+  public static <T> T parseAs(Path file, GenericType<T> type, TomlBindOptions options) throws IOException {
+    requireNonNull(type);
+    requireNonNull(options);
+    return withoutErrors(parse(file, BINDING)).as(type, options);
+  }
+
+  private static TomlParseResult withoutErrors(TomlParseResult result) {
+    if (result.hasErrors()) {
+      throw new TomlParseException(result.errors());
+    }
+    return result;
+  }
+
+  /**
+   * Write a record, class or map as a TOML document, with the default options.
+   *
+   * @param value The record, class or map.
+   * @return The TOML document.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   * @see #toToml(Object, TomlBindOptions, TomlWriteOptions)
+   */
+  public static String toToml(Object value) {
+    return toToml(value, TomlBindOptions.defaults(), TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Write a record, class or map as a TOML document, with the default write options.
+   *
+   * @param value The record, class or map.
+   * @param options The options to write the object with.
+   * @return The TOML document.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   * @see #toToml(Object, TomlBindOptions, TomlWriteOptions)
+   */
+  public static String toToml(Object value, TomlBindOptions options) {
+    return toToml(value, options, TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Write a record, class or map as a TOML document.
+   *
+   * <pre>{@code
+   * record Server(String host, int port) {}
+   *
+   * record Config(String name, List<Server> servers) {}
+   *
+   * String toml = Toml.toToml(config, TomlBindOptions.defaults(), TomlWriteOptions.defaults());
+   * }</pre>
+   *
+   * <p>
+   * This writes the same document as {@code MutableTomlTable.from(value, options).toToml(writeOptions)}: see
+   * {@link MutableTomlTable#from(Object, TomlBindOptions)} for how each value is written.
+   *
+   * @param value The record, class or map.
+   * @param options The options to write the object with.
+   * @param writeOptions The options to write the document with.
+   * @return The TOML document.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML, or the document cannot be written at the version of the write
+   *         options.
+   */
+  public static String toToml(Object value, TomlBindOptions options, TomlWriteOptions writeOptions) {
+    requireNonNull(writeOptions);
+    return MutableTomlTable.from(value, options).toToml(writeOptions);
   }
 
   /**

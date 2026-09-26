@@ -74,6 +74,16 @@ doc.set("mode", TomlValue.octal(493));
 doc.set("pattern", TomlValue.literal("\\d+"));
 ```
 
+To replace a value and keep the notation it was written in, `TomlValue.inNotationOf` takes the value
+being replaced and the new integer or string. It gives the new value in the same notation when that
+notation can hold it, and in the default notation otherwise, such as for a negative integer where
+the old one was hexadecimal. `set` alone writes the new value in the default notation.
+
+```java
+// mask = 0xFF becomes mask = 0xAB
+doc.set("mask", TomlValue.inNotationOf(doc.entry("mask").value(), 171));
+```
+
 [writing.md](writing.md) describes what is written from what.
 
 Keys and `String` values must not contain an unpaired surrogate, and dates must be ones TOML can

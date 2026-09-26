@@ -1,0 +1,17 @@
+name = "nightly"
+start = "02:30"
+retries = 3000000000
+timout = "10m"
+
+[[step]]
+name = "build"
+command = "./gradlew build"
+
+[[step]]
+name = "publish"
+when = "on-sucess"
+
+[[step]]
+name = "notify"
+command = ["mail", "-s", "nightly", "team@example.com"]
+when = "always"

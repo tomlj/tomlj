@@ -1,0 +1,19 @@
+# Deployment of the storefront.
+name = "storefront"
+replicas = 3 # raised for the sale
+timeout = "30s"
+ports = [
+  8080, # http
+  8443, # https
+]
+
+# Each service runs in its own container.
+[[service]]
+name = "web"
+image = 'registry.example.com/web:1.4'
+memory = 0x200 # MiB
+
+[[service]]
+name = "worker"
+image = 'registry.example.com/worker:1.4'
+memory = 0x400

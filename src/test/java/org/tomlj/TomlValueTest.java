@@ -308,4 +308,63 @@ class TomlValueTest {
 
     assertEquals("x = 0xFF  # c\n[t]\ny = 2\nz = { a = 1 }\n", result.toToml(LF));
   }
+
+  @Test
+  void aValueInTheNotationOfAnotherIsWrittenInThatNotation() {
+    TomlParseResult result = Toml
+        .parse("a = 0xFF\nb = 0xff\nc = 0o17\nd = 0b11\ne = 1_000\nf = 'C:\\x'\ng = '''\nx'''\nh = 10\ni = \"s\"\n");
+    assertFalse(result.hasErrors());
+    result.set("a", TomlValue.inNotationOf(result.entry("a").value(), 171));
+    result.set("b", TomlValue.inNotationOf(result.entry("b").value(), 171));
+    result.set("c", TomlValue.inNotationOf(result.entry("c").value(), 8));
+    result.set("d", TomlValue.inNotationOf(result.entry("d").value(), 5));
+    result.set("e", TomlValue.inNotationOf(result.entry("e").value(), 1234567));
+    result.set("f", TomlValue.inNotationOf(result.entry("f").value(), "D:\\y"));
+    result.set("g", TomlValue.inNotationOf(result.entry("g").value(), "y\nz"));
+    result.set("h", TomlValue.inNotationOf(result.entry("h").value(), 11));
+    result.set("i", TomlValue.inNotationOf(result.entry("i").value(), "t"));
+
+    assertEquals(
+        "a = 0xAB\nb = 0xab\nc = 0o10\nd = 0b101\ne = 1_234_567\nf = 'D:\\y'\ng = '''\ny\nz'''\nh = 11\ni = \"t\"\n",
+        result.toToml(LF));
+  }
+
+  @Test
+  void aValueInTheNotationOfAnotherIsWrittenInTheDefaultNotationWhenTheNotationCannotHoldIt() {
+    TomlParseResult result = Toml.parse("a = 0xFF\nb = 'x'\nc = 0xFF\nd = 'x'\n");
+    assertFalse(result.hasErrors());
+    result.set("a", TomlValue.inNotationOf(result.entry("a").value(), -1));
+    result.set("b", TomlValue.inNotationOf(result.entry("b").value(), "it's"));
+    result.set("c", TomlValue.inNotationOf(result.entry("c").value(), "s"));
+    result.set("d", TomlValue.inNotationOf(result.entry("d").value(), 1));
+
+    assertEquals("a = -1\nb = \"it's\"\nc = \"s\"\nd = 1\n", result.toToml(LF));
+  }
+
+  @Test
+  void aValueInTheNotationOfAValueWithNoRecordOfItIsWrittenInTheDefaultNotation() {
+    TomlParseResult result = Toml.parse("a = 0xFF\n", TomlParseOptions.defaults().withoutSource());
+    assertFalse(result.hasErrors());
+    result.set("a", TomlValue.inNotationOf(result.entry("a").value(), 171));
+
+    assertEquals("a = 171\n", result.toToml(LF));
+  }
+
+  @Test
+  void aValueInTheNotationOfAMadeValueIsWrittenInThatNotation() {
+    MutableTomlTable doc = MutableTomlTable.create();
+    doc.set("a", TomlValue.inNotationOf(TomlValue.octal(8), 493));
+    doc.set("b", TomlValue.inNotationOf(TomlValue.literal("x"), "\\d+"));
+
+    assertEquals("a = 0o755\nb = '\\d+'\n", doc.toToml(LF));
+  }
+
+  @Test
+  void rejectsAValueInTheNotationOfAnotherItCannotHold() {
+    TomlValue original = TomlValue.literal("x");
+    assertThrows(IllegalArgumentException.class, () -> TomlValue.inNotationOf(original, "bad\uD800"));
+    assertThrows(NullPointerException.class, () -> TomlValue.inNotationOf(null, 1));
+    assertThrows(NullPointerException.class, () -> TomlValue.inNotationOf(null, "s"));
+    assertThrows(NullPointerException.class, () -> TomlValue.inNotationOf(original, null));
+  }
 }

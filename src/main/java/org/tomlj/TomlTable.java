@@ -1542,4 +1542,124 @@ public interface TomlTable {
   default void toToml(Appendable appendable, TomlWriteOptions options) throws IOException {
     Serializer.toToml(this, appendable, options);
   }
+
+  /**
+   * Bind this table to a Java type, with the default options.
+   *
+   * @param type The type to bind to.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of this table.
+   * @throws TomlBindException If any value of this table cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   * @see #as(Class, TomlBindOptions)
+   */
+  default <T> T as(Class<T> type) {
+    return as(type, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Bind this table to a Java type.
+   *
+   * <pre>{@code
+   * record Server(String host, int port) {}
+   * 
+   * record Config(String name, List<Server> servers) {}
+   *
+   * Config config = Toml.parse(path).as(Config.class, TomlBindOptions.defaults());
+   * }</pre>
+   *
+   * <p>
+   * The value of each key or element is bound to the type declared for it, as follows:
+   * <ul>
+   * <li>A string to {@code String}, an enum constant, or {@code char} for a string of one character. An enum constant
+   * is matched by its name, or else by its name ignoring case and with {@code -} and space read as {@code _}; a
+   * constant with a {@link TomlName} annotation is matched by the annotation's value only.</li>
+   * <li>An integer to {@code long}, {@code int}, {@code short}, {@code byte}, {@code BigInteger}, or to a floating
+   * point type if it can be represented exactly. A value out of range for the type is an error.</li>
+   * <li>A float to {@code double}, {@code float} or {@code BigDecimal}.</li>
+   * <li>A boolean to {@code boolean}.</li>
+   * <li>An offset date-time to {@code OffsetDateTime}, {@code ZonedDateTime} or {@code Instant}, and a local date-time,
+   * date or time to {@code LocalDateTime}, {@code LocalDate} or {@code LocalTime}.</li>
+   * <li>An array to a {@code List}, {@code Set}, {@code Collection}, {@code Iterable}, a concrete collection class, or
+   * a Java array.</li>
+   * <li>A table to a record, a class, or a {@code Map} with {@code String} keys.</li>
+   * <li>Any value to {@code Object}, unchanged, and a table or array to {@link TomlTable} or {@link TomlArray}, or to a
+   * copy of it for {@link MutableTomlTable} or {@link MutableTomlArray}.</li>
+   * <li>Any value to {@code Optional<T>}, by binding it to {@code T}.</li>
+   * <li>Any value to a type that has a converter in the options, by that converter.</li>
+   * </ul>
+   *
+   * <p>
+   * A table is bound to a record through its canonical constructor, with a key for each component. It is bound to a
+   * class by creating an instance with its constructor without parameters, then setting a field for each key. Every
+   * field of the class and its superclasses is bound except static, transient and final fields. The key of a field or
+   * component is its name, converted by the options' key naming, or the value of its {@link TomlName} annotation.
+   *
+   * <p>
+   * A key the table does not have is bound as follows:
+   * <ul>
+   * <li>An {@code Optional} is empty.</li>
+   * <li>A field of a class keeps the value it was given when the instance was created.</li>
+   * <li>A record component, or a field of a class that is {@code null} once the instance is created, is {@code null} if
+   * it is nullable, and an error if it is never {@code null}. A primitive is never {@code null}; otherwise, an
+   * annotation named {@code NonNull}, {@code NotNull} or {@code Nonnull} marks a field or component as never
+   * {@code null}, and one named {@code Nullable} marks it as nullable, from any package, as long as the annotation is
+   * kept at runtime. Without either, it is never {@code null} if its class, an enclosing class, its package or its
+   * module is annotated as JSpecify's {@code NullMarked}, and nullable otherwise.</li>
+   * </ul>
+   * A key in the table that names no field or component is an error, unless the options ignore unknown keys.
+   *
+   * <p>
+   * Binding does not stop at the first error. Every value is bound, and the errors, each with the path and position of
+   * the value, are thrown together in a {@link TomlBindException}. An exception thrown by a record's constructor or a
+   * converter is reported as an error at the position of the value being bound.
+   *
+   * <p>
+   * TomlJ binds to private fields and classes by reflection. In a named module, the package holding them must be opened
+   * to the module {@code org.tomlj}.
+   *
+   * @param type The type to bind to.
+   * @param options The options to bind with.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of this table.
+   * @throws TomlBindException If any value of this table cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   */
+  @SuppressWarnings("unchecked")
+  default <T> T as(Class<T> type, TomlBindOptions options) {
+    return (T) ObjectBinder.bind(this, type, options);
+  }
+
+  /**
+   * Bind this table to a generic Java type, with the default options.
+   *
+   * @param type The type to bind to.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of this table.
+   * @throws TomlBindException If any value of this table cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   * @see #as(Class, TomlBindOptions)
+   */
+  default <T> T as(GenericType<T> type) {
+    return as(type, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Bind this table to a generic Java type.
+   *
+   * <p>
+   * This binds as {@link #as(Class, TomlBindOptions)} does, to a type such as {@code List<Server>} that a {@code Class}
+   * cannot name.
+   *
+   * @param type The type to bind to.
+   * @param options The options to bind with.
+   * @param <T> The type to bind to.
+   * @return A new instance of the type, holding the values of this table.
+   * @throws TomlBindException If any value of this table cannot be bound.
+   * @throws IllegalArgumentException If the type, or a type it holds, cannot be bound to.
+   */
+  @SuppressWarnings("unchecked")
+  default <T> T as(GenericType<T> type, TomlBindOptions options) {
+    return (T) ObjectBinder.bind(this, type.type(), options);
+  }
 }

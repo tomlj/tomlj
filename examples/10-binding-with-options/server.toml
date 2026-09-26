@@ -1,0 +1,14 @@
+# Settings for the web server. The [metrics] table is read by the metrics exporter, not by the server.
+listen-address = "0.0.0.0"
+port = 8080
+request-timeout = "30s"
+document-root = "/srv/www"
+trust-x-forwarded-for = true
+
+[tls]
+cert-file = "/etc/ssl/site.pem"
+key-file = "/etc/ssl/site.key"
+
+[metrics]
+exporter = "prometheus"
+interval = "15s"

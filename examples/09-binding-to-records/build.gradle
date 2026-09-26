@@ -1,0 +1,8 @@
+application {
+  mainClass = 'org.tomlj.examples.BindingToRecords'
+}
+
+dependencies {
+  // JSpecify's @NullMarked, read by TomlJ at runtime to find which components may be missing.
+  implementation 'org.jspecify:jspecify:1.0.0'
+}

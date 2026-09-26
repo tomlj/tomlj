@@ -680,6 +680,73 @@ public interface MutableTomlArray extends TomlArray {
     return array;
   }
 
+  /**
+   * Create an array holding the elements of a collection or Java array, with the default options.
+   *
+   * @param value The collection or Java array.
+   * @return A new array holding the elements of {@code value}.
+   * @throws IllegalArgumentException If {@code value} is not written as an array, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   * @see #from(Object, TomlBindOptions)
+   */
+  static MutableTomlArray from(Object value) {
+    return from(value, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Create an array holding the elements of a collection or Java array.
+   *
+   * <p>
+   * Each element is written as {@link MutableTomlTable#from(Object, TomlBindOptions)} writes a value, so a list of
+   * records is written as an array of tables.
+   *
+   * @param value The collection or Java array.
+   * @param options The options to write with.
+   * @return A new array holding the elements of {@code value}.
+   * @throws IllegalArgumentException If {@code value} is not written as an array, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   */
+  static MutableTomlArray from(Object value, TomlBindOptions options) {
+    requireNonNull(value);
+    requireNonNull(options);
+    return ObjectWriter.toArray(value, options);
+  }
+
+  /**
+   * Update this array to hold the elements of a collection or Java array, with the default options.
+   *
+   * @param value The collection or Java array.
+   * @return This array.
+   * @throws IllegalArgumentException If {@code value} is not written as an array, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   * @see #update(Object, TomlBindOptions)
+   */
+  default MutableTomlArray update(Object value) {
+    return update(value, TomlBindOptions.defaults());
+  }
+
+  /**
+   * Update this array to hold the elements of a collection or Java array, changing only the values that differ.
+   *
+   * <p>
+   * The elements this array already holds, in the same order and as many as there can be, are left as they are, with
+   * their comments. Between two of them, the elements of this array are updated in order by those of the list, as
+   * {@link MutableTomlTable#update(Object, TomlBindOptions)} updates a value, and the elements left over are inserted
+   * or removed.
+   *
+   * @param value The collection or Java array.
+   * @param options The options to write with.
+   * @return This array.
+   * @throws IllegalArgumentException If {@code value} is not written as an array, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   */
+  default MutableTomlArray update(Object value, TomlBindOptions options) {
+    requireNonNull(value);
+    requireNonNull(options);
+    ObjectWriter.update(this, value, options);
+    return this;
+  }
+
   @Override
   MutableTomlEntry entry(int index);
 
