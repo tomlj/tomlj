@@ -81,7 +81,7 @@ final class ObjectBinder {
   static Object bind(Object value, Type type, TomlBindOptions options) {
     Binder binder = binderFor(type, options);
     Context context = new Context(options);
-    Object result = binder.bind(value, Location.ROOT, context);
+    Object result = binder.bind(value, Location.root(value), context);
     if (!context.errors.isEmpty()) {
       List<TomlBindError> errors = new ArrayList<>(context.errors);
       errors
@@ -132,7 +132,6 @@ final class ObjectBinder {
    * Where a value is in the table or array being bound.
    */
   static final class Location {
-    static final Location ROOT = new Location(null, null, null, -1, null);
 
     @Nullable
     private final Location parent;
@@ -143,26 +142,38 @@ final class ObjectBinder {
     private final int index;
     @Nullable
     private final TomlArray array;
+    @Nullable
+    private final TomlPosition rootPosition;
 
     private Location(
         @Nullable Location parent,
         @Nullable TomlTable table,
         @Nullable String key,
         int index,
-        @Nullable TomlArray array) {
+        @Nullable TomlArray array,
+        @Nullable TomlPosition rootPosition) {
       this.parent = parent;
       this.table = table;
       this.key = key;
       this.index = index;
       this.array = array;
+      this.rootPosition = rootPosition;
+    }
+
+    /**
+     * The location of the table or array being bound, at its own position if it was read from a document.
+     */
+    static Location root(Object value) {
+      TomlPosition position = value instanceof TomlElement ? ((TomlElement) value).position() : null;
+      return new Location(null, null, null, -1, null, position);
     }
 
     Location key(TomlTable table, String key) {
-      return new Location(this, table, key, -1, null);
+      return new Location(this, table, key, -1, null, null);
     }
 
     Location index(TomlArray array, int index) {
-      return new Location(this, null, null, index, array);
+      return new Location(this, null, null, index, array, null);
     }
 
     String path() {
@@ -193,7 +204,7 @@ final class ObjectBinder {
       if (array != null) {
         return array.inputPositionOf(index);
       }
-      return null;
+      return rootPosition;
     }
 
     @Nullable

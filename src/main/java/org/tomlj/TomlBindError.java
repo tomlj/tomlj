@@ -76,7 +76,8 @@ public final class TomlBindError implements Serializable {
    * The position of the value in the TOML document.
    *
    * <p>
-   * For a missing key, this is the position of the table the key is missing from.
+   * For an unknown key, this is the position of the key, and for a missing key, the position of the table the key is
+   * missing from: its header, or the start of the document for the root table of a document.
    *
    * @return The position, or {@code null} if the value, or the table for a missing key, was not read from a document.
    */

@@ -124,7 +124,11 @@ class TomlBindTest {
   void bindsMissingKeysByNullability() {
     TomlBindException e = bindFails("[t]\nother = 1", Nullability.class);
     assertEquals(
-        List.of("t: unknown key (line 1, column 1)", "checkerNonNull: missing", "primitive: missing"),
+        List
+            .of(
+                "checkerNonNull: missing (line 1, column 1)",
+                "primitive: missing (line 1, column 1)",
+                "t: unknown key (line 1, column 1)"),
         errors(e));
 
     Nullability n = Toml.parse("checkerNonNull = \"a\"\nprimitive = 1").as(Nullability.class);
@@ -138,12 +142,19 @@ class TomlBindTest {
     assertEquals(List.of("server.port: missing (line 3, column 1)"), errors(e));
   }
 
+  @Test
+  void reportsMissingKeysAtTheTableBound() {
+    TomlTable server = Toml.parse("name = \"n\"\n[server]\nhost = \"a\"").getTable("server");
+    TomlBindException e = assertThrows(TomlBindException.class, () -> server.as(Server.class));
+    assertEquals(List.of("port: missing (line 2, column 1)"), errors(e));
+  }
+
   @NullMarked
   record NullMarkedRecord(String required, @Nullable String nullable, Optional<String> optional) {}
 
   @Test
   void honorsNullMarkedClasses() {
-    assertEquals(List.of("required: missing"), errors(bindFails("", NullMarkedRecord.class)));
+    assertEquals(List.of("required: missing (line 1, column 1)"), errors(bindFails("", NullMarkedRecord.class)));
     NullMarkedRecord r = Toml.parse("required = \"x\"").as(NullMarkedRecord.class);
     assertNull(r.nullable());
     assertEquals(Optional.empty(), r.optional());
@@ -151,7 +162,7 @@ class TomlBindTest {
 
   @Test
   void honorsNullMarkedPackagesAndNullUnmarked() {
-    assertEquals(List.of("name: missing"), errors(bindFails("", MarkedTypes.Marked.class)));
+    assertEquals(List.of("name: missing (line 1, column 1)"), errors(bindFails("", MarkedTypes.Marked.class)));
     assertNull(Toml.parse("name = \"x\"").as(MarkedTypes.Marked.class).description());
     MarkedTypes.Unmarked unmarked = Toml.parse("").as(MarkedTypes.Unmarked.class);
     assertNull(unmarked.name());
@@ -168,7 +179,7 @@ class TomlBindTest {
 
   @Test
   void reportsMissingNonNullFieldsOnlyWithoutInitialValue() {
-    assertEquals(List.of("required: missing"), errors(bindFails("", MarkedSettings.class)));
+    assertEquals(List.of("required: missing (line 1, column 1)"), errors(bindFails("", MarkedSettings.class)));
     MarkedSettings settings = Toml.parse("required = \"r\"").as(MarkedSettings.class);
     assertEquals("default", settings.withDefault);
     assertNull(settings.nullable);
@@ -511,7 +522,7 @@ class TomlBindTest {
 
     // The key on the line the parser rejected is also reported as missing
     TomlBindException e = assertThrows(TomlBindException.class, () -> result.as(StrictConfig.class));
-    assertEquals(List.of("tags: missing"), errors(e));
+    assertEquals(List.of("tags: missing (line 1, column 1)"), errors(e));
   }
 
   @Test
@@ -617,6 +628,6 @@ class TomlBindTest {
   @Test
   void reportsTypeErrorsAtTheRoot() {
     TomlBindException e = assertThrows(TomlBindException.class, () -> Toml.parse("").as(Integer.class));
-    assertEquals(List.of("expected an integer, found a table"), errors(e));
+    assertEquals(List.of("expected an integer, found a table (line 1, column 1)"), errors(e));
   }
 }
