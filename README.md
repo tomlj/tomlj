@@ -41,15 +41,6 @@ if (port > 65535) {
 * **Complete, and tested against the spec.** TomlJ supports TOML 1.1.0. Every build runs the
   official [toml-test](https://github.com/toml-lang/toml-test) suite for 1.0.0 and 1.1.0: valid
   files must give exactly the expected values, and invalid files must be rejected.
-* **Reads TOML 1.0.0 too.** `TomlVersion.V1_0_0` reports 1.1.0 syntax as an error instead of
-  accepting it.
-* **A typed getter for every TOML type**, returning `String`, `Long`, `Double`, `Boolean`,
-  `TomlArray` or `TomlTable`, and the four date and time types as `java.time`'s `OffsetDateTime`,
-  `LocalDateTime`, `LocalDate` and `LocalTime`. Each getter returns `null` if the key is missing,
-  throws `TomlInvalidTypeException` if the value is the wrong type, and has an overload that takes
-  a default.
-* **Comments are kept.** Every comment in a document is parsed into the model, attached to an entry
-  or unattached in the table or array it was written in. See [Comments](#comments).
 * **Documents can be built and edited.** A parse result is a `MutableTomlTable`: set, insert and
   remove values and comments, or build a document from scratch, and write it out with `toToml()`.
   See [Building and editing documents](#building-and-editing-documents).
@@ -57,6 +48,16 @@ if (port > 65535) {
   the parsed source except where it was edited: comments, blank lines, key order, indentation and
   the notation of each value (`0xFF`, `'literal'`, `{ a = 1 }`) stay as they were written. See
   [Writing TOML](#writing-toml).
+* **Tables bind to records and classes.** `result.as(Config.class)` binds a document to a record or
+  a class, converting each value to the type declared for it, and reports every value that does
+  not fit with its path and position. See [Binding to Java objects](#binding-to-java-objects).
+* **A typed getter for every TOML type**, returning `String`, `Long`, `Double`, `Boolean`,
+  `TomlArray` or `TomlTable`, and the four date and time types as `java.time`'s `OffsetDateTime`,
+  `LocalDateTime`, `LocalDate` and `LocalTime`. Each getter returns `null` if the key is missing,
+  throws `TomlInvalidTypeException` if the value is the wrong type, and has an overload that takes
+  a default.
+* **Reads TOML 1.0.0 too.** `TomlVersion.V1_0_0` reports 1.1.0 syntax as an error instead of
+  accepting it.
 * **No dependencies.** The jar carries its own copy of the ANTLR runtime, relocated under TomlJ's
   own package, so there is nothing else to add and no clash with ANTLR elsewhere in your project.
   Works on Java 9 and later.
@@ -88,35 +89,6 @@ those when working with keys from `keySet()` or `entrySet()`:
 String quoted = result.getString("\"@key#with$special%characters\"");
 String literal = result.getString(Collections.singletonList("@key#with$special%characters"));
 ```
-
-### Comments
-
-Every comment in a document is kept. A comment on the same line as an entry, or a run of comment
-lines directly above it, is attached to that entry. Every other comment is unattached, and belongs to
-the table or array it was written in:
-
-```toml
-# The port clients connect to.
-port = 8080 # not 80
-
-# Everything below is optional.
-
-[server]
-```
-
-```java
-for (TomlComment comment : result.comments("port")) {
-  System.out.println(comment.placement() + ": " + comment.text());
-}
-// ABOVE: The port clients connect to.
-// AFTER: not 80
-```
-
-The unattached comment is read through `elements()`, which lists a table's entries and unattached
-comments together, in document order. Comments are set and removed through the editing API, and
-`toToml()` writes every comment back where it was read from. [docs/comments.md](docs/comments.md)
-states the rules in full: how a comment's text is read, which table an unattached comment belongs
-to, how comments are edited and written, and the cases at their edges.
 
 ### Building and editing documents
 
@@ -178,6 +150,64 @@ Keeping the text takes memory, and an application that only reads a document nev
 with `TomlParseOptions.defaults().withoutSource()` to keep no source text; such a result is written
 in the default style. [docs/writing.md](docs/writing.md) describes writing in full: where each kind
 of edit lands, what each amount keeps, the default style and the options.
+
+### Binding to Java objects
+
+`as` binds a table or an array to a record, a class, a collection, a map or a Java array:
+
+```java
+record Server(String host, int port) {}
+
+record Config(String name, List<Server> servers) {}
+
+Config config = Toml.parse(source).as(Config.class);
+```
+
+Each key is bound to the record component or field of the same name, or of another style of name
+with `TomlBindOptions.withKeyNaming`, or to the key given by `@TomlName`. A key the document does not
+have leaves an `Optional` empty and a field of a class at its initial value, and is otherwise `null`,
+or an error for a component or field that is never `null`: a primitive, one annotated `NonNull`, or
+one in a class or package annotated with JSpecify's `@NullMarked`. A key that names nothing is an
+error unless the options ignore unknown keys. Binding reports every error at once, in a
+`TomlBindException`, each with its path and position:
+
+```
+servers[1].port: expected an integer, found a string (line 9, column 8)
+servers[1].hots: unknown key (line 10, column 1)
+```
+
+Converters in `TomlBindOptions` bind other types, such as `Duration`, and a `GenericType` names a
+generic type, such as `Map<String, Server>`. [docs/binding.md](docs/binding.md) describes binding in
+full: the types bound, keys, missing keys, converters and errors.
+
+### Comments
+
+Every comment in a document is kept. A comment on the same line as an entry, or a run of comment
+lines directly above it, is attached to that entry. Every other comment is unattached, and belongs to
+the table or array it was written in:
+
+```toml
+# The port clients connect to.
+port = 8080 # not 80
+
+# Everything below is optional.
+
+[server]
+```
+
+```java
+for (TomlComment comment : result.comments("port")) {
+  System.out.println(comment.placement() + ": " + comment.text());
+}
+// ABOVE: The port clients connect to.
+// AFTER: not 80
+```
+
+The unattached comment is read through `elements()`, which lists a table's entries and unattached
+comments together, in document order. Comments are set and removed through the editing API, and
+`toToml()` writes every comment back where it was read from. [docs/comments.md](docs/comments.md)
+states the rules in full: how a comment's text is read, which table an unattached comment belongs
+to, how comments are edited and written, and the cases at their edges.
 
 ### Specification version
 
