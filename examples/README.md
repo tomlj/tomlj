@@ -3,7 +3,7 @@
 Each directory here is a small program that uses TomlJ, with the TOML files it reads. They are
 numbered in the order to learn them: reading a file and handling its errors, then building, editing
 and writing documents, then walking a document of unknown structure and reading its comments, then
-binding documents to records and classes.
+binding documents to records and classes and writing them back.
 
 | Example | Shows |
 |---|---|
@@ -18,6 +18,7 @@ binding documents to records and classes.
 | [09-binding-to-records](09-binding-to-records) | Binding to enums, maps, values that may be missing and a table left unbound, and binding single tables and arrays |
 | [10-binding-with-options](10-binding-with-options) | Binding to a class whose fields hold the defaults, with kebab-case keys, a renamed key, converters and ignored keys |
 | [11-reporting-binding-errors](11-reporting-binding-errors) | Listing every value that could not be bound, with its path and position |
+| [12-writing-bound-records](12-writing-bound-records) | Writing changed records back into a document, keeping its comments and notation, and writing records as a new document |
 
 ## Running the examples
 
@@ -161,6 +162,16 @@ pipeline.toml could not be bound:
 fixed.toml could not be bound:
   step[2]: timeout must be positive, but is -5 (line 14, column 1)
 ```
+
+### 12-writing-bound-records
+
+Binds `deployment.toml` to records, changes them, and calls `update` to write the change back into
+the document. Only the values that differ are changed: `replicas` becomes 5 with its comment kept,
+the web service gets a new image, and a third service is added at the end of the array of tables.
+Every comment stays, and each unchanged value keeps the way it is written, such as `memory = 0x200`,
+and `timeout = "30s"`, which the converter reads back as the same `Duration`. The converter is
+registered with a second function that writes a `Duration`, which is needed to write one at all.
+The example ends by writing new records as a new document with `MutableTomlTable.from`.
 
 [docs/editing.md](../docs/editing.md), [docs/writing.md](../docs/writing.md),
 [docs/comments.md](../docs/comments.md) and [docs/binding.md](../docs/binding.md) describe editing,
