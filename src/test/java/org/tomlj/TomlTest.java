@@ -20,7 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.StringReader;
 import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
@@ -253,6 +256,21 @@ class TomlTest {
     assertEquals("Invalid unicode escape sequence", error.getMessage());
     assertEquals(1, error.position().line());
     assertEquals(8, error.position().column());
+  }
+
+  @Test
+  void shouldSerializeParseErrors() throws Exception {
+    TomlParseError error = Toml.parse("foo = \"\\UFFFF00FF\"").errors().get(0);
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    try (ObjectOutputStream out = new ObjectOutputStream(bytes)) {
+      out.writeObject(error);
+    }
+    TomlParseError copy;
+    try (ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
+      copy = (TomlParseError) in.readObject();
+    }
+    assertEquals(error.getMessage(), copy.getMessage());
+    assertEquals(error.position(), copy.position());
   }
 
   @ParameterizedTest
