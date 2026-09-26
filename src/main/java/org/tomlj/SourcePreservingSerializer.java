@@ -1202,8 +1202,8 @@ final class SourcePreservingSerializer {
         return newline;
       }
       // The spacing the document wrote before its own comment, or the two spaces of the default style
-      String spacing = (span.afterStart >= 0) ? text(span.tailStart, span.afterStart - 1) : "  ";
-      return spacing + '#' + after.rawLines().get(0) + newline;
+      String spacing = span.commentGap();
+      return (spacing != null ? spacing : "  ") + '#' + after.rawLines().get(0) + newline;
     }
   }
 

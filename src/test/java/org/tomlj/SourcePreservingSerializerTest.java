@@ -668,6 +668,36 @@ class SourcePreservingSerializerTest {
                 result -> requireArray(result, "t").insertBefore(1, MutableTomlTable.create().set("x", 2)),
                 "[[t]]\nx = 1\n\n[[t]]\nx = 2\n\n[[t]]\nx = 3\n"),
             edited(
+                "a value replaced by a table keeps the spacing before the comment after its line",
+                "a = 1 # note\n",
+                result -> result.set("a", MutableTomlTable.create().set("x", 1)),
+                "[a] # note\nx = 1\n"),
+            edited(
+                "an inline table replaced by a table keeps the spacing before the comment after its line",
+                "a = { x = 1 }   # note\n",
+                result -> result.set("a", MutableTomlTable.create().set("y", 2)),
+                "[a]   # note\ny = 2\n"),
+            edited(
+                "a table replaced by a value keeps the spacing before the comment after its header",
+                "[a] # note\nx = 1\n",
+                result -> result.set("a", 1),
+                "a = 1 # note\n"),
+            edited(
+                "a table replaced by a table keeps the spacing before the comment after its header",
+                "[a] # note\nx = 1\n",
+                result -> result.set("a", MutableTomlTable.create().set("y", 2)),
+                "[a] # note\ny = 2\n"),
+            edited(
+                "a table of an array of tables replaced keeps the spacing before the comment after its header",
+                "[[a]] # note\nx = 1\n",
+                result -> requireArray(result, "a").set(0, MutableTomlTable.create().set("y", 2)),
+                "[[a]] # note\ny = 2\n"),
+            edited(
+                "a comment added after a line the document wrote none after is written two spaces from it",
+                "a = 1\n",
+                result -> result.setCommentAfter("a", "note"),
+                "a = 1  # note\n"),
+            edited(
                 "an entry that is removed takes the comment above it",
                 "a = 1\n# about b\nb = 2\nc = 3\n",
                 result -> result.remove("b"),

@@ -284,6 +284,21 @@ final class SourceSpan {
   }
 
   /**
+   * The spacing the document wrote before the comment after what this span covers: after the comma, for an element
+   * whose comma comes before its comment.
+   *
+   * @return The spacing, possibly empty, or {@code null} if there is no comment after it.
+   */
+  @Nullable
+  String commentGap() {
+    if (afterStart < 0) {
+      return null;
+    }
+    int from = (commaOffset >= 0 && commaOffset < afterStart) ? (commaOffset + 1) : tailStart;
+    return source.text(from, afterStart - 1);
+  }
+
+  /**
    * The span of the value written between this span's key and its tail, where the value's own span has the same source
    * and starts at this span's value offset.
    *

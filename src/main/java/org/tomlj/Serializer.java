@@ -66,13 +66,17 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * <p>
  * Unless the options ask for {@link TomlWriteOptions.Keep#NOTHING}, a key or a scalar that has a span is written with
  * the text of that span rather than in the form this writer would give it, and the dotted keys of an inline table are
- * written as the document wrote them. The layout, the spacing and the indentation around them come from the options.
+ * written as the document wrote them. The layout, the spacing and the indentation around them come from the options,
+ * except that, when the options keep the layout, the comment after a line or header written in place of one the
+ * document wrote keeps the spacing the document wrote before it.
  */
 final class Serializer {
   private static final Pattern BARE_KEY = Pattern.compile("[A-Za-z0-9_-]+");
   private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
   // The indentation of the elements of a multi-line array, relative to the line the array starts on
   private static final String ARRAY_ELEMENT_INDENT = "  ";
+  // The spacing before a comment after a line, where the document wrote none to keep
+  private static final String DEFAULT_COMMENT_GAP = "  ";
 
   private final Appendable out;
   private final TomlWriteOptions options;
@@ -221,7 +225,7 @@ final class Serializer {
     if (value instanceof TomlTable) {
       TomlTable subTable = (TomlTable) value;
       if (needsHeader(subTable, entry.comments())) {
-        writeHeader("[", path, "]", entry.comments());
+        writeHeader("[", path, "]", entry);
       }
       writeEntries(subTable, path);
       return;
@@ -238,12 +242,12 @@ final class Serializer {
    * @param path The keys from the root to the array.
    */
   void writeArrayTableSection(TomlEntry tableEntry, List<String> path) throws IOException {
-    writeHeader("[[", path, "]]", tableEntry.comments());
+    writeHeader("[[", path, "]]", tableEntry);
     writeEntries((TomlTable) tableEntry.value().get(), path);
   }
 
-  private void writeHeader(String open, List<String> path, String close, List<TomlComment> comments)
-      throws IOException {
+  private void writeHeader(String open, List<String> path, String close, TomlEntry entry) throws IOException {
+    List<TomlComment> comments = entry.comments();
     if (options.blankLineBetweenNestedHeaders() || !isNestedHeader(lastHeader, path)) {
       blankLine();
     }
@@ -253,7 +257,7 @@ final class Serializer {
     StringBuilder header = new StringBuilder(open);
     appendKeyPath(header, path);
     out.append(header.append(close));
-    writeCommentAfter(comments);
+    writeCommentAfter(comments, commentGap(entry));
     endLine();
     lastHeader = new ArrayList<>(path);
   }
@@ -281,7 +285,7 @@ final class Serializer {
     writeCommentAbove(comments, lineIndent);
     beginLine(lineIndent);
     out.append(header);
-    writeCommentAfter(comments);
+    writeCommentAfter(comments, DEFAULT_COMMENT_GAP);
     endLine();
   }
 
@@ -304,7 +308,7 @@ final class Serializer {
     prefix.append(" = ");
     out.append(prefix);
     writeEntryValue(entry.value(), lineIndent, width(lineIndent) + prefix.codePointCount(0, prefix.length()));
-    writeCommentAfter(comments);
+    writeCommentAfter(comments, commentGap(entry));
     endLine();
   }
 
@@ -526,7 +530,7 @@ final class Serializer {
       }
       writeNestedValue(entry.value(), elementIndent, column, 1, literals);
       out.append(',');
-      writeCommentAfter(entry.comments());
+      writeCommentAfter(entry.comments(), commentGap(entry));
       endLine();
     }
     beginLine(lineIndent);
@@ -568,7 +572,22 @@ final class Serializer {
     }
   }
 
-  private void writeCommentAfter(List<TomlComment> comments) throws IOException {
+  /**
+   * The spacing before the comment after an entry's line: when the layout is kept, the spacing the document wrote
+   * before the comment after the line or header the entry was written as, so a line written anew in its place keeps it,
+   * and otherwise the two spaces of the default style.
+   */
+  private String commentGap(TomlEntry entry) {
+    if (options.keep() == TomlWriteOptions.Keep.LAYOUT && entry instanceof Entry) {
+      String gap = ((Entry) entry).commentGap();
+      if (gap != null) {
+        return gap;
+      }
+    }
+    return DEFAULT_COMMENT_GAP;
+  }
+
+  private void writeCommentAfter(List<TomlComment> comments, String gap) throws IOException {
     TomlComment after = null;
     for (TomlComment comment : comments) {
       if (comment.placement() == TomlComment.Placement.AFTER) {
@@ -576,7 +595,7 @@ final class Serializer {
       }
     }
     if (after != null) {
-      out.append("  #").append(after.rawLines().get(0));
+      out.append(gap).append('#').append(after.rawLines().get(0));
     }
   }
 

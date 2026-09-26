@@ -65,6 +65,12 @@ abstract class Entry implements MutableTomlEntry {
   @Nullable
   SourceSpan span;
 
+  // The header the document wrote the table this entry held under, once that table has been replaced through the
+  // editing API: the table took the span of its header with it, and the spacing before the comment after the header is
+  // read from it. Null otherwise.
+  @Nullable
+  SourceSpan replacedHeaderSpan;
+
   Entry(Value value, List<TomlComment> attachedComments) {
     this.value = value;
     this.attachedComments = attachedComments;
@@ -86,8 +92,30 @@ abstract class Entry implements MutableTomlEntry {
    * @param newValue The replacement value.
    */
   void replace(Value newValue) {
+    if (replacedHeaderSpan == null && value.get() instanceof LinkedTomlTable) {
+      replacedHeaderSpan = ((LinkedTomlTable) value.get()).headerSpan;
+    }
     value = newValue;
     valueModified = true;
+  }
+
+  /**
+   * The spacing the document wrote before the comment after this entry, on the line it was written as or the header of
+   * the table it holds or held.
+   *
+   * @return The spacing, or {@code null} if the document wrote no comment after this entry, or its source is not kept.
+   */
+  @Nullable
+  String commentGap() {
+    SourceSpan line = span;
+    if (line != null && line.commentGap() != null) {
+      return line.commentGap();
+    }
+    SourceSpan header = replacedHeaderSpan;
+    if (header == null && value.get() instanceof LinkedTomlTable) {
+      header = ((LinkedTomlTable) value.get()).headerSpan;
+    }
+    return (header != null) ? header.commentGap() : null;
   }
 
   @Override

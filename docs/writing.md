@@ -62,9 +62,11 @@ anew, in the place the document gives it:
   value is written anew. A value that cannot sit on a line, a table or an array of tables, leaves
   the line and is written as a section, or as sections, after the last line of its parent's subtree,
   with the comment run above the line written above the header and the comment after it written
-  after the header. An array of tables whose entry has a comment stays on the line, written as an
-  array of inline tables, since `[[x]]` sections have no place for the comment. A string holding a
-  newline is written as a multi-line string, and the line keeps its comment.
+  after the header, after the spacing the document wrote before it. A table replaced by another
+  value likewise keeps the spacing before the comment after its header. An array of tables whose
+  entry has a comment stays on the line, written as an array of inline tables, since `[[x]]`
+  sections have no place for the comment. A string holding a newline is written as a multi-line
+  string, and the line keeps its comment.
 * **A new entry** goes after the nearest line of its table: after the last line of the section that
   holds the table, or, for `insertBefore` and `insertAfter`, next to the line of the entry it was
   placed by. It is indented like the entries around it, and named by a key relative to the section
@@ -79,9 +81,11 @@ anew, in the place the document gives it:
   above it and the comment after it. A removed table's whole section is not written. An unattached
   comment stays where it is. A table a dotted key opened that is left with no entries is written
   under a header of its own, since a dotted key needs a value.
-* **A comment set above a line** is indented like the line. A comment set after a value is written
-  two spaces from it; one that replaces another keeps the spacing the document wrote before it, and
-  when one is removed, that spacing is removed with it. An unattached comment added or inserted is
+* **A comment set above a line** is indented like the line. The spacing before a comment after a
+  value is kept wherever the document wrote one: a comment that replaces another keeps it, and so
+  does the comment after a line or header written anew in place of one the document wrote. Where the
+  document wrote no comment, the comment is written two spaces from the value, and when one is
+  removed, its spacing is removed with it. An unattached comment added or inserted is
   written with a blank line below it, and in a table a blank line above it unless it comes after the
   last line of the table, without doubling one the document already has: a run directly under a line
   belongs to the table open there, and one after a blank line to the table of the next expression,

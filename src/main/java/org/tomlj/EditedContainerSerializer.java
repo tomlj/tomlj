@@ -614,13 +614,9 @@ final class EditedContainerSerializer {
    * The spacing the comment after an entry is written at: the document's own where it wrote one there, and the two
    * spaces of the default style where it did not.
    */
-  private String afterSpacing(SourceSpan span) {
-    if (span.afterStart < 0) {
-      return "  ";
-    }
-    // The comment is written after the comma, wherever the document had it, so only a comma before it is skipped
-    int from = (span.commaOffset >= 0 && span.commaOffset < span.afterStart) ? (span.commaOffset + 1) : span.tailStart;
-    return text(from, span.afterStart - 1);
+  private static String afterSpacing(SourceSpan span) {
+    String spacing = span.commentGap();
+    return (spacing != null) ? spacing : "  ";
   }
 
   /** The newline ending an entry's line, or {@code ""} if its tail does not reach one. */
