@@ -21,7 +21,8 @@ import java.util.stream.Collectors;
  *
  * <p>
  * Binding does not stop at the first error: the exception is thrown once every value has been bound, and holds every
- * error found, in document order.
+ * error found, in document order. The exception behind each error that has one, such as an exception thrown by a
+ * converter, is added as a suppressed exception, so its stack trace is printed with this one.
  *
  * @see TomlTable#as(Class)
  */
@@ -38,6 +39,12 @@ public final class TomlBindException extends RuntimeException {
   TomlBindException(List<TomlBindError> errors) {
     super(errors.stream().map(TomlBindError::toString).collect(Collectors.joining("\n")));
     this.errors = Collections.unmodifiableList(errors);
+    for (TomlBindError error : errors) {
+      Throwable cause = error.cause();
+      if (cause != null) {
+        addSuppressed(cause);
+      }
+    }
   }
 
   /**

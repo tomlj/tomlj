@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,6 +38,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -420,6 +422,8 @@ class TomlBindTest {
     assertEquals("timeout", e.errors().get(0).path());
     assertEquals("Text cannot be parsed to a Duration", e.errors().get(0).message());
     assertEquals(1, e.errors().get(0).position().line());
+    assertInstanceOf(DateTimeParseException.class, e.errors().get(0).cause());
+    assertSame(e.errors().get(0).cause(), e.getSuppressed()[0]);
   }
 
   record Port(int value) {
@@ -436,6 +440,15 @@ class TomlBindTest {
   void reportsConstructorExceptionsAtTheTable() {
     TomlBindException e = bindFails("[port]\nvalue = 0", Listener.class);
     assertEquals(List.of("port: port 0 is not between 1 and 65535 (line 1, column 1)"), errors(e));
+    assertInstanceOf(IllegalArgumentException.class, e.errors().get(0).cause());
+    assertEquals(1, e.getSuppressed().length);
+  }
+
+  @Test
+  void keepsNoCauseForErrorsFoundByBinding() {
+    TomlBindException e = bindFails("port = \"x\"", Listener.class);
+    assertNull(e.errors().get(0).cause());
+    assertEquals(0, e.getSuppressed().length);
   }
 
   record Box<T>(T value)
@@ -612,6 +625,7 @@ class TomlBindTest {
     TomlBindException copy = serializedCopy(e);
     assertEquals(e.getMessage(), copy.getMessage());
     assertEquals(e.errors(), copy.errors());
+    assertInstanceOf(IllegalArgumentException.class, copy.errors().get(0).cause());
   }
 
   @SuppressWarnings("unchecked")

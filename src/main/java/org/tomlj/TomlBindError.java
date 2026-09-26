@@ -41,13 +41,23 @@ public final class TomlBindError implements Serializable {
    */
   @Nullable
   private final TomlPosition position;
+  /**
+   * The exception that caused the error, if there was one.
+   */
+  @Nullable
+  private final Throwable cause;
 
   TomlBindError(String path, String message, @Nullable TomlPosition position) {
+    this(path, message, position, null);
+  }
+
+  TomlBindError(String path, String message, @Nullable TomlPosition position, @Nullable Throwable cause) {
     requireNonNull(path);
     requireNonNull(message);
     this.path = path;
     this.message = message;
     this.position = position;
+    this.cause = cause;
   }
 
   /**
@@ -84,6 +94,20 @@ public final class TomlBindError implements Serializable {
   @Nullable
   public TomlPosition position() {
     return position;
+  }
+
+  /**
+   * The exception that caused this error.
+   *
+   * <p>
+   * An exception thrown by a record's constructor or by a converter is reported as an error with its message, and kept
+   * here. The cause is not part of the error's equality or its string form.
+   *
+   * @return The exception thrown, or {@code null} if the error was found by binding itself.
+   */
+  @Nullable
+  public Throwable cause() {
+    return cause;
   }
 
   @Override

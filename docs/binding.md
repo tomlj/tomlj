@@ -278,7 +278,9 @@ A `TomlBindError` has three parts:
   the others.
 
 An exception thrown by a record's constructor or by a converter is reported as an error with the
-exception's message, at the position of the table or value being bound.
+exception's message, at the position of the table or value being bound. The error's `cause()` is
+the exception, and the `TomlBindException` holds each such exception as a suppressed exception, so
+a stack trace printed for it shows where each was thrown.
 
 `TomlBindException` reports a document that does not fit its types. A type that cannot be bound at
 all, whatever the document holds, is a mistake in the program: binding to it throws

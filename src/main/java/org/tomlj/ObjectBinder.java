@@ -242,6 +242,13 @@ final class ObjectBinder {
     }
 
     @Nullable
+    Object thrown(Location location, Throwable e) {
+      String message = e.getMessage();
+      errors.add(new TomlBindError(location.path(), message != null ? message : e.toString(), location.position(), e));
+      return null;
+    }
+
+    @Nullable
     Object typeError(Location location, String expected, Object value) {
       return error(location, "expected " + expected + ", found " + withArticle(TomlType.typeNameFor(value)));
     }
@@ -262,11 +269,6 @@ final class ObjectBinder {
   private static String withArticle(String typeName) {
     char first = typeName.charAt(0);
     return ("aeiou".indexOf(first) >= 0 ? "an " : "a ") + typeName;
-  }
-
-  private static String describe(Throwable e) {
-    String message = e.getMessage();
-    return message != null ? message : e.toString();
   }
 
   private static Binder make(Type type, TomlBindOptions options, Map<Type, Binder> made) {
@@ -496,7 +498,7 @@ final class ObjectBinder {
       try {
         converted = converter.apply(value);
       } catch (RuntimeException e) {
-        return context.error(location, describe(e));
+        return context.thrown(location, e);
       }
       if (converted == null) {
         return context.error(location, "the converter returned null");
@@ -1003,7 +1005,7 @@ final class ObjectBinder {
       try {
         return constructor.newInstance(arguments);
       } catch (InvocationTargetException e) {
-        return context.error(location, describe(e.getCause()));
+        return context.thrown(location, e.getCause());
       } catch (ReflectiveOperationException e) {
         throw new IllegalStateException("Cannot create " + type.getName(), e);
       }
@@ -1045,7 +1047,7 @@ final class ObjectBinder {
       try {
         instance = constructor.newInstance();
       } catch (InvocationTargetException e) {
-        return context.error(location, describe(e.getCause()));
+        return context.thrown(location, e.getCause());
       } catch (ReflectiveOperationException e) {
         throw new IllegalStateException("Cannot create " + type.getName(), e);
       }
