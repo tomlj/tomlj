@@ -300,7 +300,8 @@ is kept. A document written keeping its layout (`TomlWriteOptions.Keep.LAYOUT`, 
 keeps each comment where it was, with the indentation and blank lines it had. A comment set or
 changed through the API is written from the model, as `#`, a space and its text, or a bare `#` when
 the text is empty, indented like the line it is written next to. An `AFTER` comment follows its line
-after two spaces, or after the spacing the document had where it replaces one.
+after the spacing the document wrote before the comment after that entry, where it wrote one, even
+when the line or header is written anew, and otherwise after two spaces.
 
 An unattached comment written anew in a table is separated from the lines around it by a blank line
 above and one below, so that a re-parse reads it as attached to nothing and, by the rule above, in
