@@ -377,10 +377,15 @@ A value that differs is written as `from` writes it:
   `Optional` is removed. A key that names no member is left as it is, so a document can hold keys
   the object does not describe. A map or a `TomlTable` describes the whole table, so a key that it
   does not have is removed.
-- An array is updated in place, index by index: the element at each index is updated as any value
-  is, and elements are added or removed at the end. An element inserted at the start of a list
-  therefore changes every element after it, and the comments within the array stay at their
-  indexes.
+- An array is updated as a line diff changes a file. The elements the document already holds, in
+  the same order and as many as there can be, are left as they are, with their comments. Between
+  two of them, the elements of the document are updated in order by those of the list, as any value
+  is, and the elements left over are inserted or removed. So an element inserted at the start of a
+  list is inserted at the start of the array, and one removed from a list is removed with its
+  comments. An element that is both moved and changed is removed and inserted anew, without its
+  comments. Finding the elements left as they are compares each element of the document with each
+  of the list, from the first that changed to the last; where that is more than 10,000 comparisons,
+  those elements are updated index by index instead.
 - Any other value, or a value of another type than the document has, is replaced. The entry keeps
   its place and the comments attached to it.
 - A key added to a table is added after its other entries.

@@ -184,6 +184,15 @@ final class ObjectWriter {
     Object update(Object existing, Object value, Path path, Context context) {
       return write(value, path, context);
     }
+
+    /**
+     * Whether a value in a document already holds a Java value, so that updating it would leave it as it is.
+     *
+     * @param existing The value in the document, or {@code null} if there is none.
+     * @param value The value, not {@code null}.
+     * @return {@code true} if updating {@code existing} to hold {@code value} would change nothing.
+     */
+    abstract boolean holds(@Nullable Object existing, Object value, Context context);
   }
 
   /**
@@ -273,6 +282,13 @@ final class ObjectWriter {
       return writer.write(value, path, context);
     }
     return writer.update(existing, value, path, context);
+  }
+
+  private static boolean holdsValue(Writer writer, @Nullable Object existing, @Nullable Object value, Context context) {
+    if (value == null) {
+      return existing == null;
+    }
+    return writer.holds(existing, value, context);
   }
 
   /**
@@ -493,6 +509,28 @@ final class ObjectWriter {
       return (isBound(bound) && writesAs(bound, written)) ? KEEP : written;
     }
 
+    @Override
+    boolean holds(@Nullable Object existing, Object value, Context context) {
+      if (existing == null) {
+        return false;
+      }
+      Object bound = bind(existing);
+      if (!isBound(bound)) {
+        return false;
+      }
+      if (Objects.equals(bound, value)) {
+        return true;
+      }
+      Object written;
+      try {
+        written = toToml.apply(value);
+      } catch (RuntimeException e) {
+        // Writing the value reports it, with its path
+        return false;
+      }
+      return writesAs(bound, written);
+    }
+
     /**
      * The value in a document bound to this writer's type, or {@link #NOT_BOUND} if it cannot be.
      */
@@ -557,6 +595,18 @@ final class ObjectWriter {
       return runtimeWriter(value, path, context).update(existing, value, path, context);
     }
 
+    @Override
+    boolean holds(@Nullable Object existing, Object value, Context context) {
+      Writer writer;
+      try {
+        writer = writerFor(runtimeType(value, context.options), context.options);
+      } catch (IllegalArgumentException e) {
+        // Writing the value reports it, with its path
+        return false;
+      }
+      return writer.holds(existing, value, context);
+    }
+
     private static Writer runtimeWriter(Object value, Path path, Context context) {
       try {
         return writerFor(runtimeType(value, context.options), context.options);
@@ -586,16 +636,30 @@ final class ObjectWriter {
       Optional<?> optional = (Optional<?>) value;
       return optional.isPresent() ? element.update(existing, optional.get(), path, context) : null;
     }
+
+    @Override
+    boolean holds(@Nullable Object existing, Object value, Context context) {
+      Optional<?> optional = (Optional<?>) value;
+      return optional.isPresent() ? element.holds(existing, optional.get(), context) : existing == null;
+    }
   }
 
   /**
    * Writes a collection or Java array as an array.
    *
    * <p>
-   * An array in a document is updated element by element: the element at each index is updated in place, and elements
-   * are added or removed at the end, so the comments within the array stay with the elements at the same indexes.
+   * An array in a document is updated as a line diff changes a file. The elements it already holds, in the same order,
+   * are found first, as many as there can be, and left as they are, with their comments. Between two of them, the
+   * elements of the document are updated in place, in order, by the elements of the list, and what is left over of the
+   * list is inserted, or of the document removed.
    */
   private static class ArrayWriter extends Writer {
+    /**
+     * The most pairs of elements compared to find those an array already holds, after the elements it holds at its
+     * start and end. An array with more elements in between is updated in place index by index.
+     */
+    private static final int MAX_COMPARED = 10_000;
+
     private final Writer element;
 
     ArrayWriter(Writer element) {
@@ -626,21 +690,113 @@ final class ObjectWriter {
     void updateArray(MutableTomlArray array, Object value, Path path, Context context) {
       context.enter(value, path);
       List<Object> elements = elements(value);
-      for (int i = 0; i < elements.size(); i++) {
-        Path elementPath = path.index(i);
-        if (i >= array.size()) {
-          array.add(nonNull(writeValue(element, elements.get(i), elementPath, context), elementPath));
-          continue;
+      List<int[]> held = held(array, elements, context);
+      held.add(new int[] {array.size(), elements.size()});
+      // The index in the array as it is being updated, and the next index of the array as it was and of the list
+      int at = 0;
+      int from = 0;
+      int to = 0;
+      for (int[] pair : held) {
+        for (; from < pair[0] && to < pair[1]; from++, to++, at++) {
+          Path elementPath = path.index(to);
+          Object updated = updateValue(element, array.get(at), elements.get(to), elementPath, context);
+          if (!isKept(updated)) {
+            array.set(at, nonNull(updated, elementPath));
+          }
         }
-        Object updated = updateValue(element, array.get(i), elements.get(i), elementPath, context);
-        if (!isKept(updated)) {
-          array.set(i, nonNull(updated, elementPath));
+        for (; to < pair[1]; to++, at++) {
+          Path elementPath = path.index(to);
+          Object written = nonNull(writeValue(element, elements.get(to), elementPath, context), elementPath);
+          if (at == array.size()) {
+            array.add(written);
+          } else {
+            array.insertBefore(at, written);
+          }
         }
-      }
-      while (array.size() > elements.size()) {
-        array.remove(array.size() - 1);
+        for (; from < pair[0]; from++) {
+          array.remove(at);
+        }
+        from++;
+        to++;
+        at++;
       }
       context.exit(value);
+    }
+
+    /**
+     * Find the elements of an array that already hold elements of a list, in the same order, as many as there can be.
+     *
+     * @return The index in the array and the index in the list of each element found, in order.
+     */
+    private List<int[]> held(MutableTomlArray array, List<Object> elements, Context context) {
+      List<int[]> held = new ArrayList<>();
+      int start = 0;
+      int arrayEnd = array.size();
+      int listEnd = elements.size();
+      while (start < arrayEnd
+          && start < listEnd
+          && holdsValue(element, array.get(start), elements.get(start), context)) {
+        held.add(new int[] {start, start});
+        start++;
+      }
+      List<int[]> atEnd = new ArrayList<>();
+      while (arrayEnd > start
+          && listEnd > start
+          && holdsValue(element, array.get(arrayEnd - 1), elements.get(listEnd - 1), context)) {
+        arrayEnd--;
+        listEnd--;
+        atEnd.add(new int[] {arrayEnd, listEnd});
+      }
+
+      int rows = arrayEnd - start;
+      int columns = listEnd - start;
+      if ((long) rows * columns <= MAX_COMPARED) {
+        // The longest common subsequence: longest[i][j] is the most elements held from index i of the array and j of
+        // the list onward
+        boolean[][] holds = new boolean[rows][columns];
+        int[][] longest = new int[rows + 1][columns + 1];
+        for (int i = rows - 1; i >= 0; i--) {
+          for (int j = columns - 1; j >= 0; j--) {
+            holds[i][j] = holdsValue(element, array.get(start + i), elements.get(start + j), context);
+            longest[i][j] = holds[i][j] ? longest[i + 1][j + 1] + 1 : Math.max(longest[i + 1][j], longest[i][j + 1]);
+          }
+        }
+        int i = 0;
+        int j = 0;
+        while (i < rows && j < columns) {
+          if (holds[i][j]) {
+            held.add(new int[] {start + i, start + j});
+            i++;
+            j++;
+          } else if (longest[i + 1][j] >= longest[i][j + 1]) {
+            i++;
+          } else {
+            j++;
+          }
+        }
+      }
+
+      Collections.reverse(atEnd);
+      held.addAll(atEnd);
+      return held;
+    }
+
+    @Override
+    boolean holds(@Nullable Object existing, Object value, Context context) {
+      if (!(existing instanceof MutableTomlArray)) {
+        return false;
+      }
+      MutableTomlArray array = (MutableTomlArray) existing;
+      List<Object> elements = elements(value);
+      if (array.size() != elements.size()) {
+        return false;
+      }
+      for (int i = 0; i < elements.size(); i++) {
+        if (!holdsValue(element, array.get(i), elements.get(i), context)) {
+          return false;
+        }
+      }
+      return true;
     }
 
     private static Object nonNull(@Nullable Object element, Path path) {
@@ -747,6 +903,33 @@ final class ObjectWriter {
         updateEntry(table, entry.getKey(), valueWriter, entry.getValue(), path.key(entry.getKey()), context);
       }
       context.exit(value);
+    }
+
+    @Override
+    boolean holds(@Nullable Object existing, Object value, Context context) {
+      if (!(existing instanceof MutableTomlTable)) {
+        return false;
+      }
+      MutableTomlTable table = (MutableTomlTable) existing;
+      Map<String, Object> byKey = new HashMap<>();
+      for (Map.Entry<?, ?> entry : asMap(value).entrySet()) {
+        if (!(entry.getKey() instanceof CharSequence)) {
+          return false;
+        }
+        byKey.put(entry.getKey().toString(), entry.getValue());
+      }
+      for (String key : table.keySet()) {
+        if (!byKey.containsKey(key)) {
+          return false;
+        }
+      }
+      for (Map.Entry<String, Object> entry : byKey.entrySet()) {
+        Object existingValue = table.get(Collections.singletonList(entry.getKey()));
+        if (!holdsValue(valueWriter, existingValue, entry.getValue(), context)) {
+          return false;
+        }
+      }
+      return true;
     }
 
     /**
@@ -860,6 +1043,22 @@ final class ObjectWriter {
         updateEntry(table, member.key, writers.get(i), member.get(value), path.key(member.key), context);
       }
       context.exit(value);
+    }
+
+    @Override
+    boolean holds(@Nullable Object existing, Object value, Context context) {
+      if (!(existing instanceof MutableTomlTable)) {
+        return false;
+      }
+      MutableTomlTable table = (MutableTomlTable) existing;
+      for (int i = 0; i < members.size(); i++) {
+        ObjectBinder.Member member = members.get(i);
+        Object existingValue = table.get(Collections.singletonList(member.key));
+        if (!holdsValue(writers.get(i), existingValue, member.get(value), context)) {
+          return false;
+        }
+      }
+      return true;
     }
   }
 }

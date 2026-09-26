@@ -729,8 +729,10 @@ public interface MutableTomlArray extends TomlArray {
    * Update this array to hold the elements of a collection or Java array, changing only the values that differ.
    *
    * <p>
-   * The element at each index is updated as {@link MutableTomlTable#update(Object, TomlBindOptions)} updates a value,
-   * and elements are added or removed at the end.
+   * The elements this array already holds, in the same order and as many as there can be, are left as they are, with
+   * their comments. Between two of them, the elements of this array are updated in order by those of the list, as
+   * {@link MutableTomlTable#update(Object, TomlBindOptions)} updates a value, and the elements left over are inserted
+   * or removed.
    *
    * @param value The collection or Java array.
    * @param options The options to write with.

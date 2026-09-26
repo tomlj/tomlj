@@ -1216,8 +1216,9 @@ public interface MutableTomlTable extends TomlTable {
    * <li>A table is updated in place, entry by entry. A key of a record or class that is {@code null} or an empty
    * {@code Optional} is removed, and a key that names no member is left as it is. A key that a map does not have is
    * removed.</li>
-   * <li>An array is updated in place, element by element: the element at each index is updated, and elements are added
-   * or removed at the end.</li>
+   * <li>An array is updated in place: the elements it already holds, in the same order, are left as they are, and
+   * between them its elements are updated in order, and elements are inserted or removed where the list has more or
+   * fewer.</li>
    * <li>Any other value is replaced, keeping its entry and the comments attached to it.</li>
    * </ul>
    * A key added to a table is added after its other entries.

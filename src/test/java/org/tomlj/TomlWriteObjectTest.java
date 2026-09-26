@@ -497,13 +497,13 @@ class TomlWriteObjectTest {
         """;
     TomlParseResult document = parse(toml);
     ZonedDateTime inParis = ZonedDateTime.of(2026, 9, 26, 10, 0, 0, 0, ZoneId.of("Europe/Paris"));
-    List<BigDecimal> prices = List.of(new BigDecimal("1.500"), new BigDecimal("2.00"));
+    List<BigDecimal> prices = List.of(new BigDecimal("0.5"), new BigDecimal("1.500"), new BigDecimal("2.00"));
     document.update(new Written(new BigDecimal("1.500"), inParis, new Label("x"), prices), options);
     assertEquals("""
         price = 1.50
         at = 2026-09-26 10:00:00+02:00
         label = "\\u0078"
-        prices = [1.50, 2.0]
+        prices = [0.5, 1.50, 2.0]
         """, document.toToml());
 
     document.update(new Written(new BigDecimal("2.5"), inParis.plusHours(1), new Label("y"), prices), options);
@@ -511,7 +511,7 @@ class TomlWriteObjectTest {
         price = 2.5
         at = 2026-09-26T11:00:00+02:00
         label = "y"
-        prices = [1.50, 2.0]
+        prices = [0.5, 1.50, 2.0]
         """, document.toToml());
   }
 
@@ -534,6 +534,17 @@ class TomlWriteObjectTest {
     limits.put("c", 3);
     document.getTable("limits").update(limits);
     assertEquals("[limits]\na = 1 # a\nc = 3\n", document.toToml());
+  }
+
+  record Groups(List<TomlTable> group) {}
+
+  @Test
+  void updatesArraysKeepingTheTablesTheyHold() {
+    String source = "[[group]]\na = 1\n[[group]]\na = 2 # two\n";
+    TomlParseResult document = parse(source);
+    Groups groups = Toml.parse(source, TomlParseOptions.defaults().withoutSource()).as(Groups.class);
+    document.update(new Groups(List.of(groups.group().get(1))));
+    assertEquals("[[group]]\na = 2 # two\n", document.toToml());
   }
 
   record Plugins(String name, TomlArray levels, TomlTable settings) {}
@@ -590,6 +601,104 @@ class TomlWriteObjectTest {
     MutableTomlArray ports = document.getArray("ports");
     assertSame(ports, ports.update(new int[] {1, 3}));
     assertEquals("ports = [\n  1, # one\n  3,\n]\n", document.toToml());
+  }
+
+  @Test
+  void updatesArraysKeepingTheElementsTheyHold() {
+    TomlParseResult document = parse("""
+        ports = [
+          8080, # http
+          8443, # https
+        ]
+        """);
+    document.update(Map.of("ports", List.of(80, 8080, 8443)));
+    assertEquals("""
+        ports = [
+          80,
+          8080, # http
+          8443, # https
+        ]
+        """, document.toToml());
+    assertFalse(document.getArray("ports").isModified(1));
+
+    document.update(Map.of("ports", List.of(80, 8443)));
+    assertEquals("""
+        ports = [
+          80,
+          8443, # https
+        ]
+        """, document.toToml());
+  }
+
+  record Servers(List<Server> servers) {}
+
+  @Test
+  void updatesArraysOfTablesKeepingTheTablesTheyHold() {
+    TomlParseResult document = parse("""
+        [[servers]] # a
+        host = "alpha"
+        port = 8001
+
+        [[servers]] # b
+        host = "beta"
+        port = 8002
+
+        [[servers]] # g
+        host = "gamma"
+        port = 8003
+        """);
+    document
+        .update(
+            new Servers(
+                List
+                    .of(
+                        new Server("zeta", 8000),
+                        new Server("alpha", 8001),
+                        new Server("beta", 9002),
+                        new Server("gamma", 8003))));
+    assertEquals("""
+        [[servers]]
+        host = "zeta"
+        port = 8000
+
+        [[servers]] # a
+        host = "alpha"
+        port = 8001
+
+        [[servers]] # b
+        host = "beta"
+        port = 9002
+
+        [[servers]] # g
+        host = "gamma"
+        port = 8003
+        """, document.toToml());
+  }
+
+  @Test
+  void updatesArraysToHoldTheirList() {
+    List<List<Integer>> lists = new ArrayList<>();
+    lists.add(List.of());
+    lists.add(List.of(1, 2, 3));
+    lists.add(List.of(3, 2, 1));
+    lists.add(List.of(1, 4, 2, 5, 3));
+    lists.add(List.of(2, 2, 2));
+    lists.add(List.of(9, 1, 9));
+    List<Integer> large = new ArrayList<>();
+    List<Integer> reversed = new ArrayList<>();
+    for (int i = 0; i < 300; i++) {
+      large.add(i);
+      reversed.add(0, i);
+    }
+    lists.add(large);
+    lists.add(reversed);
+    for (List<Integer> from : lists) {
+      for (List<Integer> to : lists) {
+        TomlParseResult document = parse("values = " + MutableTomlArray.from(from).toToml() + "\n");
+        document.update(Map.of("values", to));
+        assertEquals(to, parse(document.toToml()).getArray("values").as(new GenericType<List<Integer>>() {}));
+      }
+    }
   }
 
   @Test
