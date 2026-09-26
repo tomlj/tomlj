@@ -1,10 +1,11 @@
 # Binding to Java objects
 
 `as` binds a table or an array to a Java type: a record, a class, a collection, a map or a Java
-array. The values are converted to the types declared for them, and every value that cannot be
-bound is reported with its path and position. `from` and `update` do the reverse, writing an object
-as a table or into a document. This document states which types are bound and how, which keys are
-missing or unknown, how errors are reported, and how objects are written.
+array, and `Toml.parseAs` parses a document and binds it in one call. The values are converted to
+the types declared for them, and every value that cannot be bound is reported with its path and
+position. `from` and `update` do the reverse, writing an object as a table or into a document.
+This document states which types are bound and how, which keys are missing or unknown, how errors
+are reported, and how objects are written.
 
 Binding copies values out of the document. The objects it creates are not connected to the table
 they were bound from, and changing one does not change the other.
@@ -16,8 +17,7 @@ record Server(String host, int port) {}
 
 record Config(String name, List<Server> servers) {}
 
-TomlParseResult result = Toml.parse(Paths.get("config.toml"));
-Config config = result.as(Config.class);
+Config config = Toml.parseAs(Paths.get("config.toml"), Config.class);
 ```
 
 ```toml
@@ -36,22 +36,31 @@ Each key of the table is bound to the record component, or the field of a class,
 name, and each value to the type declared for it. The binding goes as deep as the types do: here
 each table of the array `servers` is bound to a `Server`.
 
-Any table or array of a document can be bound on its own, not only the document itself:
+`Toml.parseAs` parses a `String` or a file and binds the document. A document with any parse error
+is not bound: `parseAs` throws a `TomlParseException`, whose `errors()` lists every parse error. The
+document is parsed without its source text (see `TomlParseOptions.withoutSource()`), so a table or
+array bound to `TomlTable`, `TomlArray` or `Object` keeps none either, and `toToml()` writes it in
+the default style.
+
+`as` binds a table or array already parsed: a parse result, or any table or array within it. It
+suits a document parsed with other options, or one bound more than once or in parts:
 
 ```java
+TomlParseResult result = Toml.parse(Paths.get("config.toml"));
 Server first = result.getArray("servers").getTable(0).as(Server.class);
 Server[] servers = result.getArray("servers").as(Server[].class);
 ```
 
-`as(Class)` binds with the default options, and `as(Class, TomlBindOptions)` with the options
-given. `TomlBindOptions` is immutable: `defaults()` gives the default options, and each `with`
-method returns a copy with one option changed. Options also hold what they learn about each Java
-type bound with them, so one set of options kept and reused for many bindings examines each class
-only once.
+`parseAs(file, Class)` and `as(Class)` bind with the default options, and
+`parseAs(file, Class, TomlBindOptions)` and `as(Class, TomlBindOptions)` with the options given.
+`TomlBindOptions` is immutable: `defaults()` gives the default options, and each `with` method
+returns a copy with one option changed. Options also hold what they learn about each Java type bound
+with them, so one set of options kept and reused for many bindings examines each class only once.
 
-A parse result with errors is bound as it is: a value that parsed is bound, and a key on a line that
-could not be parsed is missing from the result, so it is bound as any missing key is (see
-[Missing keys](#missing-keys)). Check `hasErrors()` first to report parse errors on their own.
+`as` binds a parse result with errors as it is: a value that parsed is bound, and a key on a line
+that could not be parsed is missing from the result, so it is bound as any missing key is (see
+[Missing keys](#missing-keys)). Check `hasErrors()` first to report parse errors on their own, as
+`parseAs` does.
 
 ## Records
 
@@ -376,6 +385,9 @@ Config config = document.as(Config.class);
 document.update(new Config("staging", config.servers()));
 Files.writeString(source, document.toToml());
 ```
+
+The document is parsed with `Toml.parse`, not `parseAs`, since `parseAs` keeps no source text to
+write it back from.
 
 Each value is compared with the value in the document by binding the document's value to the type
 of the member. If that gives an equal value, or one that writes as the same TOML value, such as the

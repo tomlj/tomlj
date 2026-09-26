@@ -27,12 +27,15 @@ import org.tomlj.bindtest.Unloadable;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.ref.WeakReference;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -52,6 +55,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class TomlBindTest {
 
@@ -582,6 +586,72 @@ class TomlBindTest {
     // The key on the line the parser rejected is also reported as missing
     TomlBindException e = assertThrows(TomlBindException.class, () -> result.as(StrictConfig.class));
     assertEquals(List.of("tags: missing (line 1, column 1)"), errors(e));
+  }
+
+  @Test
+  void parsesAndBindsAString() {
+    Config config = Toml.parseAs("""
+        name = "demo"
+        tags = ["a", "b"]
+
+        [server]
+        host = "localhost"
+        port = 8080
+        """, Config.class);
+    assertEquals(new Config("demo", new Server("localhost", 8080), List.of("a", "b")), config);
+  }
+
+  @Test
+  void parsesAndBindsAFile(@TempDir Path dir) throws IOException {
+    Path file = dir.resolve("config.toml");
+    Files.writeString(file, "name = \"demo\"\n\n[server]\nhost = \"localhost\"\nport = 8080\n");
+    assertEquals(new Config("demo", new Server("localhost", 8080), null), Toml.parseAs(file, Config.class));
+
+    Map<String, Object> map = Toml.parseAs(file, new GenericType<Map<String, Object>>() {});
+    assertEquals(List.of("name", "server"), new ArrayList<>(map.keySet()));
+  }
+
+  @Test
+  void parsesAndBindsWithOptions() {
+    TomlBindOptions options = TomlBindOptions.defaults().withUnknownKeysIgnored(true);
+    assertEquals(new Server("a", 1), Toml.parseAs("host = \"a\"\nport = 1\nweight = 2", Server.class, options));
+    assertEquals(
+        Map.of("a", new Server("a", 1)),
+        Toml.parseAs("[a]\nhost = \"a\"\nport = 1\nweight = 2", new GenericType<Map<String, Server>>() {}, options));
+  }
+
+  @Test
+  void bindsNothingFromADocumentWithParseErrors() {
+    // The bind errors this document would also have are not reported
+    TomlParseException e = assertThrows(
+        TomlParseException.class,
+        () -> Toml.parseAs("name = \"demo\"\ntags = [\nport = \"x\"\nname = 1", StrictConfig.class));
+    assertEquals(
+        List
+            .of(
+                "Unexpected end of line, expected ] or a value (line 2, column 9)",
+                "name previously defined at line 1, column 1 (line 4, column 1)"),
+        e.errors().stream().map(TomlParseError::toString).collect(Collectors.toList()));
+    assertEquals(String.join("\n", e.errors().stream().map(TomlParseError::toString).toList()), e.getMessage());
+  }
+
+  @Test
+  void serializesParseExceptions() throws Exception {
+    TomlParseException e = assertThrows(TomlParseException.class, () -> Toml.parseAs("name = ", StrictConfig.class));
+    TomlParseException copy = serializedCopy(e);
+    assertEquals(e.getMessage(), copy.getMessage());
+    assertEquals(
+        e.errors().stream().map(TomlParseError::toString).toList(),
+        copy.errors().stream().map(TomlParseError::toString).toList());
+  }
+
+  record Plugins(String name, TomlTable plugins) {}
+
+  @Test
+  void parsesWithoutSourceToBind() {
+    // A table bound to TomlTable keeps no source text, so it is written in the default style
+    Plugins bound = Toml.parseAs("name = \"demo\"\n\n[plugins]\nmask = 0x1F\n", Plugins.class);
+    assertEquals("mask = 31\n", bound.plugins().toToml());
   }
 
   @Test

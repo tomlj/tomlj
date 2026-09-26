@@ -48,10 +48,10 @@ if (port > 65535) {
   the parsed source except where it was edited: comments, blank lines, key order, indentation and
   the notation of each value (`0xFF`, `'literal'`, `{ a = 1 }`) stay as they were written. See
   [Writing TOML](#writing-toml).
-* **Tables bind to records and classes, and back.** `result.as(Config.class)` binds a document to
-  a record or a class, converting each value to the type declared for it, and reports every value
-  that does not fit with its path and position. `result.update(config)` writes a changed object
-  back into the document, touching only the values that differ. See
+* **Tables bind to records and classes, and back.** `Toml.parseAs(file, Config.class)` binds a
+  document to a record or a class, converting each value to the type declared for it, and reports
+  every value that does not fit with its path and position. `result.update(config)` writes a
+  changed object back into the document, touching only the values that differ. See
   [Binding to Java objects](#binding-to-java-objects).
 * **A typed getter for every TOML type**, returning `String`, `Long`, `Double`, `Boolean`,
   `TomlArray` or `TomlTable`, and the four date and time types as `java.time`'s `OffsetDateTime`,
@@ -155,14 +155,15 @@ of edit lands, what each amount keeps, the default style and the options.
 
 ### Binding to Java objects
 
-`as` binds a table or an array to a record, a class, a collection, a map or a Java array:
+`Toml.parseAs` parses a document and binds it to a record, a class or a map, and `as` binds any
+table or array of a parsed document to a record, a class, a collection, a map or a Java array:
 
 ```java
 record Server(String host, int port) {}
 
 record Config(String name, List<Server> servers) {}
 
-Config config = Toml.parse(source).as(Config.class);
+Config config = Toml.parseAs(source, Config.class);
 ```
 
 Each key is bound to the record component or field of the same name, or of another style of name
@@ -177,6 +178,9 @@ error unless the options ignore unknown keys. Binding reports every error at onc
 servers[1].port: expected an integer, found a string (line 9, column 8)
 servers[1].hots: unknown key (line 10, column 1)
 ```
+
+`parseAs` binds nothing from a document with parse errors, and reports them in a
+`TomlParseException`.
 
 Converters in `TomlBindOptions` bind other types, such as `Duration`, and a `GenericType` names a
 generic type, such as `Map<String, Server>`.
