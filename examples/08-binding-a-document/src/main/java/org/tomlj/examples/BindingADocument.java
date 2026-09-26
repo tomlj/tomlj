@@ -14,7 +14,7 @@ package org.tomlj.examples;
 
 import org.tomlj.Toml;
 import org.tomlj.TomlBindException;
-import org.tomlj.TomlParseResult;
+import org.tomlj.TomlParseException;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -41,20 +41,19 @@ public final class BindingADocument {
 
   public static void main(String[] args) throws IOException {
     Path file = Path.of(args.length > 0 ? args[0] : "config.toml");
-    TomlParseResult result = Toml.parse(file);
-    if (result.hasErrors()) {
-      result.errors().forEach(error -> System.err.println(error.toString()));
-      System.exit(1);
-    }
-
+    // parseAs parses the file and binds the document in one call.
     try {
-      Config config = result.as(Config.class);
+      Config config = Toml.parseAs(file, Config.class);
       System.out.println(config.title() + " listens on " + config.server().host() + ":" + config.server().port());
       System.out.println("database pool: " + config.database().pool().min() + " to " + config.database().pool().max());
       for (Warehouse warehouse : config.warehouse()) {
         System.out
             .println("warehouse " + warehouse.name() + ", opened " + warehouse.opened() + ", bins " + warehouse.bins());
       }
+    } catch (TomlParseException e) {
+      // A file with parse errors is not bound. The exception holds every parse error.
+      e.errors().forEach(error -> System.err.println(error.toString()));
+      System.exit(1);
     } catch (TomlBindException e) {
       // Binding throws once every value has been bound, with each value that does not fit the type declared for it.
       // Each error prints with its path and position.

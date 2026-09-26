@@ -12,7 +12,6 @@
  */
 package org.tomlj.examples;
 
-import org.tomlj.MutableTomlTable;
 import org.tomlj.Toml;
 import org.tomlj.TomlBindException;
 import org.tomlj.TomlBindOptions;
@@ -86,8 +85,7 @@ public final class WritingBoundRecords {
         Duration.ofSeconds(45),
         List.of(8080),
         List.of(new Service("web", "registry.example.com/web:1.5", 512)));
-    MutableTomlTable stagingDocument = MutableTomlTable.from(staging, OPTIONS);
-    String written = stagingDocument.toToml();
+    String written = Toml.toToml(staging, OPTIONS);
     System.out.println(written);
   }
 

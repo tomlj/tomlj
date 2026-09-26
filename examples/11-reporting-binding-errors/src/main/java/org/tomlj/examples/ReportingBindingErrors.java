@@ -14,7 +14,7 @@ package org.tomlj.examples;
 
 import org.tomlj.Toml;
 import org.tomlj.TomlBindException;
-import org.tomlj.TomlParseResult;
+import org.tomlj.TomlParseException;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -54,17 +54,14 @@ public final class ReportingBindingErrors {
   }
 
   private static void bind(Path file) throws IOException {
-    TomlParseResult result = Toml.parse(file);
-    if (result.hasErrors()) {
-      result.errors().forEach(error -> System.err.println(error.toString()));
-      System.exit(1);
-    }
-
     // Binding does not stop at the first error: every value is bound, and the errors are thrown together, in the order
     // of the document.
     try {
-      Pipeline pipeline = result.as(Pipeline.class);
+      Pipeline pipeline = Toml.parseAs(file, Pipeline.class);
       System.out.println(file + ": " + pipeline.step().size() + " steps");
+    } catch (TomlParseException e) {
+      e.errors().forEach(error -> System.err.println(error.toString()));
+      System.exit(1);
     } catch (TomlBindException e) {
       // Each error prints as its path, what is wrong, and its position. path(), message() and position() give the
       // parts, for a program that reports errors in its own format.

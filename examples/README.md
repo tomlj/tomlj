@@ -118,11 +118,11 @@ example ends by printing a reference of the settings, described by their comment
 ### 08-binding-a-document
 
 Binds `config.toml`, the file `01-reading-a-document` reads with getters, to a tree of records with
-`as(Config.class)`. Each key is bound to the record component of the same name, and each value to
-the component's type: `[server]` to a nested record, `opened` to a `LocalDate`, and each
-`[[warehouse]]` to an element of a `List`. A document whose values do not fit the records makes `as`
-throw a `TomlBindException`, and the example prints its errors, each with its path and position,
-as it prints parse errors.
+`Toml.parseAs(file, Config.class)`, which parses the file and binds it in one call. Each key is
+bound to the record component of the same name, and each value to the component's type: `[server]`
+to a nested record, `opened` to a `LocalDate`, and each `[[warehouse]]` to an element of a `List`. A
+file with parse errors makes `parseAs` throw a `TomlParseException`, and one whose values do not fit
+the records a `TomlBindException`; the example prints the errors of either, each with its position.
 
 ### 09-binding-to-records
 
@@ -171,7 +171,7 @@ the web service gets a new image, and a third service is added at the end of the
 Every comment stays, and each unchanged value keeps the way it is written, such as `memory = 0x200`,
 and `timeout = "30s"`, which the converter reads back as the same `Duration`. The converter is
 registered with a second function that writes a `Duration`, which is needed to write one at all.
-The example ends by writing new records as a new document with `MutableTomlTable.from`.
+The example ends by writing new records as a new document with `Toml.toToml`.
 
 [docs/editing.md](../docs/editing.md), [docs/writing.md](../docs/writing.md),
 [docs/comments.md](../docs/comments.md) and [docs/binding.md](../docs/binding.md) describe editing,
