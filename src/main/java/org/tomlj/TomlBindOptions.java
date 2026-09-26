@@ -26,13 +26,16 @@ import java.util.function.Function;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
- * Options controlling how a table or array is bound to a Java type.
+ * Options controlling how a table or array is bound to a Java type, and how a Java object is written as a table or
+ * array.
  *
  * <p>
- * Options are immutable, and hold what they learn about each Java type bound with them, so reusing one set of options
- * for many bindings avoids examining the same classes again.
+ * Options are immutable, and hold what they learn about each Java type bound or written with them, so reusing one set
+ * of options for many bindings avoids examining the same classes again.
  *
  * @see TomlTable#as(Class, TomlBindOptions)
+ * @see MutableTomlTable#from(Object, TomlBindOptions)
+ * @see MutableTomlTable#update(Object, TomlBindOptions)
  */
 public final class TomlBindOptions {
 
@@ -98,29 +101,44 @@ public final class TomlBindOptions {
       KeyNaming.EXACT,
       false,
       Collections.<Class<?>, Function<Object, ?>>emptyMap(),
-      new OnClassCache<ObjectBinder.Binder>());
+      Collections.<Class<?>, Function<Object, ?>>emptyMap(),
+      new OnClassCache<ObjectBinder.Binder>(),
+      new OnClassCache<ObjectWriter.Writer>());
 
   private final KeyNaming keyNaming;
   private final boolean ignoresUnknownKeys;
   private final Map<Class<?>, Function<Object, ?>> converters;
+  private final Map<Class<?>, Function<Object, ?>> writeConverters;
   private final TypeCache<ObjectBinder.Binder> binders;
+  private final TypeCache<ObjectWriter.Writer> writers;
 
   private TomlBindOptions(
       KeyNaming keyNaming,
       boolean ignoresUnknownKeys,
-      Map<Class<?>, Function<Object, ?>> converters) {
-    this(keyNaming, ignoresUnknownKeys, converters, new MapCache<ObjectBinder.Binder>());
+      Map<Class<?>, Function<Object, ?>> converters,
+      Map<Class<?>, Function<Object, ?>> writeConverters) {
+    this(
+        keyNaming,
+        ignoresUnknownKeys,
+        converters,
+        writeConverters,
+        new MapCache<ObjectBinder.Binder>(),
+        new MapCache<ObjectWriter.Writer>());
   }
 
   private TomlBindOptions(
       KeyNaming keyNaming,
       boolean ignoresUnknownKeys,
       Map<Class<?>, Function<Object, ?>> converters,
-      TypeCache<ObjectBinder.Binder> binders) {
+      Map<Class<?>, Function<Object, ?>> writeConverters,
+      TypeCache<ObjectBinder.Binder> binders,
+      TypeCache<ObjectWriter.Writer> writers) {
     this.keyNaming = keyNaming;
     this.ignoresUnknownKeys = ignoresUnknownKeys;
     this.converters = converters;
+    this.writeConverters = writeConverters;
     this.binders = binders;
+    this.writers = writers;
   }
 
   /**
@@ -141,7 +159,7 @@ public final class TomlBindOptions {
    */
   public TomlBindOptions withKeyNaming(KeyNaming keyNaming) {
     requireNonNull(keyNaming);
-    return new TomlBindOptions(keyNaming, ignoresUnknownKeys, converters);
+    return new TomlBindOptions(keyNaming, ignoresUnknownKeys, converters, writeConverters);
   }
 
   /**
@@ -156,7 +174,7 @@ public final class TomlBindOptions {
    * @return A new set of options.
    */
   public TomlBindOptions withUnknownKeysIgnored(boolean ignored) {
-    return new TomlBindOptions(keyNaming, ignored, converters);
+    return new TomlBindOptions(keyNaming, ignored, converters, writeConverters);
   }
 
   /**
@@ -170,7 +188,8 @@ public final class TomlBindOptions {
    *
    * <p>
    * A converter is used for fields, components and elements declared with exactly this type, and takes the place of the
-   * binding TomlJ would use otherwise. A converter registered earlier for the same type is replaced.
+   * binding TomlJ would use otherwise. A converter registered earlier for the same type is replaced, and values of the
+   * type cannot be written as TOML; see {@link #withConverter(Class, Function, Function)} to write them.
    *
    * <pre>{@code
    * TomlBindOptions options =
@@ -187,7 +206,58 @@ public final class TomlBindOptions {
     requireNonNull(converter);
     Map<Class<?>, Function<Object, ?>> newConverters = new HashMap<>(converters);
     newConverters.put(type, converter);
-    return new TomlBindOptions(keyNaming, ignoresUnknownKeys, Collections.unmodifiableMap(newConverters));
+    Map<Class<?>, Function<Object, ?>> newWriteConverters = new HashMap<>(writeConverters);
+    newWriteConverters.remove(type);
+    return new TomlBindOptions(
+        keyNaming,
+        ignoresUnknownKeys,
+        Collections.unmodifiableMap(newConverters),
+        Collections.unmodifiableMap(newWriteConverters));
+  }
+
+  /**
+   * Create a copy of these options that binds values to a type with a converter, and writes values of the type with
+   * another.
+   *
+   * <p>
+   * {@code read} binds values as the converter given to {@link #withConverter(Class, Function)} does. {@code write} is
+   * given a value of the type, never {@code null}, when an object is written as TOML, and returns the TOML value to
+   * write for it: any value {@link MutableTomlTable#set(String, Object)} accepts, such as a {@code String}, a number, a
+   * {@code Map}, a {@code List}, or a {@link TomlValue} to choose how it is written. If it throws a
+   * {@code RuntimeException} or returns {@code null}, writing throws {@code IllegalArgumentException}.
+   *
+   * <p>
+   * When a document is updated from an object, a value in the document is left as it is if {@code read} converts it to
+   * a value equal to the one being written, so {@code write} does not have to return the same text as the document
+   * holds.
+   *
+   * <pre>{@code
+   * TomlBindOptions options = TomlBindOptions
+   *     .defaults()
+   *     .withConverter(Duration.class, value -> Duration.parse((String) value), Duration::toString);
+   * }</pre>
+   *
+   * @param type The type the converters produce and write.
+   * @param read The converter from TOML values.
+   * @param write The converter to TOML values.
+   * @param <T> The type the converters produce and write.
+   * @return A new set of options with the given converters.
+   */
+  public <T> TomlBindOptions withConverter(
+      Class<T> type,
+      Function<Object, ? extends T> read,
+      Function<? super T, ?> write) {
+    requireNonNull(write);
+    TomlBindOptions withRead = withConverter(type, read);
+    Map<Class<?>, Function<Object, ?>> newWriteConverters = new HashMap<>(writeConverters);
+    @SuppressWarnings("unchecked")
+    Function<Object, ?> writer = (Function<Object, ?>) write;
+    newWriteConverters.put(type, writer);
+    return new TomlBindOptions(
+        keyNaming,
+        ignoresUnknownKeys,
+        withRead.converters,
+        Collections.unmodifiableMap(newWriteConverters));
   }
 
   /**
@@ -213,12 +283,21 @@ public final class TomlBindOptions {
     return converters.get(type);
   }
 
+  @Nullable
+  Function<Object, ?> writeConverterFor(Class<?> type) {
+    return writeConverters.get(type);
+  }
+
   TypeCache<ObjectBinder.Binder> binders() {
     return binders;
   }
 
+  TypeCache<ObjectWriter.Writer> writers() {
+    return writers;
+  }
+
   /**
-   * The binder made for each Java type, so that each is made once.
+   * The binder or writer made for each Java type, so that each is made once.
    */
   interface TypeCache<T> {
     @Nullable
@@ -248,7 +327,7 @@ public final class TomlBindOptions {
   /**
    * Keeps a class's value with the class, so it holds nothing that outlives the class. A generic type, such as
    * {@code List<Server>}, is not kept: its value would be kept with {@code List}, and would hold {@code Server}. A
-   * binder made for a class holds those it made for its members, so they are made once all the same.
+   * binder or writer made for a class holds those it made for its members, so they are made once all the same.
    */
   private static final class OnClassCache<T> implements TypeCache<T> {
     private final ClassValue<AtomicReference<T>> values = new ClassValue<AtomicReference<T>>() {
@@ -283,12 +362,13 @@ public final class TomlBindOptions {
     TomlBindOptions other = (TomlBindOptions) obj;
     return this.keyNaming == other.keyNaming
         && this.ignoresUnknownKeys == other.ignoresUnknownKeys
-        && this.converters.equals(other.converters);
+        && this.converters.equals(other.converters)
+        && this.writeConverters.equals(other.writeConverters);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(keyNaming, ignoresUnknownKeys, converters);
+    return Objects.hash(keyNaming, ignoresUnknownKeys, converters, writeConverters);
   }
 
   @Override
@@ -299,6 +379,8 @@ public final class TomlBindOptions {
         + ignoresUnknownKeys
         + ", converters="
         + converters.keySet()
+        + ", writeConverters="
+        + writeConverters.keySet()
         + '}';
   }
 }

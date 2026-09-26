@@ -579,7 +579,8 @@ class TomlBindTest {
     };
     Class<?> type = loader.loadClass(name);
     assertNotSame(Unloadable.class, type);
-    assertEquals(type, Toml.parse("name = \"a\"").as(type).getClass());
+    Object bound = Toml.parse("name = \"a\"").as(type);
+    assertEquals("name = \"a\"\n", MutableTomlTable.from(bound).toToml());
     return new WeakReference<>(loader);
   }
 

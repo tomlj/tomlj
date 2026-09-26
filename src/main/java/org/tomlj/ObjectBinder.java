@@ -180,12 +180,7 @@ final class ObjectBinder {
       if (parent == null) {
         return "";
       }
-      String parentPath = parent.path();
-      if (key != null) {
-        String quoted = Toml.joinKeyPath(Collections.singletonList(key));
-        return parentPath.isEmpty() ? quoted : parentPath + "." + quoted;
-      }
-      return parentPath + "[" + index + "]";
+      return key != null ? keyPath(parent.path(), key) : indexPath(parent.path(), index);
     }
 
     /**
@@ -214,6 +209,21 @@ final class ObjectBinder {
       }
       return position();
     }
+  }
+
+  /**
+   * The path of a key of the value at a path, as {@link TomlBindError#path()} gives it.
+   */
+  static String keyPath(String parentPath, String key) {
+    String quoted = Toml.joinKeyPath(Collections.singletonList(key));
+    return parentPath.isEmpty() ? quoted : parentPath + "." + quoted;
+  }
+
+  /**
+   * The path of an element of the array at a path, as {@link TomlBindError#path()} gives it.
+   */
+  static String indexPath(String parentPath, int index) {
+    return parentPath + "[" + index + "]";
   }
 
   static final class Context {
@@ -298,9 +308,7 @@ final class ObjectBinder {
       return collectionBinder(collectionFactory(raw), make(elementType, options, made));
     }
     if (Map.class.isAssignableFrom(raw)) {
-      Type keyType = typeArgument(type, Map.class, 0);
-      Class<?> keyClass = rawClass(keyType);
-      if (keyClass != String.class && keyClass != Object.class && keyClass != CharSequence.class) {
+      if (!hasStringKeys(type)) {
         throw new IllegalArgumentException(
             "Cannot bind to " + type.getTypeName() + ": the keys of a map must be strings");
       }
@@ -683,15 +691,37 @@ final class ObjectBinder {
     }
   }
 
-  private static void checkBindableClass(Class<?> raw, Type type) {
-    String reason = null;
+  /**
+   * Whether the keys of a map type are strings, as the keys of a table are.
+   */
+  static boolean hasStringKeys(Type mapType) {
+    Class<?> keyClass = rawClass(typeArgument(mapType, Map.class, 0));
+    return keyClass == String.class || keyClass == Object.class || keyClass == CharSequence.class;
+  }
+
+  /**
+   * Why a class cannot be bound or written by reflection, member by member, or {@code null} if it can be.
+   *
+   * @param raw The class.
+   * @param verb What is done with it: {@code "bind to"} or {@code "write"}.
+   */
+  @Nullable
+  static String notReflectedReason(Class<?> raw, String verb) {
     if (raw.isPrimitive()) {
-      reason = "it is a primitive type";
-    } else if (raw.isInterface() || Modifier.isAbstract(raw.getModifiers())) {
-      reason = "it is an interface or abstract class";
-    } else if (raw.getName().startsWith("java.") || raw.getName().startsWith("javax.")) {
-      reason = "TomlJ does not bind to it";
-    } else if (raw.isMemberClass() && !Modifier.isStatic(raw.getModifiers())) {
+      return "it is a primitive type";
+    }
+    if (raw.isInterface() || Modifier.isAbstract(raw.getModifiers())) {
+      return "it is an interface or abstract class";
+    }
+    if (raw.getName().startsWith("java.") || raw.getName().startsWith("javax.")) {
+      return "TomlJ does not " + verb + " it";
+    }
+    return null;
+  }
+
+  private static void checkBindableClass(Class<?> raw, Type type) {
+    String reason = notReflectedReason(raw, "bind to");
+    if (reason == null && raw.isMemberClass() && !Modifier.isStatic(raw.getModifiers())) {
       reason = "it is an inner class; make it static";
     }
     if (reason != null) {
