@@ -508,33 +508,65 @@ final class ObjectBinder {
   }
 
   private static Binder enumBinder(Class<?> raw) {
-    Object[] constants = raw.getEnumConstants();
+    Map<Object, String> names = enumNames(raw);
     return (value, location, context) -> {
       if (!(value instanceof String)) {
         return context.typeError(location, "a string", value);
       }
       String s = (String) value;
-      for (Object constant : constants) {
-        if (((Enum<?>) constant).name().equals(s)) {
-          return constant;
+      for (Map.Entry<Object, String> entry : names.entrySet()) {
+        if (entry.getValue().equals(s)) {
+          return entry.getKey();
         }
       }
       String normalized = s.replace('-', '_').replace(' ', '_');
-      for (Object constant : constants) {
-        if (((Enum<?>) constant).name().equalsIgnoreCase(normalized)) {
-          return constant;
+      for (Map.Entry<Object, String> entry : names.entrySet()) {
+        String name = ((Enum<?>) entry.getKey()).name();
+        if (entry.getValue().equals(name) && name.equalsIgnoreCase(normalized)) {
+          return entry.getKey();
         }
       }
-      StringBuilder names = new StringBuilder();
-      for (Object constant : constants) {
-        if (names.length() > 0) {
-          names.append(", ");
-        }
-        names.append(((Enum<?>) constant).name());
-      }
-      return context.error(location, "\"" + s + "\" is not one of " + names);
+      return context.error(location, "\"" + s + "\" is not one of " + String.join(", ", names.values()));
     };
   }
+
+  /**
+   * The constants of an enum, in order, each with the string it is written as: the value of its {@link TomlName}
+   * annotation, or else its name.
+   *
+   * @throws IllegalArgumentException If two constants have the same string.
+   */
+  static Map<Object, String> enumNames(Class<?> raw) {
+    Map<Object, String> names = new LinkedHashMap<>();
+    for (Object constant : raw.getEnumConstants()) {
+      String name = ((Enum<?>) constant).name();
+      TomlName tomlName;
+      try {
+        tomlName = raw.getField(name).getAnnotation(TomlName.class);
+      } catch (NoSuchFieldException e) {
+        throw new IllegalStateException("Enum " + raw.getName() + " has no field for " + name, e);
+      }
+      names.put(constant, tomlName != null ? tomlName.value() : name);
+    }
+    Map<String, Object> byName = new HashMap<>();
+    for (Map.Entry<Object, String> entry : names.entrySet()) {
+      Object previous = byName.put(entry.getValue(), entry.getKey());
+      if (previous != null) {
+        throw new IllegalArgumentException(
+            "Cannot bind to "
+                + raw.getName()
+                + ": "
+                + ((Enum<?>) previous).name()
+                + " and "
+                + ((Enum<?>) entry.getKey()).name()
+                + " are both named \""
+                + entry.getValue()
+                + "\"");
+      }
+    }
+    return names;
+  }
+
 
   private static Binder arrayBinder(Class<?> componentClass, Binder component) {
     return (value, location, context) -> {

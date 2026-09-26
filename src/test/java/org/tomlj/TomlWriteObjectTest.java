@@ -128,6 +128,23 @@ class TomlWriteObjectTest {
     assertEquals(When.ON_SUCCESS, back.when());
   }
 
+  enum Trigger {
+    @TomlName("always")
+    RUN_ALWAYS, ON_SUCCESS
+  }
+
+  record Triggers(Trigger first, Trigger second) {}
+
+  @Test
+  void writesEnumConstantsByTheirTomlName() {
+    Triggers triggers = new Triggers(Trigger.RUN_ALWAYS, Trigger.ON_SUCCESS);
+    assertEquals("""
+        first = "always"
+        second = "ON_SUCCESS"
+        """, MutableTomlTable.from(triggers).toToml());
+    assertEquals(triggers, MutableTomlTable.from(triggers).as(Triggers.class));
+  }
+
   record WithMissing(String name, @Nullable String description, Optional<Integer> backlog) {}
 
   @Test

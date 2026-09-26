@@ -356,6 +356,30 @@ class TomlBindTest {
     }
   }
 
+  enum Trigger {
+    @TomlName("always")
+    RUN_ALWAYS, ON_SUCCESS
+  }
+
+  record TriggerHolder(Trigger when) {}
+
+  @Test
+  void bindsEnumConstantsByTheirTomlName() {
+    assertEquals(Trigger.RUN_ALWAYS, Toml.parse("when = \"always\"").as(TriggerHolder.class).when());
+    assertEquals(Trigger.ON_SUCCESS, Toml.parse("when = \"on-success\"").as(TriggerHolder.class).when());
+    for (String when : List.of("RUN_ALWAYS", "run-always", "Always")) {
+      TomlBindException e = bindFails("when = \"" + when + "\"", TriggerHolder.class);
+      assertEquals(List.of("when: \"" + when + "\" is not one of always, ON_SUCCESS (line 1, column 8)"), errors(e));
+    }
+  }
+
+  enum Clash {
+    @TomlName("B")
+    A, B
+  }
+
+  record ClashHolder(Clash clash) {}
+
   record Numbers(double d, byte b, Mode mode, char c) {}
 
   @Test
@@ -652,6 +676,10 @@ class TomlBindTest {
     assertEquals(
         "Cannot bind to org.tomlj.TomlBindTest$Duplicate: a and b are both bound to the key x",
         assertThrows(IllegalArgumentException.class, () -> empty.as(Duplicate.class)).getMessage());
+    assertEquals(
+        "Cannot bind org.tomlj.TomlBindTest$ClashHolder.clash: Cannot bind to org.tomlj.TomlBindTest$Clash: A and B are "
+            + "both named \"B\"",
+        assertThrows(IllegalArgumentException.class, () -> empty.as(ClashHolder.class)).getMessage());
     assertTrue(
         assertThrows(IllegalArgumentException.class, () -> empty.as(WithThread.class))
             .getMessage()

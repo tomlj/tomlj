@@ -1154,8 +1154,8 @@ public interface MutableTomlTable extends TomlTable {
    * <ul>
    * <li>A {@code String}, {@code boolean}, {@code long}, {@code int}, {@code short}, {@code byte}, {@code double},
    * {@code OffsetDateTime}, {@code LocalDateTime}, {@code LocalDate} or {@code LocalTime} as itself.</li>
-   * <li>A {@code char} as a string, an enum constant as its name, and a {@code float} as the shortest decimal that
-   * reads back as it.</li>
+   * <li>A {@code char} as a string, an enum constant as its name or the value of its {@link TomlName} annotation, and a
+   * {@code float} as the shortest decimal that reads back as it.</li>
    * <li>A {@code BigInteger} as an integer, and a {@code BigDecimal} as a float, if TOML can hold it exactly.</li>
    * <li>An {@code Instant} as an offset date-time in UTC, and a {@code ZonedDateTime} as an offset date-time.</li>
    * <li>A collection or Java array as an array, and a record, class or map as a table.</li>

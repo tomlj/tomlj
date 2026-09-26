@@ -569,7 +569,8 @@ public interface TomlArray {
    * The value of each key or element is bound to the type declared for it, as follows:
    * <ul>
    * <li>A string to {@code String}, an enum constant, or {@code char} for a string of one character. An enum constant
-   * is matched by its name, or else by its name ignoring case and with {@code -} and space read as {@code _}.</li>
+   * is matched by its name, or else by its name ignoring case and with {@code -} and space read as {@code _}; a
+   * constant with a {@link TomlName} annotation is matched by the annotation's value only.</li>
    * <li>An integer to {@code long}, {@code int}, {@code short}, {@code byte}, {@code BigInteger}, or to a floating
    * point type if it can be represented exactly. A value out of range for the type is an error.</li>
    * <li>A float to {@code double}, {@code float} or {@code BigDecimal}.</li>

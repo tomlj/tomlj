@@ -194,8 +194,17 @@ to is an error, as is an integer bound to a floating point type that cannot hold
 float too large for a `float`. A float bound to a `float` is rounded to the nearest `float`.
 
 An enum constant is matched by its name, or else by its name ignoring case and reading `-` and space
-as `_`, so `"on-success"` and `"on success"` are bound to `ON_SUCCESS`. A string that matches no
-constant is an error that lists the constants.
+as `_`, so `"on-success"` and `"on success"` are bound to `ON_SUCCESS`. `@TomlName` gives a constant
+a string of its own, which it is matched by exactly, in place of its name:
+
+```java
+enum Trigger {
+  @TomlName("always") RUN_ALWAYS,
+  ON_SUCCESS
+}
+```
+
+A string that matches no constant is an error that lists the strings the constants are matched by.
 
 A `List`, `Collection` or `Iterable` is bound to an `ArrayList`, a `Set` to a `LinkedHashSet`, a
 `SortedSet` to a `TreeSet`, a `Map` to a `LinkedHashMap` and a `SortedMap` to a `TreeMap`. A
@@ -337,7 +346,7 @@ an array of tables, after the other entries. Each value is written as follows:
 | `OffsetDateTime`, `LocalDateTime`, `LocalDate`, `LocalTime` | itself |
 | `Instant` | an offset date-time in UTC |
 | `ZonedDateTime` | an offset date-time, with the offset of its zone at that time |
-| an enum constant | its name |
+| an enum constant | its name, or the value of its `@TomlName` |
 | a collection or Java array | an array |
 | a record, a class, a map | a table |
 | `TomlTable`, `TomlArray` | a copy of it |

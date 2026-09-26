@@ -366,7 +366,8 @@ final class ObjectWriter {
       return new OptionalWriter(make(typeArgument(type, Optional.class, 0), options, made));
     }
     if (raw.isEnum()) {
-      return new ScalarWriter(type, options, value -> ((Enum<?>) value).name());
+      Map<Object, String> names = ObjectBinder.enumNames(raw);
+      return new ScalarWriter(type, options, names::get);
     }
     if (raw.isArray()) {
       Type componentType = type instanceof GenericArrayType ? ((GenericArrayType) type).getGenericComponentType()
