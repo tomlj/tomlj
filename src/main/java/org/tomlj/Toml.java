@@ -35,7 +35,8 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.IntStream;
 
 /**
- * Methods for parsing data stored in Tom's Obvious, Minimal Language (TOML), and for binding it to Java objects.
+ * Methods for parsing data stored in Tom's Obvious, Minimal Language (TOML), for binding it to Java objects, and for
+ * writing Java objects as TOML.
  * <p>
  * By default, documents may nest tables and arrays at most {@value TomlParseOptions#DEFAULT_MAX_NESTING_DEPTH} levels
  * deep, not counting the root table, and a value, table or array nested deeper than that is reported as a parse error.
@@ -426,6 +427,61 @@ public final class Toml {
       throw new TomlParseException(result.errors());
     }
     return result;
+  }
+
+  /**
+   * Write a record, class or map as a TOML document, with the default options.
+   *
+   * @param value The record, class or map.
+   * @return The TOML document.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   * @see #toToml(Object, TomlBindOptions, TomlWriteOptions)
+   */
+  public static String toToml(Object value) {
+    return toToml(value, TomlBindOptions.defaults(), TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Write a record, class or map as a TOML document, with the default write options.
+   *
+   * @param value The record, class or map.
+   * @param options The options to write the object with.
+   * @return The TOML document.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML.
+   * @see #toToml(Object, TomlBindOptions, TomlWriteOptions)
+   */
+  public static String toToml(Object value, TomlBindOptions options) {
+    return toToml(value, options, TomlWriteOptions.defaults());
+  }
+
+  /**
+   * Write a record, class or map as a TOML document.
+   *
+   * <pre>{@code
+   * record Server(String host, int port) {}
+   *
+   * record Config(String name, List<Server> servers) {}
+   *
+   * String toml = Toml.toToml(config, TomlBindOptions.defaults(), TomlWriteOptions.defaults());
+   * }</pre>
+   *
+   * <p>
+   * This writes the same document as {@code MutableTomlTable.from(value, options).toToml(writeOptions)}: see
+   * {@link MutableTomlTable#from(Object, TomlBindOptions)} for how each value is written.
+   *
+   * @param value The record, class or map.
+   * @param options The options to write the object with.
+   * @param writeOptions The options to write the document with.
+   * @return The TOML document.
+   * @throws IllegalArgumentException If {@code value} is not written as a table, a type it holds cannot be written, or
+   *         a value it holds cannot be written as TOML, or the document cannot be written at the version of the write
+   *         options.
+   */
+  public static String toToml(Object value, TomlBindOptions options, TomlWriteOptions writeOptions) {
+    requireNonNull(writeOptions);
+    return MutableTomlTable.from(value, options).toToml(writeOptions);
   }
 
   /**

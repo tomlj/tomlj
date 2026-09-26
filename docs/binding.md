@@ -3,9 +3,9 @@
 `as` binds a table or an array to a Java type: a record, a class, a collection, a map or a Java
 array, and `Toml.parseAs` parses a document and binds it in one call. The values are converted to
 the types declared for them, and every value that cannot be bound is reported with its path and
-position. `from` and `update` do the reverse, writing an object as a table or into a document.
-This document states which types are bound and how, which keys are missing or unknown, how errors
-are reported, and how objects are written.
+position. `from`, `Toml.toToml` and `update` do the reverse, writing an object as a table, as a
+document or into a document. This document states which types are bound and how, which keys are
+missing or unknown, how errors are reported, and how objects are written.
 
 Binding copies values out of the document. The objects it creates are not connected to the table
 they were bound from, and changing one does not change the other.
@@ -324,11 +324,14 @@ Otherwise binding throws `IllegalArgumentException`, naming the class TomlJ coul
 
 `MutableTomlTable.from` writes a record, a class or a map as a new table, and
 `MutableTomlArray.from` writes a collection or a Java array as a new array. They are the reverse of
-`as`: the table binds back to an equal object with the same options.
+`as`: the table binds back to an equal object with the same options. `Toml.toToml` writes a
+record, a class or a map as a document: `Toml.toToml(value)` is
+`MutableTomlTable.from(value).toToml()`, and `Toml.toToml(value, TomlBindOptions, TomlWriteOptions)`
+takes the options of both.
 
 ```java
 Config config = new Config("production", List.of(new Server("alpha.example.com", 8001)));
-String toml = MutableTomlTable.from(config).toToml();
+String toml = Toml.toToml(config);
 ```
 
 ```toml

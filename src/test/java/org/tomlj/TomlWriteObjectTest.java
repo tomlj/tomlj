@@ -85,6 +85,21 @@ class TomlWriteObjectTest {
     assertEquals(CONFIG, Toml.parse(MutableTomlTable.from(CONFIG).toToml()).as(Config.class));
   }
 
+  @Test
+  void writesObjectsAsDocuments() {
+    assertEquals(MutableTomlTable.from(CONFIG).toToml(), Toml.toToml(CONFIG));
+
+    TomlBindOptions options = TomlBindOptions
+        .defaults()
+        .withConverter(Duration.class, value -> Duration.parse((String) value), Duration::toString);
+    assertEquals("timeout = \"PT30S\"\n", Toml.toToml(Map.of("timeout", Duration.ofSeconds(30)), options));
+
+    TomlWriteOptions writeOptions = TomlWriteOptions.defaults().withSpaceInsideArrays(true);
+    assertEquals("tags = [ \"a\", \"b\" ]\n", Toml.toToml(Map.of("tags", List.of("a", "b")), options, writeOptions));
+
+    assertThrows(IllegalArgumentException.class, () -> Toml.toToml(List.of("a")));
+  }
+
   record Scalars(
       char c,
       byte b,

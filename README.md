@@ -185,9 +185,10 @@ servers[1].hots: unknown key (line 10, column 1)
 Converters in `TomlBindOptions` bind other types, such as `Duration`, and a `GenericType` names a
 generic type, such as `Map<String, Server>`.
 
-Objects are written back the same way. `MutableTomlTable.from(config)` creates a table from an
-object, and `update` changes a document to hold one, leaving each value that already binds to the
-same value as it was, with its comments and the way it is written:
+Objects are written back the same way. `Toml.toToml(config)` writes an object as a new document,
+`MutableTomlTable.from(config)` creates a table from one, and `update` changes a document to hold
+one, leaving each value that already binds to the same value as it was, with its comments and the
+way it is written:
 
 ```java
 TomlParseResult document = Toml.parse(source);
