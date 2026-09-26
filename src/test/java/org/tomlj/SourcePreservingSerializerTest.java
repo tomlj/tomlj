@@ -653,6 +653,21 @@ class SourcePreservingSerializerTest {
                 result -> requireArray(result, "t").add(MutableTomlTable.create().set("x", 2)),
                 "[[t]]\nx = 1\n\n[[t]]\nx = 2\n[q]\ny = 2\n"),
             edited(
+                "a new table at the start of an array of tables goes before the first one and the run above it",
+                "a = 1\n\n# first\n[[t]]\nx = 1\n[q]\ny = 2\n",
+                result -> requireArray(result, "t").insertBefore(0, MutableTomlTable.create().set("x", 0)),
+                "a = 1\n\n[[t]]\nx = 0\n\n# first\n[[t]]\nx = 1\n[q]\ny = 2\n"),
+            edited(
+                "a new table at the start of an array of tables is separated from the first one by a blank line",
+                "[[t]]\nx = 1\n",
+                result -> requireArray(result, "t").insertBefore(0, MutableTomlTable.create().set("x", 0)),
+                "[[t]]\nx = 0\n\n[[t]]\nx = 1\n"),
+            edited(
+                "a new table between two of an array of tables follows the one before it",
+                "[[t]]\nx = 1\n\n[[t]]\nx = 3\n",
+                result -> requireArray(result, "t").insertBefore(1, MutableTomlTable.create().set("x", 2)),
+                "[[t]]\nx = 1\n\n[[t]]\nx = 2\n\n[[t]]\nx = 3\n"),
+            edited(
                 "an entry that is removed takes the comment above it",
                 "a = 1\n# about b\nb = 2\nc = 3\n",
                 result -> result.remove("b"),

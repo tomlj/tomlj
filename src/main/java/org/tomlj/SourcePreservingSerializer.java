@@ -294,6 +294,8 @@ final class SourcePreservingSerializer {
           Group arrayGroup = new Group(section);
           subtrees[i] = arrayGroup;
           List<Group> preceding = new ArrayList<>();
+          // Tables the editing API added before the first table the document wrote a header for
+          List<Entry.Indexed> leading = new ArrayList<>();
           for (TomlElement tableElement : array.elements()) {
             Entry.Indexed indexed = (Entry.Indexed) tableElement;
             SourceSpan header = null;
@@ -301,6 +303,12 @@ final class SourcePreservingSerializer {
               header = headerOf(indexed, (LinkedTomlTable) indexed.value);
             }
             if (header != null && usable(header, SourceSpan.Kind.HEADER)) {
+              // They go before that header, and the blank lines and comments above it, since a table written after it
+              // would be read back as a later element of the array
+              for (Entry.Indexed added : leading) {
+                chunks.add(new SectionChunk(added, arrayPath, true, section, header.start, BEFORE_LINE, arrayOptions));
+              }
+              leading.clear();
               Group group = new Group(arrayGroup);
               addHeader(header, indexed, arrayPath, group, headerIndent, arrayOptions);
               collectTable(
@@ -312,6 +320,8 @@ final class SourcePreservingSerializer {
                   false,
                   arrayOptions);
               preceding.add(group);
+            } else if (preceding.isEmpty()) {
+              leading.add(indexed);
             } else {
               // A table the editing API added to the array follows the one before it, which the walk has already read
               chunks
@@ -325,6 +335,10 @@ final class SourcePreservingSerializer {
                           NEW_SECTION,
                           arrayOptions));
             }
+          }
+          // An array the document wrote no header for goes after the last line of its parent's subtree
+          for (Entry.Indexed added : leading) {
+            chunks.add(new SectionChunk(added, arrayPath, true, section, -1, NEW_SECTION, arrayOptions));
           }
         }
       }
@@ -1354,6 +1368,10 @@ final class SourcePreservingSerializer {
       }
       append(text);
       afterComment = false;
+      if (rank == BEFORE_LINE) {
+        // A header of the document follows, and is separated from this section as from any other
+        requestBlankLine();
+      }
     }
   }
 }
