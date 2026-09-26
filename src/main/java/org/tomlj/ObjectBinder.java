@@ -701,10 +701,129 @@ final class ObjectBinder {
   }
 
   /**
-   * A field or record component, and the key it is bound to.
+   * A field or record component of a record or class, and the key it is bound to.
+   */
+  static final class Member {
+    final String name;
+    final String key;
+    final Type type;
+    final Field field;
+    @Nullable
+    final Method accessor;
+
+    private Member(String name, String key, Type type, Field field, @Nullable Method accessor) {
+      this.name = name;
+      this.key = key;
+      this.type = type;
+      this.field = field;
+      this.accessor = accessor;
+    }
+
+    /**
+     * The value of this member in an instance, read through the accessor of a record component.
+     */
+    @Nullable
+    Object get(Object instance) {
+      try {
+        return accessor != null ? accessor.invoke(instance) : field.get(instance);
+      } catch (InvocationTargetException e) {
+        Throwable cause = e.getCause();
+        if (cause instanceof RuntimeException) {
+          throw (RuntimeException) cause;
+        }
+        throw new IllegalStateException(cause);
+      } catch (IllegalAccessException e) {
+        throw new IllegalStateException("Cannot read " + field.getDeclaringClass().getName() + "." + name, e);
+      }
+    }
+  }
+
+  /**
+   * The components of a record, or the fields of a class and its superclasses that are bound: all but static, transient
+   * and final fields. The fields of a superclass come first.
+   *
+   * @throws IllegalArgumentException If two members have the same key, or a member is not accessible.
+   */
+  static List<Member> members(Type genericType, TomlBindOptions options) {
+    Class<?> type = rawClass(genericType);
+    List<Member> list = new ArrayList<>();
+    if (Records.isRecord(type)) {
+      Map<TypeVariable<?>, Type> arguments = typeArguments(genericType);
+      for (Records.Component component : Records.components(type)) {
+        Field field;
+        Method accessor;
+        try {
+          field = type.getDeclaredField(component.name);
+          accessor = type.getDeclaredMethod(component.name);
+        } catch (NoSuchFieldException | NoSuchMethodException e) {
+          throw new IllegalStateException(
+              "Record " + type.getName() + " has no field or accessor for " + component.name,
+              e);
+        }
+        makeAccessible(accessor, type);
+        list.add(member(component.name, resolve(component.genericType, arguments), field, accessor, options));
+      }
+    } else {
+      Type current = genericType;
+      while (true) {
+        Class<?> raw = rawClass(current);
+        if (raw == Object.class) {
+          break;
+        }
+        Map<TypeVariable<?>, Type> arguments = typeArguments(current);
+        List<Member> declared = new ArrayList<>();
+        for (Field field : raw.getDeclaredFields()) {
+          int modifiers = field.getModifiers();
+          if (Modifier.isStatic(modifiers)
+              || Modifier.isTransient(modifiers)
+              || Modifier.isFinal(modifiers)
+              || field.isSynthetic()) {
+            continue;
+          }
+          makeAccessible(field, raw);
+          declared.add(member(field.getName(), resolve(field.getGenericType(), arguments), field, null, options));
+        }
+        list.addAll(0, declared);
+        Type superclass = raw.getGenericSuperclass();
+        if (superclass == null) {
+          break;
+        }
+        current = resolve(superclass, arguments);
+      }
+    }
+    Map<String, Member> byKey = new HashMap<>();
+    for (Member member : list) {
+      Member previous = byKey.put(member.key, member);
+      if (previous != null) {
+        throw new IllegalArgumentException(
+            "Cannot bind to "
+                + type.getName()
+                + ": "
+                + previous.name
+                + " and "
+                + member.name
+                + " are both bound to the key "
+                + member.key);
+      }
+    }
+    return list;
+  }
+
+  private static Member member(
+      String name,
+      Type type,
+      Field field,
+      @Nullable Method accessor,
+      TomlBindOptions options) {
+    TomlName tomlName = field.getAnnotation(TomlName.class);
+    String key = tomlName != null ? tomlName.value() : options.keyNaming().keyFor(name);
+    return new Member(name, key, type, field, accessor);
+  }
+
+  /**
+   * A member, and how its value is bound.
    */
   private static final class Property {
-    final String name;
     final String key;
     final Binder binder;
     final boolean optional;
@@ -712,8 +831,7 @@ final class ObjectBinder {
     @Nullable
     final Field field;
 
-    Property(String name, String key, Binder binder, boolean optional, boolean nonNull, @Nullable Field field) {
-      this.name = name;
+    Property(String key, Binder binder, boolean optional, boolean nonNull, @Nullable Field field) {
       this.key = key;
       this.binder = binder;
       this.optional = optional;
@@ -724,41 +842,28 @@ final class ObjectBinder {
 
   private static Property property(
       Class<?> owner,
-      String name,
-      Type type,
-      Field field,
+      Member member,
       boolean bindsField,
       TomlBindOptions options,
       Map<Type, Binder> made) {
-    TomlName tomlName = field.getAnnotation(TomlName.class);
-    String key = tomlName != null ? tomlName.value() : options.keyNaming().keyFor(name);
     Binder binder;
     try {
-      binder = make(type, options, made);
+      binder = make(member.type, options, made);
     } catch (GrowingTypeException e) {
       throw e;
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Cannot bind " + owner.getName() + "." + name + ": " + e.getMessage(), e);
+      throw new IllegalArgumentException(
+          "Cannot bind " + owner.getName() + "." + member.name + ": " + e.getMessage(),
+          e);
     }
-    boolean optional = rawClass(type) == Optional.class;
-    return new Property(name, key, binder, optional, isNonNull(field), bindsField ? field : null);
+    boolean optional = rawClass(member.type) == Optional.class;
+    return new Property(member.key, binder, optional, isNonNull(member.field), bindsField ? member.field : null);
   }
 
-  private static Map<String, Property> byKey(Class<?> owner, List<Property> properties) {
+  private static Map<String, Property> byKey(List<Property> properties) {
     Map<String, Property> map = new LinkedHashMap<>();
     for (Property property : properties) {
-      Property previous = map.put(property.key, property);
-      if (previous != null) {
-        throw new IllegalArgumentException(
-            "Cannot bind to "
-                + owner.getName()
-                + ": "
-                + previous.name
-                + " and "
-                + property.name
-                + " are both bound to the key "
-                + property.key);
-      }
+      map.put(property.key, property);
     }
     return map;
   }
@@ -790,19 +895,11 @@ final class ObjectBinder {
     }
 
     void init(Type genericType, TomlBindOptions options, Map<Type, Binder> made) {
-      Map<TypeVariable<?>, Type> arguments = typeArguments(genericType);
       List<Property> list = new ArrayList<>();
       List<Class<?>> parameterTypes = new ArrayList<>();
-      for (Records.Component component : Records.components(type)) {
-        Field field;
-        try {
-          field = type.getDeclaredField(component.name);
-        } catch (NoSuchFieldException e) {
-          throw new IllegalStateException("Record " + type.getName() + " has no field for " + component.name, e);
-        }
-        Type componentType = resolve(component.genericType, arguments);
-        list.add(property(type, component.name, componentType, field, false, options, made));
-        parameterTypes.add(component.type);
+      for (Member member : members(genericType, options)) {
+        list.add(property(type, member, false, options, made));
+        parameterTypes.add(member.field.getType());
       }
       Constructor<?> canonical;
       try {
@@ -812,7 +909,7 @@ final class ObjectBinder {
       }
       makeAccessible(canonical, type);
       this.properties = list;
-      this.byKey = byKey(type, list);
+      this.byKey = byKey(list);
       this.constructor = canonical;
     }
 
@@ -865,35 +962,11 @@ final class ObjectBinder {
     void init(Type genericType, TomlBindOptions options, Map<Type, Binder> made) {
       Constructor<?> noArg = noArgConstructor(type);
       List<Property> list = new ArrayList<>();
-      Type current = genericType;
-      while (true) {
-        Class<?> raw = rawClass(current);
-        if (raw == Object.class) {
-          break;
-        }
-        Map<TypeVariable<?>, Type> arguments = typeArguments(current);
-        List<Property> declared = new ArrayList<>();
-        for (Field field : raw.getDeclaredFields()) {
-          int modifiers = field.getModifiers();
-          if (Modifier.isStatic(modifiers)
-              || Modifier.isTransient(modifiers)
-              || Modifier.isFinal(modifiers)
-              || field.isSynthetic()) {
-            continue;
-          }
-          makeAccessible(field, raw);
-          Type fieldType = resolve(field.getGenericType(), arguments);
-          declared.add(property(raw, field.getName(), fieldType, field, true, options, made));
-        }
-        list.addAll(0, declared);
-        Type superclass = raw.getGenericSuperclass();
-        if (superclass == null) {
-          break;
-        }
-        current = resolve(superclass, arguments);
+      for (Member member : members(genericType, options)) {
+        list.add(property(member.field.getDeclaringClass(), member, true, options, made));
       }
       this.properties = list;
-      this.byKey = byKey(type, list);
+      this.byKey = byKey(list);
       this.constructor = noArg;
     }
 
@@ -1010,22 +1083,18 @@ final class ObjectBinder {
     @Nullable
     private static final Method GET_NAME;
     @Nullable
-    private static final Method GET_TYPE;
-    @Nullable
     private static final Method GET_GENERIC_TYPE;
 
     static {
       Method isRecord = null;
       Method getRecordComponents = null;
       Method getName = null;
-      Method getType = null;
       Method getGenericType = null;
       try {
         isRecord = Class.class.getMethod("isRecord");
         getRecordComponents = Class.class.getMethod("getRecordComponents");
         Class<?> component = Class.forName("java.lang.reflect.RecordComponent");
         getName = component.getMethod("getName");
-        getType = component.getMethod("getType");
         getGenericType = component.getMethod("getGenericType");
       } catch (ReflectiveOperationException e) {
         isRecord = null;
@@ -1033,18 +1102,15 @@ final class ObjectBinder {
       IS_RECORD = isRecord;
       GET_RECORD_COMPONENTS = getRecordComponents;
       GET_NAME = getName;
-      GET_TYPE = getType;
       GET_GENERIC_TYPE = getGenericType;
     }
 
     static final class Component {
       final String name;
-      final Class<?> type;
       final Type genericType;
 
-      Component(String name, Class<?> type, Type genericType) {
+      Component(String name, Type genericType) {
         this.name = name;
-        this.type = type;
         this.genericType = genericType;
       }
     }
@@ -1065,12 +1131,7 @@ final class ObjectBinder {
         Object[] components = (Object[]) GET_RECORD_COMPONENTS.invoke(type);
         List<Component> list = new ArrayList<>(components.length);
         for (Object component : components) {
-          list
-              .add(
-                  new Component(
-                      (String) GET_NAME.invoke(component),
-                      (Class<?>) GET_TYPE.invoke(component),
-                      (Type) GET_GENERIC_TYPE.invoke(component)));
+          list.add(new Component((String) GET_NAME.invoke(component), (Type) GET_GENERIC_TYPE.invoke(component)));
         }
         return list;
       } catch (ReflectiveOperationException e) {
