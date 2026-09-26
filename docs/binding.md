@@ -2,8 +2,9 @@
 
 `as` binds a table or an array to a Java type: a record, a class, a collection, a map or a Java
 array. The values are converted to the types declared for them, and every value that cannot be
-bound is reported with its path and position. This document states which types are bound and how,
-which keys are missing or unknown, and how errors are reported.
+bound is reported with its path and position. `from` and `update` do the reverse, writing an object
+as a table or into a document. This document states which types are bound and how, which keys are
+missing or unknown, how errors are reported, and how objects are written.
 
 Binding copies values out of the document. The objects it creates are not connected to the table
 they were bound from, and changing one does not change the other.
@@ -236,6 +237,18 @@ record of your own changes how those are bound. A `RuntimeException` thrown by t
 reported as an error at the value, with the exception's message, so a converter that checks its
 input and throws with a clear message gives a clear error.
 
+To write values of the type too (see [Writing objects](#writing-objects)), give a second function,
+which returns the TOML value for one: any value `MutableTomlTable.set` accepts, such as a `String`,
+a number, a `Map` or a `List`, or a `TomlValue` to choose how it is written:
+
+```java
+TomlBindOptions options = TomlBindOptions.defaults()
+    .withConverter(Duration.class, value -> Duration.parse((String) value), Duration::toString)
+    .withConverter(Permissions.class, value -> Permissions.of((Long) value), p -> TomlValue.octal(p.bits()));
+```
+
+A type whose converter only reads cannot be written.
+
 ## Errors
 
 Binding does not stop at the first error. Every value is bound, and the errors are thrown together
@@ -284,3 +297,93 @@ module com.example.app {
 ```
 
 Otherwise binding throws `IllegalArgumentException`, naming the class TomlJ could not reach.
+
+## Writing objects
+
+`MutableTomlTable.from` writes a record, a class or a map as a new table, and
+`MutableTomlArray.from` writes a collection or a Java array as a new array. They are the reverse of
+`as`: the table binds back to an equal object with the same options.
+
+```java
+Config config = new Config("production", List.of(new Server("alpha.example.com", 8001)));
+String toml = MutableTomlTable.from(config).toToml();
+```
+
+```toml
+name = "production"
+
+[[servers]]
+host = "alpha.example.com"
+port = 8001
+```
+
+Each member is written under the key it is bound to, with the key naming and `@TomlName` of the
+options, in the order the members are declared, those of a superclass first. The object passed to
+`from` is written as its own class, and a value within it as the type its member declares, so an
+instance of a subclass held in a member declared as its superclass is written with the members of
+the superclass only. The writer chooses where each goes: here the array of records is written as
+an array of tables, after the other entries. Each value is written as follows:
+
+| Java type | TOML value |
+|---|---|
+| `String`, `boolean`, `long`, `int`, `short`, `byte`, `double` | itself |
+| `char` | a string of one character |
+| `float` | the shortest decimal that reads back as it: `0.1f` is `0.1` |
+| `BigInteger`, `BigDecimal` | an integer or float, if TOML can hold it exactly |
+| `OffsetDateTime`, `LocalDateTime`, `LocalDate`, `LocalTime` | itself |
+| `Instant` | an offset date-time in UTC |
+| `ZonedDateTime` | an offset date-time, with the offset of its zone at that time |
+| an enum constant | its name |
+| a collection or Java array | an array |
+| a record, a class, a map | a table |
+| `TomlTable`, `TomlArray` | a copy of it |
+| `Optional<T>` | its value, written as a `T` |
+| `Object` | its value, written as a value of its own class |
+
+A member that is `null`, or an empty `Optional`, is left out, and so is an entry of a map whose
+value is. An element of a collection or array cannot be `null`, since a TOML array has no place for
+a missing value.
+
+The types that can be written are those that can be bound, except that a class written needs no
+constructor without parameters, and may be an inner class that is not static. A type that cannot
+be written, or one whose converter only reads, throws `IllegalArgumentException` before any value
+is read. So does a value that TOML cannot hold, naming its path: an integer beyond 64 bits, a
+`BigDecimal` with more precision than a float, a string with an unpaired surrogate, a year after
+9999, a `null` element, or an object that holds itself.
+
+## Updating a document
+
+`update` changes a table or array to hold an object, and changes only the values that differ, so
+a document read from a file can be changed through its objects and written back with its comments
+and layout:
+
+```java
+TomlParseResult document = Toml.parse(source);
+Config config = document.as(Config.class);
+document.update(new Config("staging", config.servers()));
+Files.writeString(source, document.toToml());
+```
+
+Each value is compared with the value in the document by binding the document's value to the type
+of the member. If that gives an equal value, or one that writes as the same TOML value, such as the
+`BigDecimal` values `1.5` and `1.50`, the document's value is left as it is, with the way it was
+written: `0x1F` for `31`, `'literal'` for `literal`, `1` for `1.0`, `"on-success"` for
+`ON_SUCCESS`, or `"30s"` for a duration read by a converter that accepts that form. Updating a
+document with the object bound from it changes nothing, and `isModified()` stays `false`.
+
+A value that differs is written as `from` writes it:
+
+- A table is updated in place, key by key. The key of a member that is `null` or an empty
+  `Optional` is removed. A key that names no member is left as it is, so a document can hold keys
+  the object does not describe. A map or a `TomlTable` describes the whole table, so a key that it
+  does not have is removed.
+- An array is updated in place, index by index: the element at each index is updated as any value
+  is, and elements are added or removed at the end. An element inserted at the start of a list
+  therefore changes every element after it, and the comments within the array stay at their
+  indexes.
+- Any other value, or a value of another type than the document has, is replaced. The entry keeps
+  its place and the comments attached to it.
+- A key added to a table is added after its other entries.
+
+`update` stops at the first value it cannot write, throwing `IllegalArgumentException`, with the
+values before it already changed.

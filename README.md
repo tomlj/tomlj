@@ -48,9 +48,11 @@ if (port > 65535) {
   the parsed source except where it was edited: comments, blank lines, key order, indentation and
   the notation of each value (`0xFF`, `'literal'`, `{ a = 1 }`) stay as they were written. See
   [Writing TOML](#writing-toml).
-* **Tables bind to records and classes.** `result.as(Config.class)` binds a document to a record or
-  a class, converting each value to the type declared for it, and reports every value that does
-  not fit with its path and position. See [Binding to Java objects](#binding-to-java-objects).
+* **Tables bind to records and classes, and back.** `result.as(Config.class)` binds a document to
+  a record or a class, converting each value to the type declared for it, and reports every value
+  that does not fit with its path and position. `result.update(config)` writes a changed object
+  back into the document, touching only the values that differ. See
+  [Binding to Java objects](#binding-to-java-objects).
 * **A typed getter for every TOML type**, returning `String`, `Long`, `Double`, `Boolean`,
   `TomlArray` or `TomlTable`, and the four date and time types as `java.time`'s `OffsetDateTime`,
   `LocalDateTime`, `LocalDate` and `LocalTime`. Each getter returns `null` if the key is missing,
@@ -177,8 +179,21 @@ servers[1].hots: unknown key (line 10, column 1)
 ```
 
 Converters in `TomlBindOptions` bind other types, such as `Duration`, and a `GenericType` names a
-generic type, such as `Map<String, Server>`. [docs/binding.md](docs/binding.md) describes binding in
-full: the types bound, keys, missing keys, converters and errors.
+generic type, such as `Map<String, Server>`.
+
+Objects are written back the same way. `MutableTomlTable.from(config)` creates a table from an
+object, and `update` changes a document to hold one, leaving each value that already binds to the
+same value as it was, with its comments and the way it is written:
+
+```java
+TomlParseResult document = Toml.parse(source);
+Config config = document.as(Config.class);
+document.update(new Config("staging", config.servers()));
+Files.writeString(source, document.toToml());
+```
+
+[docs/binding.md](docs/binding.md) describes binding in full: the types bound, keys, missing keys,
+converters, errors, and writing objects.
 
 ### Comments
 
