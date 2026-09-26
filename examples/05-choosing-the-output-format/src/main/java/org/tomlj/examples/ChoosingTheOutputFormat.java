@@ -12,6 +12,7 @@
  */
 package org.tomlj.examples;
 
+import org.tomlj.MutableTomlTable;
 import org.tomlj.Toml;
 import org.tomlj.TomlParseOptions;
 import org.tomlj.TomlParseResult;
@@ -22,6 +23,7 @@ import org.tomlj.TomlWriteOptions.Keep;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalTime;
 
 /**
  * Writes one document in each of the ways TomlWriteOptions offers: as it was read, with its notation kept and a new
@@ -40,18 +42,23 @@ public final class ChoosingTheOutputFormat {
     // Keep.NOTATION keeps the order, the comments and the form of each key and value (0x03, 'ops team', the inline
     // table), and lays the document out anew from the options.
     TomlWriteOptions notation = TomlWriteOptions.defaults().keep(Keep.NOTATION).withIndent(2).withMaxLineWidth(60);
+    String withNotation = doc.toToml(notation);
     System.out.println("--- Keep.NOTATION, indented by 2, lines up to 60 columns");
-    System.out.print(doc.toToml(notation));
+    System.out.print(withNotation);
 
     // Keep.NOTHING writes the document in the default style, as a document built in code is written.
+    TomlWriteOptions nothing = TomlWriteOptions.defaults().keep(Keep.NOTHING);
+    String inDefaultStyle = doc.toToml(nothing);
     System.out.println("--- Keep.NOTHING");
-    System.out.print(doc.toToml(TomlWriteOptions.defaults().keep(Keep.NOTHING)));
+    System.out.print(inDefaultStyle);
 
     // reformat() sets how much of one table is kept. The rest of the document keeps its layout.
     TomlParseResult partly = parse(text, TomlParseOptions.defaults());
-    partly.getTable("targets").reformat(Keep.NOTHING);
+    MutableTomlTable targets = partly.getTable("targets");
+    targets.reformat(Keep.NOTHING);
+    String partlyReformatted = partly.toToml();
     System.out.println("--- targets reformatted, the rest kept");
-    System.out.print(partly.toToml());
+    System.out.print(partlyReformatted);
 
     // Writing for TOML 1.0.0 throws where the document holds text that 1.0.0 does not allow, here the time 22:00, which
     // has no seconds.
@@ -65,13 +72,16 @@ public final class ChoosingTheOutputFormat {
     // A value set through the editing API is written anew, as 22:00:00, so replacing the time with itself makes the
     // document one that 1.0.0 allows. Keep.NOTHING would do the same for every value, as it copies no text.
     TomlParseResult forV100 = parse(text, TomlParseOptions.defaults());
-    forV100.set("alerts.quiet-from", forV100.getLocalTime("alerts.quiet-from"));
-    System.out.print(forV100.toToml(v100));
+    LocalTime quietFrom = forV100.getLocalTime("alerts.quiet-from");
+    forV100.set("alerts.quiet-from", quietFrom);
+    String writtenForV100 = forV100.toToml(v100);
+    System.out.print(writtenForV100);
 
     // A document that will not be written back can be parsed without its text, which saves memory. It is written in
     // the default style.
     TomlParseResult readOnly = parse(text, TomlParseOptions.defaults().withoutSource());
-    boolean same = readOnly.toToml().equals(doc.toToml(TomlWriteOptions.defaults().keep(Keep.NOTHING)));
+    String readOnlyToml = readOnly.toToml();
+    boolean same = readOnlyToml.equals(inDefaultStyle);
     System.out.println("--- parsed without the source, same as Keep.NOTHING: " + same);
   }
 

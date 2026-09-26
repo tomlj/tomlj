@@ -50,7 +50,8 @@ public final class ReportingErrors {
     }
 
     // What parsed without error is still in the result.
-    System.out.println("name is still readable: " + result.getString("name"));
+    String name = result.getString("name");
+    System.out.println("name is still readable: " + name);
   }
 
   private static void checkLimits(Path file) throws IOException {

@@ -41,13 +41,16 @@ public final class WalkingTheModel {
     System.out.println("--- the tree");
     printTable(catalog, "");
 
+    String json = catalog.toJson();
     System.out.println("--- as JSON");
-    System.out.print(catalog.toJson());
+    System.out.print(json);
 
     // With VALUES_AS_OBJECTS_WITH_TYPE, each value is written as {"type": ..., "value": ...}, keeping the TOML type
     // that JSON has no form for.
+    TomlTable discounts = catalog.getTable("discounts");
+    String typedJson = discounts.toJson(JsonOptions.VALUES_AS_OBJECTS_WITH_TYPE);
     System.out.println("--- as JSON with TOML types");
-    System.out.print(catalog.getTable("discounts").toJson(JsonOptions.VALUES_AS_OBJECTS_WITH_TYPE));
+    System.out.print(typedJson);
   }
 
   private static void printTable(TomlTable table, String indent) {

@@ -22,6 +22,7 @@ import org.tomlj.TomlElement;
 import org.tomlj.TomlKeyValue;
 import org.tomlj.TomlParseResult;
 import org.tomlj.TomlTable;
+import org.tomlj.TomlValue;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -43,8 +44,10 @@ public final class ReadingComments {
     // A comment run directly above an entry, or a comment on its line, is attached to the entry.
     TomlComment above = settings.comment("concurrency", ABOVE);
     TomlComment after = settings.comment("concurrency", AFTER);
-    System.out.println("concurrency, above: " + above.lines());
-    System.out.println("concurrency, after: " + after.text());
+    List<String> aboveLines = above.lines();
+    String afterText = after.text();
+    System.out.println("concurrency, above: " + aboveLines);
+    System.out.println("concurrency, after: " + afterText);
     System.out.println();
 
     // Every other comment is unattached. elements() lists a table's entries and its unattached comments together, in
@@ -59,8 +62,9 @@ public final class ReadingComments {
     // Elements of an array have comments of their own.
     TomlArray mirrors = settings.getArray("cache.mirrors");
     for (int i = 0; i < mirrors.size(); i++) {
+      String mirror = mirrors.getString(i);
       for (TomlComment comment : mirrors.comments(i)) {
-        System.out.println(mirrors.getString(i) + ", " + comment.placement() + ": " + comment.text());
+        System.out.println(mirror + ", " + comment.placement() + ": " + comment.text());
       }
     }
     System.out.println();
@@ -87,10 +91,12 @@ public final class ReadingComments {
       if (note != null) {
         text.add("(" + note.text() + ")");
       }
-      System.out.println(String.format("  %-16s%s", Toml.joinKeyPath(keyPath), String.join(" ", text)).stripTrailing());
+      String key = Toml.joinKeyPath(keyPath);
+      System.out.println(String.format("  %-16s%s", key, String.join(" ", text)).stripTrailing());
 
-      if (entry.value().isTable()) {
-        printReference(entry.value().getTable(), keyPath);
+      TomlValue value = entry.value();
+      if (value.isTable()) {
+        printReference(value.getTable(), keyPath);
       }
     }
   }
