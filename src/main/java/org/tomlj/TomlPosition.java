@@ -12,14 +12,20 @@
  */
 package org.tomlj;
 
+import java.io.Serializable;
+
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 
 /**
  * A position in an input document.
  */
-public final class TomlPosition {
+public final class TomlPosition implements Serializable {
+  private static final long serialVersionUID = 1L;
+
+  /** The line, counting from 1. */
   private final int line;
+  /** The column, counting from 1. */
   private final int column;
 
   /**
