@@ -1219,7 +1219,9 @@ public interface MutableTomlTable extends TomlTable {
    * <li>An array is updated in place: the elements it already holds, in the same order, are left as they are, and
    * between them its elements are updated in order, and elements are inserted or removed where the list has more or
    * fewer.</li>
-   * <li>Any other value is replaced, keeping its entry and the comments attached to it.</li>
+   * <li>Any other value is replaced, keeping its entry and the comments attached to it. A string or integer that
+   * replaces one of the same type keeps its notation when that notation can hold it: a literal or multi-line literal
+   * string, an integer in hexadecimal, octal or binary, or a decimal integer with grouped digits.</li>
    * </ul>
    * A key added to a table is added after its other entries.
    *

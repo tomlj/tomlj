@@ -401,6 +401,13 @@ A value that differs is written as `from` writes it:
   those elements are updated index by index instead.
 - Any other value, or a value of another type than the document has, is replaced. The entry keeps
   its place and the comments attached to it.
+- A string or integer that replaces one of the same type keeps its notation when the notation can
+  hold the new value: a literal or multi-line literal string, an integer in hexadecimal (with the
+  case of its digits), octal or binary, or a decimal integer with its digits grouped, which are
+  grouped in threes. So `0xFF` updated to `171` becomes `0xAB`, and `'C:\Users'` updated to
+  `D:\Data` becomes `'D:\Data'`. A notation that cannot hold the value, such as a literal string for
+  a string with an apostrophe, or hexadecimal for a negative integer, gives way to the notation
+  `from` writes.
 - A key added to a table is added after its other entries.
 
 `update` stops at the first value it cannot write, throwing `IllegalArgumentException`, with the

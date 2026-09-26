@@ -596,7 +596,7 @@ class TomlWriteObjectTest {
         k   =   0x10 # note
         added = true
         [settings.sub]
-        x = "z" # x
+        x = 'z' # x
         """, document.toToml());
   }
 
@@ -645,6 +645,58 @@ class TomlWriteObjectTest {
           8443, # https
         ]
         """, document.toToml());
+  }
+
+  record Notations(String path, String script, String quote, long mask, long lower, long mode, long flags, long big) {}
+
+  @Test
+  void updatesValuesKeepingTheirNotation() {
+    TomlParseResult document = parse("""
+        path = 'C:\\Users'
+        script = '''
+        echo hi
+        '''
+        quote = 'plain'
+        mask = 0xFF
+        lower = 0xff
+        mode = 0o755
+        flags = 0b1010
+        big = 1_000_000
+        """);
+    document.update(new Notations("D:\\Data", "echo bye\n", "it's", 0xAB, 0xAB, 0644, 0b11, 2500000));
+    assertEquals("""
+        path = 'D:\\Data'
+        script = '''
+        echo bye
+        '''
+        quote = "it's"
+        mask = 0xAB
+        lower = 0xab
+        mode = 0o644
+        flags = 0b11
+        big = 2_500_000
+        """, document.toToml());
+
+    document.update(new Notations("D:\\Data", "echo bye\n", "it's", -1, 0xAB, 0644, 0b11, -1234));
+    assertEquals("""
+        path = 'D:\\Data'
+        script = '''
+        echo bye
+        '''
+        quote = "it's"
+        mask = -1
+        lower = 0xab
+        mode = 0o644
+        flags = 0b11
+        big = -1_234
+        """, document.toToml());
+  }
+
+  @Test
+  void updatesArrayElementsKeepingTheirNotation() {
+    TomlParseResult document = parse("masks = [0xff, 0x0F]\n");
+    document.update(Map.of("masks", List.of(0xab, 0xcd)));
+    assertEquals("masks = [0xab, 0xCD]\n", document.toToml());
   }
 
   record Servers(List<Server> servers) {}

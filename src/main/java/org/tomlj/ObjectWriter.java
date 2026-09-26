@@ -39,6 +39,7 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -282,6 +283,62 @@ final class ObjectWriter {
       return writer.write(value, path, context);
     }
     return writer.update(existing, value, path, context);
+  }
+
+  /**
+   * The value to store in place of a scalar, in the notation the scalar was written in if that notation can hold it: a
+   * literal or multi-line literal string, an integer in hexadecimal, octal or binary, or a decimal integer with its
+   * digits grouped.
+   *
+   * @param existing The entry whose value is replaced, or {@code null} if there is none.
+   * @param updated The value to store, as a writer gives it.
+   * @return {@code updated} in the notation of the value it replaces, or {@code updated} itself if that value was not
+   *         written in one of these notations, or it cannot hold {@code updated}.
+   */
+  private static Object inNotationOf(@Nullable TomlEntry existing, Object updated) {
+    // An int, short or byte is stored as a long, as the editing API widens it
+    Object scalar = (updated instanceof Integer || updated instanceof Short || updated instanceof Byte)
+        ? ((Number) updated).longValue()
+        : updated;
+    if (existing == null || (!(scalar instanceof String) && !(scalar instanceof Long))) {
+      return updated;
+    }
+    TomlValue replaced = existing.value();
+    ValueSpan span = (replaced instanceof Value.Scalar) ? ((Value.Scalar) replaced).writtenSpan() : null;
+    if (span == null || !replaced.get().getClass().equals(scalar.getClass())) {
+      return updated;
+    }
+    String text = span.source.text(span.start, span.stop);
+    try {
+      if (scalar instanceof String) {
+        String string = (String) scalar;
+        if (text.startsWith("'''")) {
+          return TomlValue.multilineLiteral(string);
+        }
+        if (text.startsWith("'")) {
+          return TomlValue.literal(string);
+        }
+      } else {
+        long integer = (Long) scalar;
+        if (text.startsWith("0x")) {
+          String digits = text.substring(2);
+          boolean lowercase = !digits.equals(digits.toUpperCase(Locale.ROOT));
+          return lowercase ? TomlValue.hexLowercase(integer) : TomlValue.hex(integer);
+        }
+        if (text.startsWith("0o")) {
+          return TomlValue.octal(integer);
+        }
+        if (text.startsWith("0b")) {
+          return TomlValue.binary(integer);
+        }
+        if (text.indexOf('_') >= 0) {
+          return TomlValue.grouped(integer);
+        }
+      }
+    } catch (IllegalArgumentException e) {
+      // The notation cannot hold the value, which is stored as it is and written in the default notation
+    }
+    return updated;
   }
 
   private static boolean holdsValue(Writer writer, @Nullable Object existing, @Nullable Object value, Context context) {
@@ -702,7 +759,7 @@ final class ObjectWriter {
           Path elementPath = path.index(to);
           Object updated = updateValue(element, array.get(at), elements.get(to), elementPath, context);
           if (!isKept(updated)) {
-            array.set(at, nonNull(updated, elementPath));
+            array.set(at, inNotationOf(array.entry(at), nonNull(updated, elementPath)));
           }
         }
         for (; to < pair[1]; to++, at++) {
@@ -855,7 +912,7 @@ final class ObjectWriter {
       if (updated == null) {
         table.remove(keyPath);
       } else if (!isKept(updated)) {
-        table.set(keyPath, updated);
+        table.set(keyPath, inNotationOf(table.entry(keyPath), updated));
       }
     }
   }
