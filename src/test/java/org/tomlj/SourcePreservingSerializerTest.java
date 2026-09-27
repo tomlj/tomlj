@@ -800,6 +800,56 @@ class SourcePreservingSerializerTest {
                 result -> result.addComment("note"),
                 "a = 1\n[t]\nb = 2\n\n# note\n"),
             edited(
+                "an unattached comment added to the root after a new table goes after the table's section",
+                "a = 1\n",
+                result -> {
+                  result.getOrCreateTable("t").set("b", 2);
+                  result.addComment("note");
+                },
+                "a = 1\n\n[t]\nb = 2\n\n# note\n"),
+            edited(
+                "an unattached comment added to the root before a new table goes before the table's section",
+                "a = 1\n",
+                result -> {
+                  result.addComment("note");
+                  result.getOrCreateTable("t").set("b", 2);
+                },
+                "a = 1\n# note\n\n[t]\nb = 2\n"),
+            edited(
+                "an unattached comment added to the root between two new tables goes between their sections",
+                "a = 1\n",
+                result -> {
+                  result.getOrCreateTable("t").set("b", 2);
+                  result.addComment("note");
+                  result.getOrCreateTable("u").set("c", 3);
+                },
+                "a = 1\n\n[t]\nb = 2\n\n# note\n\n[u]\nc = 3\n"),
+            edited(
+                "an unattached comment added to the root goes after a new sub-table of the section before it",
+                "a = 1\n[t]\nb = 2\n",
+                result -> {
+                  requireTable(result, "t").getOrCreateTable("s").set("c", 3);
+                  result.addComment("note");
+                },
+                "a = 1\n[t]\nb = 2\n\n[t.s]\nc = 3\n\n# note\n"),
+            edited("an unattached comment added to the root goes after a new array of tables", "a = 1\n", result -> {
+              result.set("t", MutableTomlArray.of(MutableTomlTable.create().set("b", 2)));
+              result.addComment("note");
+            }, "a = 1\n\n[[t]]\nb = 2\n\n# note\n"),
+            edited(
+                "an unattached comment added to the root goes after a line that became a section",
+                "a = 1\nb = 2\n",
+                result -> {
+                  result.set("a", MutableTomlTable.create().set("x", 1));
+                  result.addComment("note");
+                },
+                "b = 2\n\n[a]\nx = 1\n\n# note\n"),
+            edited(
+                "an unattached comment added to the root goes after the sections of a table with no header",
+                "[t.u]\nb = 2\n",
+                result -> result.addComment("note"),
+                "[t.u]\nb = 2\n\n# note\n"),
+            edited(
                 "a new entry of the root goes before the first header, comments written between sections aside",
                 "[fruit]\nx = 1\n\n# a note about the header below\n\n[fruit.apple]\ny = 2\n",
                 result -> result.set("z", 3),

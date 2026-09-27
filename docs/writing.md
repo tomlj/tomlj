@@ -95,9 +95,9 @@ anew, in the place the document gives it:
   single run left after the last line of a table when the line below it is removed is written
   directly under the line above it, regardless of the blank lines the document had there. The root
   is not affected: a run after its last section belongs to the root whether or not a blank line
-  precedes it. An unattached comment added to the root goes after its last section, with a blank
-  line above it. A comment set on a table the document wrote as dotted keys gives it a header to
-  hold the comment.
+  precedes it. An unattached comment added to the root after a table goes after the sections of the
+  entries before it, new ones included, with a blank line above it. A comment set on a table the
+  document wrote as dotted keys gives it a header to hold the comment.
 * **An array or inline table edited in place** keeps its line and its brackets. Each element that
   was not replaced is written from its own text, with its literal, its comments and the layout
   around it; an element added or replaced is written in the default style, laid out like the
