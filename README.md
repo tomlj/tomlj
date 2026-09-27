@@ -11,6 +11,9 @@ String host = result.getString("server.host");
 long port = result.getLong("server.port", () -> 8080);
 ```
 
+The [examples](examples) directory has complete programs that show how to use TomlJ, from reading a
+configuration file to editing a document in place and binding it to records.
+
 ## Error reporting and recovery
 
 *TomlJ never throws on invalid input.* Every error is recorded with its position, and parsing
@@ -65,9 +68,6 @@ if (port > 65535) {
   Works on Java 9 and later.
 
 ## Usage
-
-The [examples](examples) directory has complete programs, from reading a configuration file to
-editing a document in place.
 
 You can parse a `String`, `Path`, `InputStream`, `Reader` or `ReadableByteChannel`. Check
 `hasErrors()` before using the result:
