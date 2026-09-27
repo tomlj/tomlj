@@ -785,7 +785,7 @@ final class EditedContainerSerializer {
 
     /**
      * The span an item is written from: the one the document recorded for it, where that span's source is this
-     * container's source and, for an entry, its key has as many parts as the key path the entry is written with.
+     * container's source and, for an entry, its key as written is the key path the entry is written with.
      */
     @Nullable
     @SuppressWarnings("ReferenceEquality") // compares the span's source by identity
@@ -795,10 +795,8 @@ final class EditedContainerSerializer {
         return (span != null && span.kind == SourceSpan.Kind.COMMENT && span.source == source) ? span : null;
       }
       SourceSpan span = ((Entry) element).span;
-      boolean written = span != null
-          && span.kind == SourceSpan.Kind.ELEMENT
-          && span.source == source
-          && span.keyParts == keyPath.size();
+      boolean written =
+          span != null && span.kind == SourceSpan.Kind.ELEMENT && span.source == source && span.writesKey(keyPath);
       return written ? span : null;
     }
   }

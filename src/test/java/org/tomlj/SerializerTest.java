@@ -843,6 +843,20 @@ class SerializerTest {
   }
 
   @Test
+  void shouldWriteTheDottedKeysOfATableReadFromADocumentWithTheKeysItIsStoredUnder() {
+    TomlParseResult result = Toml.parse("a.b = 1\nt = { 'm' . \"n\" = 2 }\n");
+    assertFalse(result.hasErrors(), () -> result.errors().toString());
+    MutableTomlTable table = MutableTomlTable.create();
+    table.set("y", MutableTomlTable.createInline().set("zz", result.get("a")));
+    table.set("t", result.get("t"));
+
+    assertSerializes(
+        table,
+        TomlWriteOptions.defaults().withLineSeparator("\n"),
+        "y = { zz.b = 1 }\nt = { 'm' . \"n\" = 2 }\n");
+  }
+
+  @Test
   void shouldWriteATableMadeInlineOnItsEntrysLineUnlessNothingIsKept() {
     MutableTomlTable doc = MutableTomlTable.create();
     doc.set("point", MutableTomlTable.createInline().set("x", 1).set("y", 2));

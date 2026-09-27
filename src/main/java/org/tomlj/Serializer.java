@@ -314,9 +314,9 @@ final class Serializer {
 
   /**
    * Write a line from its span: its key, the spacing around the {@code =}, its value and the comment after it, as they
-   * were written. The key is written anew when the line was written with a dotted key of a different number of parts
-   * than the key it is written with here, the value is written anew when it has no usable span, and the line ends with
-   * the options' line separator, since the line is written at a new position.
+   * were written. The key is written anew when the key as written is not the key it is written with here, the value is
+   * written anew when it has no usable span, and the line ends with the options' line separator, since the line is
+   * written at a new position.
    *
    * @param lineIndent The indentation of the line.
    * @param keyPath The key, as the keys of a dotted key.
@@ -336,7 +336,7 @@ final class Serializer {
     // The indentation is written with the rest of the line, which lays out anything written anew within it
     beginLine("");
     StringBuilder text = new StringBuilder(lineIndent);
-    if (span.keyParts == keyPath.size()) {
+    if (span.writesKey(keyPath)) {
       text.append(span.source.text(span.keyStart, span.keyStop, version));
     } else {
       appendKeyPath(text, keyPath);
@@ -834,7 +834,7 @@ final class Serializer {
     for (int i = 0; i < items.size(); i++) {
       InlineItem item = items.get(i);
       item.order = i;
-      SourceSpan span = writtenKeySpan(item.entry, item.keyPath.size());
+      SourceSpan span = writtenKeySpan(item.entry, item.keyPath);
       if (span != null && (source == null || span.source == source)) {
         source = span.source;
         item.anchor = span.start;
@@ -881,8 +881,8 @@ final class Serializer {
   }
 
   /**
-   * Append the key of an entry: the key as the document wrote it, where the notation is kept and the key has as many
-   * parts as the key it is written with here, and otherwise the key in the default style.
+   * Append the key of an entry: the key as the document wrote it, where the notation is kept and the key as written is
+   * the key it is written with here, and otherwise the key in the default style.
    *
    * @param text The text to append to.
    * @param keyPath The key, as the keys of a dotted key.
@@ -890,7 +890,7 @@ final class Serializer {
    * @param literals Whether a key that has a span is written with the text of that span.
    */
   private void appendEntryKey(StringBuilder text, List<String> keyPath, TomlEntry entry, boolean literals) {
-    SourceSpan span = literals ? writtenKeySpan(entry, keyPath.size()) : null;
+    SourceSpan span = literals ? writtenKeySpan(entry, keyPath) : null;
     if (span != null) {
       text.append(span.source.text(span.keyStart, span.keyStop, version));
     } else {
@@ -899,20 +899,20 @@ final class Serializer {
   }
 
   /**
-   * Where an entry's key was written, if the entry has a span and its key has as many parts as the key it is written
-   * with here.
+   * Where an entry's key was written, if the entry has a span and the key as written is the key it is written with
+   * here.
    *
    * @param entry The entry.
-   * @param parts The number of keys the key is written with here, which the key as written must have as many of.
+   * @param keyPath The key the entry is written with here, as the keys of a dotted key.
    * @return The span of the line or element the entry was written as, or {@code null}.
    */
   @Nullable
-  private static SourceSpan writtenKeySpan(TomlEntry entry, int parts) {
+  private static SourceSpan writtenKeySpan(TomlEntry entry, List<String> keyPath) {
     if (!(entry instanceof Entry)) {
       return null;
     }
     SourceSpan span = ((Entry) entry).span;
-    return (span != null && span.keyStart >= 0 && span.keyParts == parts) ? span : null;
+    return (span != null && span.writesKey(keyPath)) ? span : null;
   }
 
   /**
