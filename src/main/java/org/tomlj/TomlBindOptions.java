@@ -15,8 +15,10 @@ package org.tomlj;
 import static java.util.Objects.requireNonNull;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -95,8 +97,8 @@ public final class TomlBindOptions {
     }
   }
 
-  // The default options are shared for as long as TomlJ is loaded, so they keep what they learn about a class with the
-  // class itself: a class loader that is discarded, as on a redeploy, can then be unloaded
+  // The default options are shared for as long as TomlJ is loaded, so they must not keep a class loader that is
+  // discarded, as on a redeploy, from being unloaded. OnClassCache says where they keep what they learn about a class.
   private static final TomlBindOptions DEFAULTS = new TomlBindOptions(
       KeyNaming.EXACT,
       false,
@@ -325,28 +327,72 @@ public final class TomlBindOptions {
   }
 
   /**
-   * Keeps a class's value with the class, so it holds nothing that outlives the class. A generic type, such as
-   * {@code List<Server>}, is not kept: its value would be kept with {@code List}, and would hold {@code Server}. A
-   * binder or writer made for a class holds those it made for its members, so they are made once all the same.
+   * Keeps a class's value so that the cache does not keep a class loader from being unloaded.
+   *
+   * <p>
+   * A class loaded by the bootstrap loader or by an ancestor of TomlJ's class loader stays loaded for at least as long
+   * as TomlJ. Its value is kept in a map held by the cache, and is released with TomlJ. It is not kept with the class:
+   * the value refers to TomlJ's classes, and a value kept in a {@link ClassValue} on a class keeps TomlJ's class loader
+   * loaded for as long as that class is loaded (JDK-8136353).
+   *
+   * <p>
+   * Any other class's value is kept in a {@link ClassValue} on the class, and is released with the class. This includes
+   * TomlJ's own classes and the classes of a class loader below TomlJ's.
+   *
+   * <p>
+   * A generic type, such as {@code List<Server>}, is not kept: its value would be kept with {@code List}, and would
+   * hold {@code Server}. A binder or writer made for a class holds those it made for its members, so they are made once
+   * all the same.
    */
-  private static final class OnClassCache<T> implements TypeCache<T> {
-    private final ClassValue<AtomicReference<T>> values = new ClassValue<AtomicReference<T>>() {
+  static final class OnClassCache<T> implements TypeCache<T> {
+    private static final List<ClassLoader> TOMLJ_LOADER_ANCESTORS = ancestors(OnClassCache.class.getClassLoader());
+
+    private final Map<Class<?>, T> mapValues = new ConcurrentHashMap<>();
+    private final ClassValue<AtomicReference<T>> classValues = new ClassValue<AtomicReference<T>>() {
       @Override
       protected AtomicReference<T> computeValue(Class<?> type) {
         return new AtomicReference<>();
       }
     };
 
+    private static List<ClassLoader> ancestors(@Nullable ClassLoader loader) {
+      List<ClassLoader> ancestors = new ArrayList<>();
+      ClassLoader parent = (loader == null) ? null : loader.getParent();
+      while (parent != null) {
+        ancestors.add(parent);
+        parent = parent.getParent();
+      }
+      return ancestors;
+    }
+
+    /**
+     * Whether a class's value is kept in the map rather than with the class.
+     */
+    static boolean keptInMap(Class<?> type) {
+      ClassLoader loader = type.getClassLoader();
+      return loader == null || TOMLJ_LOADER_ANCESTORS.contains(loader);
+    }
+
     @Override
     @Nullable
     public T get(Type type) {
-      return (type instanceof Class) ? values.get((Class<?>) type).get() : null;
+      if (!(type instanceof Class)) {
+        return null;
+      }
+      Class<?> c = (Class<?>) type;
+      return keptInMap(c) ? mapValues.get(c) : classValues.get(c).get();
     }
 
     @Override
     public void putIfAbsent(Type type, T value) {
-      if (type instanceof Class) {
-        values.get((Class<?>) type).compareAndSet(null, value);
+      if (!(type instanceof Class)) {
+        return;
+      }
+      Class<?> c = (Class<?>) type;
+      if (keptInMap(c)) {
+        mapValues.putIfAbsent(c, value);
+      } else {
+        classValues.get(c).compareAndSet(null, value);
       }
     }
   }

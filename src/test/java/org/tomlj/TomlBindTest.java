@@ -714,6 +714,16 @@ class TomlBindTest {
   }
 
   @Test
+  void defaultOptionsKeepAClassThatOutlivesTomlJInAMap() {
+    // Loaded by the bootstrap loader
+    assertTrue(TomlBindOptions.OnClassCache.keptInMap(String.class));
+    // Loaded by the platform loader, an ancestor of TomlJ's loader
+    assertTrue(TomlBindOptions.OnClassCache.keptInMap(java.sql.Date.class));
+    // Loaded by TomlJ's loader
+    assertFalse(TomlBindOptions.OnClassCache.keptInMap(TomlBindTest.class));
+  }
+
+  @Test
   void serializesBindExceptions() throws Exception {
     TomlBindException e = bindFails("[port]\nvalue = 0", Listener.class);
     TomlBindException copy = serializedCopy(e);
