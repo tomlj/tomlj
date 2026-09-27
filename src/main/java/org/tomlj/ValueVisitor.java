@@ -223,7 +223,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
       throw new TomlParseError(e.getMessage(), position);
     }
     if (spans != null) {
-      entry.span = spans.element(nodes, index, null, 0, ctx);
+      entry.span = spans.element(nodes, index, null, Collections.emptyList(), ctx);
       spans.recordScalar(entry.value, ctx);
     }
   }
@@ -293,7 +293,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
     // A dotted key records its parts on the entry it ends at, which is the one in the table the key opened.
     Entry.KeyValue entry = table.entry(path);
     if (entry != null) {
-      entry.span = spans.element(nodes, index, keyContext, path.size(), valContext);
+      entry.span = spans.element(nodes, index, keyContext, path, valContext);
       spans.recordScalar(entry.value, valContext);
     }
   }
@@ -369,7 +369,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
      * @param nodes The flattened nodes of the array or inline table.
      * @param index The index of the element.
      * @param keyContext The key as written, or {@code null} for an element of an array.
-     * @param keyParts The number of keys the written key has, or {@code 0} for an element of an array.
+     * @param keyPath The keys of the written key, or an empty list for an element of an array.
      * @param valContext The value as written.
      * @return The span.
      */
@@ -377,7 +377,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
         List<ParseTree> nodes,
         int index,
         TomlParser.@Nullable KeyContext keyContext,
-        int keyParts,
+        List<String> keyPath,
         TomlParser.ValContext valContext) {
       SourceSpan.Builder span = new SourceSpan.Builder(source, SourceSpan.Kind.ELEMENT, cursor);
       TomlParser.CommentRunContext run = Comments.runAbove(nodes, index);
@@ -385,7 +385,7 @@ final class ValueVisitor extends TomlParserBaseVisitor<Object> {
         span.above(run);
       }
       if (keyContext != null) {
-        span.key(keyContext, keyParts);
+        span.key(keyContext, keyPath);
       }
       span.value(valContext.getStart().getStartIndex());
       TerminalNode after = Comments.commentAfter(nodes, index);

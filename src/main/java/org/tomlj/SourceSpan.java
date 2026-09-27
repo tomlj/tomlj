@@ -12,6 +12,10 @@
  */
 package org.tomlj;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -88,10 +92,10 @@ final class SourceSpan {
   final int keyStop;
 
   /**
-   * The number of keys the written key has, {@code 2} for {@code a.b}, so that a writer can tell whether the written
-   * key still names the entry from the section it is written in. {@code 0} where there is no key.
+   * The keys before the last one of the written key, {@code [a, b]} for {@code a.b.c}. Empty for a key of one part and
+   * where there is no key. The last key is the key of the entry or table the span is recorded on, and is not kept here.
    */
-  final int keyParts;
+  final List<String> leadingKeys;
 
   /** The first offset of the value, or {@code -1} for a HEADER or a COMMENT. The value's own extent is on the value. */
   final int valueStart;
@@ -128,8 +132,8 @@ final class SourceSpan {
   final int stop;
 
   /**
-   * Collects the parts of a span as they are read. A part never set is {@code -1}, and {@link SourceSpan#keyParts} is
-   * {@code 0} where no key is set.
+   * Collects the parts of a span as they are read. A part never set is {@code -1}, and {@link SourceSpan#leadingKeys}
+   * is empty where no key is set.
    */
   static final class Builder {
     private final Source source;
@@ -139,7 +143,7 @@ final class SourceSpan {
     private int aboveStop = -1;
     private int keyStart = -1;
     private int keyStop = -1;
-    private int keyParts;
+    private List<String> leadingKeys = Collections.emptyList();
     private int valueStart = -1;
     private int commaOffset = -1;
     private int afterStart = -1;
@@ -188,13 +192,15 @@ final class SourceSpan {
      * Set the key or header.
      *
      * @param key The key as written, or the whole header, brackets included.
-     * @param parts The number of keys the written key has.
+     * @param keyPath The keys of the written key.
      * @return This builder.
      */
-    Builder key(ParserRuleContext key, int parts) {
+    Builder key(ParserRuleContext key, List<String> keyPath) {
       this.keyStart = key.getStart().getStartIndex();
       this.keyStop = key.getStop().getStopIndex();
-      this.keyParts = parts;
+      if (keyPath.size() > 1) {
+        this.leadingKeys = new ArrayList<>(keyPath.subList(0, keyPath.size() - 1));
+      }
       return this;
     }
 
@@ -273,7 +279,7 @@ final class SourceSpan {
     this.aboveStop = builder.aboveStop;
     this.keyStart = builder.keyStart;
     this.keyStop = builder.keyStop;
-    this.keyParts = builder.keyParts;
+    this.leadingKeys = builder.leadingKeys;
     this.valueStart = builder.valueStart;
     this.commaOffset = builder.commaOffset;
     this.afterStart = builder.afterStart;
@@ -281,6 +287,29 @@ final class SourceSpan {
     this.tailStart = builder.tailStart;
     this.newlineStart = builder.newlineStart;
     this.stop = stop;
+  }
+
+  /**
+   * Whether the key as written is a given key. The last key as written is the key of the entry the span is recorded on,
+   * and a copy of the entry keeps both its key and its span, so only the number of keys and the keys before the last
+   * are compared. A table copied under another key keeps the spans of its entries, so those keys can name tables other
+   * than the ones the entry is written in.
+   *
+   * @param keyPath The key, as the keys of a dotted key, or an empty list for an element of an array.
+   * @return {@code true} if the key as written has as many keys as {@code keyPath}, and the same keys before the last.
+   */
+  boolean writesKey(List<String> keyPath) {
+    int parts = keyParts();
+    return parts == keyPath.size() && (parts < 2 || leadingKeys.equals(keyPath.subList(0, parts - 1)));
+  }
+
+  /**
+   * The number of keys the written key has, {@code 2} for {@code a.b}.
+   *
+   * @return The number of keys, or {@code 0} where there is no key.
+   */
+  int keyParts() {
+    return (keyStart < 0) ? 0 : (leadingKeys.size() + 1);
   }
 
   /**
@@ -347,8 +376,10 @@ final class SourceSpan {
         + keyStart
         + ", "
         + keyStop
-        + "]/"
-        + keyParts
+        + "]"
+        + leadingKeys
+        + "/"
+        + keyParts()
         + " value="
         + valueStart
         + " comma="

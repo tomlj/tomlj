@@ -246,7 +246,7 @@ class SourceSpanTest {
     assertEquals(0, span.start);
     assertEquals("# above\n# a run\n", span.source.text(span.aboveStart, span.aboveStop));
     assertEquals("a.b.c", span.source.text(span.keyStart, span.keyStop));
-    assertEquals(3, span.keyParts);
+    assertEquals(3, span.keyParts());
     assertEquals("1", span.source.text(span.valueStart, span.valueStart));
     assertEquals("# after", span.source.text(span.afterStart, span.afterStop));
     assertEquals(span.valueStart + 1, span.tailStart);
@@ -262,7 +262,7 @@ class SourceSpanTest {
     assertEquals(-1, span.aboveStop);
     assertEquals(-1, span.afterStart);
     assertEquals(-1, span.afterStop);
-    assertEquals(1, span.keyParts);
+    assertEquals(1, span.keyParts());
   }
 
   @Test
@@ -284,7 +284,7 @@ class SourceSpanTest {
     assertEquals(SourceSpan.Kind.HEADER, span.kind);
     assertEquals(0, span.start);
     assertEquals("[a.b]", span.source.text(span.keyStart, span.keyStop));
-    assertEquals(2, span.keyParts);
+    assertEquals(2, span.keyParts());
     assertEquals(-1, span.valueStart);
     assertEquals("# after", span.source.text(span.afterStart, span.afterStop));
     assertEquals(span.keyStop + 1, span.tailStart);
@@ -324,7 +324,7 @@ class SourceSpanTest {
     assertEquals("# one\n# two\n", span.source.text(span.aboveStart, span.aboveStop));
     assertEquals(span.aboveStop, span.stop);
     assertEquals(-1, span.keyStart);
-    assertEquals(0, span.keyParts);
+    assertEquals(0, span.keyParts());
     assertEquals(document, span.source.text(0, span.source.length() - 1));
   }
 
@@ -360,7 +360,7 @@ class SourceSpanTest {
     assertEquals(",", first.source.text(first.commaOffset, first.commaOffset));
     assertEquals(6, first.commaOffset);
     assertEquals(-1, first.keyStart);
-    assertEquals(0, first.keyParts);
+    assertEquals(0, first.keyParts());
 
     assertEquals(7, elementSpanOf(parse("a = [1 ,2]\n"), 0).commaOffset);
     assertEquals(9, elementSpanOf(parse("a = [1, 2,]\n"), 1).commaOffset);
@@ -399,7 +399,7 @@ class SourceSpanTest {
     assertNotNull(span);
     assertEquals(SourceSpan.Kind.ELEMENT, span.kind);
     assertEquals("b.c", span.source.text(span.keyStart, span.keyStop));
-    assertEquals(2, span.keyParts);
+    assertEquals(2, span.keyParts());
     assertEquals("1", span.source.text(span.valueStart, span.valueStart));
     assertEquals(span.valueStart + 1, span.tailStart);
   }

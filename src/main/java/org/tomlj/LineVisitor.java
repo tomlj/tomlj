@@ -375,7 +375,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
     }
     int valueStart = valContext.getStart().getStartIndex();
     int valueStop = valContext.getStop().getStopIndex();
-    entry.span = lineSpan(from, SourceSpan.Kind.LINE, keyContext, path.size(), lineEnd)
+    entry.span = lineSpan(from, SourceSpan.Kind.LINE, keyContext, path, lineEnd)
         .value(valueStart)
         .tail(tailStart(valueStop, lineEnd))
         .build(lineEnd.getStopIndex());
@@ -399,7 +399,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
     }
     // Input skipped after a header is written where the comment on its line would be, so the two never both appear.
     assert !strayInput || commentAfter == null : "a header the parser skipped input after has a comment after it";
-    table.headerSpan = lineSpan(from, SourceSpan.Kind.HEADER, ctx, path.size(), lineEnd)
+    table.headerSpan = lineSpan(from, SourceSpan.Kind.HEADER, ctx, path, lineEnd)
         .tail(tailStart(ctx.getStop().getStopIndex(), lineEnd))
         .build(lineEnd.getStopIndex());
   }
@@ -410,7 +410,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
    * @param from The source the line was read from.
    * @param kind LINE or HEADER.
    * @param key The key as written, or the whole header.
-   * @param keyParts The number of keys the written key has.
+   * @param keyPath The keys of the written key.
    * @param lineEnd The newline ending the line.
    * @return The builder, whose start is the first offset of the line's leading whitespace: the blank lines above it and
    *         the indentation of its first line.
@@ -419,7 +419,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
       Source from,
       SourceSpan.Kind kind,
       ParserRuleContext key,
-      int keyParts,
+      List<String> keyPath,
       Token lineEnd) {
     TomlParser.CommentRunContext run = runAbove;
     Token comment = commentAfter;
@@ -428,7 +428,7 @@ final class LineVisitor extends TomlParserBaseVisitor<LinkedTomlTable> {
     if (run != null) {
       span.above(run);
     }
-    span.key(key, keyParts).newline(lineEnd);
+    span.key(key, keyPath).newline(lineEnd);
     if (comment != null) {
       span.after(comment);
     }

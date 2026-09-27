@@ -268,8 +268,9 @@ final class SourcePreservingSerializer {
       String key = pair.key();
       if (writtenOnALine(pair)) {
         SourceSpan span = pair.span;
-        if (span != null && usable(span, SourceSpan.Kind.LINE) && span.keyParts == (relative.size() + 1)) {
-          addLine(span, pair, section, part, path(relative, key), lineIndent, tableOptions);
+        List<String> keyPath = path(relative, key);
+        if (span != null && usable(span, SourceSpan.Kind.LINE) && span.writesKey(keyPath)) {
+          addLine(span, pair, section, part, keyPath, lineIndent, tableOptions);
         } else {
           pending.add(i);
         }
@@ -511,7 +512,7 @@ final class SourcePreservingSerializer {
 
   /**
    * Collect a chunk for each element of a table that has no usable span: an entry or an unattached comment the editing
-   * API added, or one whose span was read from another document or with a key of a different number of parts.
+   * API added, or one whose span was read from another document or with a key other than the one it is written with.
    *
    * <p>
    * Such an element is written beside its neighbours in the table's sequence: after the nearest element before it that

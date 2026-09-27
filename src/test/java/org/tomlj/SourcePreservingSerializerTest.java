@@ -529,6 +529,12 @@ class SourcePreservingSerializerTest {
                 notation,
                 "x = 1\nt = { a = 0x1 }\naot = [{ b = 2 }]\n"),
             notationKept(
+                "a table copied into an inline table under another key is written with that key after the entries the document wrote",
+                "t = { m.n = 1, p = 2 }\n",
+                result -> requireTable(result, "t").set("q", requireTable(result, "t.m")),
+                notation,
+                "t = { m.n = 1, p = 2, q.n = 1 }\n"),
+            notationKept(
                 "the entries of a table are indented like its header when the options align them",
                 "[t]\na = 1\n[t.u]\nb = 2\n[[q]]\nz = 1\n",
                 notation.withIndent(2).withEntriesAlignedWithHeaders(true),
@@ -840,6 +846,22 @@ class SourcePreservingSerializerTest {
                     .set("z", MutableTomlTable.copyOf(requireTable(result, "a.b")))
                     .setComment("z.x", "note", TomlComment.Placement.AFTER),
                 "[a.b]\nx = 0x10\n\n[z]\nx = 0x10  # note\n"),
+            edited(
+                "a table a dotted key opened, copied into an inline table, is written with the key it is stored under",
+                "a.b = 1\n",
+                result -> result.set("y", MutableTomlTable.createInline().set("zz", requireTable(result, "a"))),
+                "a.b = 1\ny = { zz.b = 1 }\n"),
+            edited(
+                "a table a dotted key opened, copied into a table added to an array, is written with the key it is stored under",
+                "[t]\nm.n = 1\narr = [1]\n",
+                result -> requireArray(result, "t.arr")
+                    .add(MutableTomlTable.create().set("k", requireTable(result, "t.m"))),
+                "[t]\nm.n = 1\narr = [1, { k.n = 1 }]\n"),
+            edited(
+                "an inline table copied under the same keys keeps the text of its dotted keys",
+                "t = { 'm' . \"n\" = 1 }\n",
+                result -> result.set("y", requireTable(result, "t")),
+                "t = { 'm' . \"n\" = 1 }\ny = { 'm' . \"n\" = 1 }\n"),
             edited(
                 "a value that is replaced keeps its line and the comment on it",
                 "a = 1  # note\nb = 2\n",
