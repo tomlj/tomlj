@@ -242,6 +242,12 @@ final class ObjectBinder {
     }
 
     @Nullable
+    Object error(Location location, String message, Throwable cause) {
+      errors.add(new TomlBindError(location.path(), message, location.position(), cause));
+      return null;
+    }
+
+    @Nullable
     Object thrown(Location location, Throwable e) {
       String message = e.getMessage();
       errors.add(new TomlBindError(location.path(), message != null ? message : e.toString(), location.position(), e));
@@ -312,6 +318,10 @@ final class ObjectBinder {
     }
     if (Collection.class.isAssignableFrom(raw) || raw == Iterable.class) {
       Type elementType = typeArgument(type, raw == Iterable.class ? Iterable.class : Collection.class, 0);
+      if (SortedSet.class.isAssignableFrom(raw) && !canSortElements(elementType)) {
+        throw new IllegalArgumentException(
+            "Cannot bind to " + type.getTypeName() + ": the elements of a sorted set must be Comparable");
+      }
       return collectionBinder(collectionFactory(raw), make(elementType, options, made));
     }
     if (Map.class.isAssignableFrom(raw)) {
@@ -596,9 +606,17 @@ final class ObjectBinder {
       int errorCount = context.errors.size();
       Collection<Object> result = factory.get();
       for (int i = 0; i < array.size(); i++) {
-        Object bound = element.bind(array.get(i), location.index(array, i), context);
-        if (bound != null) {
+        Location elementLocation = location.index(array, i);
+        Object bound = element.bind(array.get(i), elementLocation, context);
+        if (bound == null) {
+          continue;
+        }
+        try {
           result.add(bound);
+        } catch (ClassCastException e) {
+          // A sorted set whose element type is Object, an interface or an abstract class can be given a value that is
+          // not Comparable, or not comparable with the other elements
+          context.error(elementLocation, "cannot be compared with the other elements of a sorted set", e);
         }
       }
       return context.errors.size() > errorCount ? null : result;
@@ -737,6 +755,24 @@ final class ObjectBinder {
   static boolean hasStringKeys(Type mapType) {
     Class<?> keyClass = rawClass(typeArgument(mapType, Map.class, 0));
     return keyClass == String.class || keyClass == Object.class || keyClass == CharSequence.class;
+  }
+
+  /**
+   * Whether the elements of a sorted set can be sorted: its raw class is {@code Object}, an interface, an abstract
+   * class, or implements {@link Comparable}.
+   *
+   * <p>
+   * {@code Object}, an interface and an abstract class are allowed even though none of them implement
+   * {@code Comparable}: the value bound at that element has a concrete class that TomlJ does not know when the binder
+   * is made, and that class might implement {@code Comparable}. If it does not, binding reports an error for that
+   * element.
+   */
+  static boolean canSortElements(Type elementType) {
+    Class<?> elementClass = rawClass(elementType);
+    return elementClass == Object.class
+        || elementClass.isInterface()
+        || Modifier.isAbstract(elementClass.getModifiers())
+        || Comparable.class.isAssignableFrom(elementClass);
   }
 
   /**

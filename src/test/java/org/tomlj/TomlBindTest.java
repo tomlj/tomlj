@@ -696,6 +696,12 @@ class TomlBindTest {
 
   record IntKeys(Map<Integer, String> map) {}
 
+  record NotComparable(String h) {}
+
+  record SortedElements(SortedSet<NotComparable> s) {}
+
+  record SortedObjects(SortedSet<Object> s) {}
+
   @Test
   void defaultOptionsLetAClassLoaderBeUnloaded() throws Exception {
     WeakReference<ClassLoader> loader = bindInLoaderOfItsOwn();
@@ -786,6 +792,25 @@ class TomlBindTest {
         assertThrows(IllegalArgumentException.class, () -> empty.as(IntKeys.class))
             .getMessage()
             .contains("the keys of a map must be strings"));
+  }
+
+  @Test
+  void rejectsSortedSetOfElementsThatAreNotComparable() {
+    assertEquals(
+        "Cannot bind org.tomlj.TomlBindTest$SortedElements.s: Cannot bind to "
+            + "java.util.SortedSet<org.tomlj.TomlBindTest$NotComparable>: the elements of a sorted set must be "
+            + "Comparable",
+        assertThrows(IllegalArgumentException.class, () -> Toml.parse("s = [{ h = \"a\" }]").as(SortedElements.class))
+            .getMessage());
+  }
+
+  @Test
+  void reportsSortedSetElementsThatCannotBeCompared() {
+    TomlBindException e = bindFails("s = [1, { h = \"a\" }]", SortedObjects.class);
+    assertEquals(
+        List.of("s[1]: cannot be compared with the other elements of a sorted set (line 1, column 9)"),
+        errors(e));
+    assertInstanceOf(ClassCastException.class, e.errors().get(0).cause());
   }
 
   @Test
