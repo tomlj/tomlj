@@ -208,7 +208,11 @@ final class SourcePreservingSerializer {
     int count = elements.size();
     Contribution[] parts = new Contribution[count];
     boolean[] sections = new boolean[count];
-    Group[] subtrees = new Group[count];
+    // The order of a new element of the root, taken where the element is in the walk, so that a comment is written after
+    // a section collected before it and before one collected after it, where they go at the same offset
+    int[] orders = new int[count];
+    // The number of chunks collected before each element is walked
+    int[] chunkStarts = new int[count];
     List<Integer> pending = new ArrayList<>();
     Contribution contributed = new Contribution();
     boolean notationOnly = (tableOptions.keep() == TomlWriteOptions.Keep.NOTATION);
@@ -223,6 +227,7 @@ final class SourcePreservingSerializer {
       TomlElement element = elements.get(i);
       Contribution part = new Contribution();
       parts[i] = part;
+      chunkStarts[i] = chunks.size();
 
       if (element instanceof TomlComment) {
         TomlComment comment = (TomlComment) element;
@@ -239,6 +244,7 @@ final class SourcePreservingSerializer {
                         lineIndent,
                         span.start,
                         SOURCE_LINE,
+                        sequence++,
                         section,
                         rootTable,
                         rootTable && sawSection,
@@ -259,6 +265,9 @@ final class SourcePreservingSerializer {
           part.add(span.start, span.stop, indentOf(span));
         } else {
           pending.add(i);
+          if (rootTable) {
+            orders[i] = sequence++;
+          }
         }
         contributed.merge(part);
         continue;
@@ -273,6 +282,9 @@ final class SourcePreservingSerializer {
           addLine(span, pair, section, part, keyPath, lineIndent, tableOptions);
         } else {
           pending.add(i);
+          if (rootTable) {
+            orders[i] = sequence++;
+          }
         }
         contributed.merge(part);
         continue;
@@ -287,7 +299,7 @@ final class SourcePreservingSerializer {
         if (subOptions.keep() == TomlWriteOptions.Keep.NOTHING) {
           // The table is written whole, in the place its header had, so nothing of the subtree is read from the
           // document; only where its text ended is, which is where a section written into the table around it goes.
-          subtrees[i] = closedGroup(section, subtreeStop(subTable, headerWritten ? header.stop : -1));
+          addRewrittenText(section, subtreeStop(subTable, headerWritten ? header.stop : -1));
           chunks
               .add(
                   new SectionChunk(
@@ -300,7 +312,6 @@ final class SourcePreservingSerializer {
                       subOptions));
         } else if (headerWritten) {
           Group group = new Group(section);
-          subtrees[i] = group;
           addHeader(header, pair, path(sectionPath, relative, key), group, headerIndent, subOptions);
           collectTable(
               subTable,
@@ -326,10 +337,9 @@ final class SourcePreservingSerializer {
         TomlWriteOptions arrayOptions = ElementContainer.optionsWithin(array, tableOptions);
         List<String> arrayPath = path(sectionPath, relative, key);
         if (arrayOptions.keep() == TomlWriteOptions.Keep.NOTHING) {
-          collectTableArrayKeepingNothing(pair, array, arrayPath, section, subtrees, i, arrayOptions);
+          collectTableArrayKeepingNothing(pair, array, arrayPath, section, arrayOptions);
         } else {
           Group arrayGroup = new Group(section);
-          subtrees[i] = arrayGroup;
           List<Group> preceding = new ArrayList<>();
           // Tables the editing API added before the first table the document wrote a header for
           List<Entry.Indexed> leading = new ArrayList<>();
@@ -387,7 +397,8 @@ final class SourcePreservingSerializer {
         elements,
         parts,
         sections,
-        subtrees,
+        orders,
+        chunkStarts,
         pending,
         sectionPath,
         relative,
@@ -406,8 +417,6 @@ final class SourcePreservingSerializer {
    * @param array The array.
    * @param arrayPath The keys from the root to the array.
    * @param section The section the array is written in.
-   * @param subtrees Where the group for the text the array was read from is recorded.
-   * @param index The index of the entry in its table's sequence.
    * @param arrayOptions The options the array is written with.
    */
   private void collectTableArrayKeepingNothing(
@@ -415,8 +424,6 @@ final class SourcePreservingSerializer {
       ListTomlArray array,
       List<String> arrayPath,
       Group section,
-      Group[] subtrees,
-      int index,
       TomlWriteOptions arrayOptions) {
     int anchor = -1;
     int stop = -1;
@@ -434,7 +441,7 @@ final class SourcePreservingSerializer {
       }
       stop = subtreeStop((LinkedTomlTable) indexed.value, stop);
     }
-    subtrees[index] = closedGroup(section, stop);
+    addRewrittenText(section, stop);
     chunks
         .add(
             new SectionChunk(
@@ -448,19 +455,16 @@ final class SourcePreservingSerializer {
   }
 
   /**
-   * A group for text of the document that is written from the model instead: it holds no chunk, and records only the
-   * end offset of that text, so that a section added to the enclosing table is written after it.
+   * Record the end of text of the document that is written from the model instead, so that a section added to the table
+   * around it is written after it.
    *
    * @param section The section the text was written in.
    * @param stop The end of the text, or {@code -1} if none of it has a span.
-   * @return The group.
    */
-  private static Group closedGroup(Group section, int stop) {
-    Group group = new Group(section);
+  private static void addRewrittenText(Group section, int stop) {
     if (stop >= 0) {
-      group.addLine(stop);
+      section.addLine(stop);
     }
-    return group;
   }
 
   /**
@@ -524,12 +528,15 @@ final class SourcePreservingSerializer {
    * @param section The section the table's lines are written in. A comment written after the last of them is written
    *        directly under the line above it, so that a re-parse reads it in this table rather than in the table whose
    *        header follows.
+   * @param orders The order reserved for each new element of the root, by its index in the table's sequence.
+   * @param chunkStarts The number of chunks collected before each element was walked, by its index.
    */
   private void anchorNewElements(
       List<TomlElement> elements,
       Contribution[] parts,
       boolean[] sections,
-      Group[] subtrees,
+      int[] orders,
+      int[] chunkStarts,
       List<Integer> pending,
       List<String> sectionPath,
       List<String> relative,
@@ -554,18 +561,22 @@ final class SourcePreservingSerializer {
 
       boolean found = false;
       boolean afterSubtree = false;
+      if (isComment && rootTable && writesSection(chunkStarts[0], chunkStarts[index])) {
+        // A comment of the root that follows a section is written after everything written for the elements before it,
+        // since a run written under a header belongs to the table that header opened, and the sections of the root are
+        // written after all its lines. The rank puts it after the new sections written at that offset, and its order
+        // before those of the elements after it.
+        anchor = endOf(chunkStarts[0], chunkStarts[index]);
+        rank = NEW_SECTION;
+        found = true;
+        afterSubtree = true;
+      }
       for (int j = Math.min(index, limit) - 1; j >= 0 && !found; j--) {
         Contribution part = parts[j];
         if (part.hasLines()) {
           anchor = part.lastStop;
           indent = part.lastIndent;
           found = true;
-        } else if (isComment && rootTable && subtrees[j] != null && subtrees[j].subtreeStop >= 0) {
-          // The root's own comments are written after the last section, since a run written under a header belongs to
-          // the table that header opened.
-          anchor = subtrees[j].subtreeStop;
-          found = true;
-          afterSubtree = true;
         }
       }
       if (!found || afterSubtree) {
@@ -593,6 +604,7 @@ final class SourcePreservingSerializer {
       // When only the notation is kept, every line of a section is indented alike, regardless of the indentation of the
       // neighbouring line
       String lineIndent = (indent != null && !notationOnly) ? indent : spaces(options.entryIndent(sectionPath.size()));
+      int order = rootTable ? orders[index] : sequence++;
       if (isComment) {
         chunks
             .add(
@@ -601,15 +613,45 @@ final class SourcePreservingSerializer {
                     lineIndent,
                     anchor,
                     rank,
+                    order,
                     section,
                     rootTable,
                     afterSubtree,
                     tableOptions));
       } else {
         Entry.KeyValue pair = (Entry.KeyValue) element;
-        chunks.add(new EntryChunk(pair, path(relative, pair.key()), lineIndent, anchor, rank, section, tableOptions));
+        chunks
+            .add(
+                new EntryChunk(
+                    pair,
+                    path(relative, pair.key()),
+                    lineIndent,
+                    anchor,
+                    rank,
+                    order,
+                    section,
+                    tableOptions));
       }
     }
+  }
+
+  /** Whether a chunk in a range of the chunks collected is a header or a section written anew. */
+  private boolean writesSection(int from, int to) {
+    for (int i = from; i < to; i++) {
+      if (chunks.get(i).startsSection()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The greatest offset the chunks in a range of those collected end at, or {@code -1} if there are none. */
+  private int endOf(int from, int to) {
+    int end = -1;
+    for (int i = from; i < to; i++) {
+      end = Math.max(end, chunks.get(i).end());
+    }
+    return end;
   }
 
   private void addLine(
@@ -964,7 +1006,8 @@ final class SourcePreservingSerializer {
     final int rank;
 
     /**
-     * The order this chunk was collected in, which orders the chunks anchored at the same offset with the same rank.
+     * The order this chunk was collected in, or the order reserved for it, which orders the chunks anchored at the same
+     * offset with the same rank.
      */
     final int order;
 
@@ -972,12 +1015,26 @@ final class SourcePreservingSerializer {
     int position = -1;
 
     Chunk(int rank) {
+      this(rank, sequence++);
+    }
+
+    Chunk(int rank, int order) {
       this.rank = rank;
-      this.order = sequence++;
+      this.order = order;
     }
 
     /** The offset this chunk sorts at: where it was read, or where the line it is anchored to ends. */
     abstract int anchor();
+
+    /** The offset the text of the document this chunk is written from ends at, or its anchor if it has none. */
+    int end() {
+      return anchor();
+    }
+
+    /** Whether this chunk is a header, or a section written anew. */
+    boolean startsSection() {
+      return false;
+    }
 
     /** The section this chunk is a {@code key = value} line of, or {@code null} if it is not such a line. */
     @Nullable
@@ -1045,6 +1102,16 @@ final class SourcePreservingSerializer {
     @Override
     int anchor() {
       return span.start;
+    }
+
+    @Override
+    int end() {
+      return span.stop;
+    }
+
+    @Override
+    boolean startsSection() {
+      return span.kind == SourceSpan.Kind.HEADER;
     }
 
     @Override
@@ -1242,9 +1309,10 @@ final class SourcePreservingSerializer {
         String lineIndent,
         int anchor,
         int rank,
+        int order,
         Group section,
         TomlWriteOptions lineOptions) {
-      super(rank);
+      super(rank, order);
       this.entry = entry;
       this.keyPath = keyPath;
       this.lineIndent = lineIndent;
@@ -1306,11 +1374,12 @@ final class SourcePreservingSerializer {
         String lineIndent,
         int anchor,
         int rank,
+        int order,
         Group section,
         boolean rootComment,
         boolean afterSection,
         TomlWriteOptions lineOptions) {
-      super(rank);
+      super(rank, order);
       this.comment = comment;
       this.lineIndent = lineIndent;
       this.anchor = anchor;
@@ -1380,6 +1449,11 @@ final class SourcePreservingSerializer {
     @Override
     int anchor() {
       return (after >= 0) ? after : group.sectionAnchor();
+    }
+
+    @Override
+    boolean startsSection() {
+      return true;
     }
 
     @Override
