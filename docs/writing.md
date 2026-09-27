@@ -134,7 +134,7 @@ an inline table stays inline.
 ## The default style
 
 The default style writes a table in two parts: first its `key = value` lines and its unattached
-comments, in their order in the table, then its sub-tables and arrays of tables, in their order. A
+comments, in their order in the table, then its sub-tables and arrays of tables, in their order.
 An unattached comment of the root that comes after its first sub-table is written among the sections
 instead, in its order among them, where a re-parse reads it in the root. A sub-table is written
 under a `[a.b]` header naming its path from the root, unless it holds only sub-tables and arrays of
