@@ -475,6 +475,24 @@ class SourcePreservingSerializerTest {
                 notation,
                 "[t]\nx = 1\n# tail\n\n[u]\ny = 2\n"),
             notationKept(
+                "a comment added to a table stays under its last line when a new entry is written under its header",
+                "[[t.arr]]\n[t]\nx = 1\n",
+                result -> {
+                  requireTable(result, "t").addComment("note");
+                  requireTable(result, "t").set("z", 1);
+                },
+                notation,
+                "[[t.arr]]\n\n[t]\nz = 1\nx = 1\n# note\n"),
+            notationKept(
+                "the trailing comment of a table stays under its last line when a new entry is written under its header",
+                "[p]\ntype.name = \"Nail\"\n# note\n",
+                result -> {
+                  requireTable(result, "p").set("n", 1);
+                  requireTable(result, "p").remove("type.name");
+                },
+                notation,
+                "[p]\nn = 1\n# note\n\n[p.type]\n"),
+            notationKept(
                 "a comment of the root written after a section keeps its blank line",
                 "[t]\nx = 1\n\n# root note\n",
                 notation,
@@ -753,6 +771,23 @@ class SourcePreservingSerializerTest {
                 "[t]\nx = 1\n[u]\n",
                 result -> requireTable(result, "t").addComment("note"),
                 "[t]\nx = 1\n# note\n\n[u]\n"),
+            edited(
+                "an unattached comment added to a table stays under its last line when a new entry is written under its"
+                    + " header",
+                "[[t.arr]]\n[t]\nx = 1\n",
+                result -> {
+                  requireTable(result, "t").addComment("note");
+                  requireTable(result, "t").set("z", 1);
+                },
+                "[[t.arr]]\n[t]\nz = 1\nx = 1\n# note\n"),
+            edited(
+                "the trailing comment of a table stays under its last line when a new entry is written under its header",
+                "[p]\ntype.name = \"Nail\"\n# note\n",
+                result -> {
+                  requireTable(result, "p").set("n", 1);
+                  requireTable(result, "p").remove("type.name");
+                },
+                "[p]\nn = 1\n# note\n\n[p.type]\n"),
             edited(
                 "an unattached comment added to the root of a document with sections goes after the last of them",
                 "a = 1\n[t]\nb = 2\n",
