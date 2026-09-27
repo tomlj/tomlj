@@ -50,7 +50,9 @@ public final class ReadingADocument {
 
     // Tables can be read whole. The dotted keys pool.min and pool.max define a table pool.
     TomlTable pool = config.getTable("database.pool");
-    System.out.println("database pool: " + pool.getLong("min") + " to " + pool.getLong("max") + " connections");
+    long min = pool.getLong("min");
+    long max = pool.getLong("max");
+    System.out.println("database pool: " + min + " to " + max + " connections");
 
     // [[warehouse]] sections form an array of tables.
     TomlArray warehouses = config.getArrayOrEmpty("warehouse");

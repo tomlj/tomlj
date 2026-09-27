@@ -84,6 +84,7 @@ public final class BuildingADocument {
       throw new IllegalStateException("the document did not parse: " + reparsed.errors());
     }
     System.out.println();
-    System.out.println("mode read back: " + reparsed.getLong("storage.mode"));
+    long mode = reparsed.getLong("storage.mode");
+    System.out.println("mode read back: " + mode);
   }
 }
