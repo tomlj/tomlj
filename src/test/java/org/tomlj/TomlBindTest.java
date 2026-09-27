@@ -796,7 +796,7 @@ class TomlBindTest {
         "Cannot bind to org.tomlj.TomlBindTest$NoDefaultConstructor: it has no constructor without parameters",
         assertThrows(IllegalArgumentException.class, () -> empty.as(NoDefaultConstructor.class)).getMessage());
     assertEquals(
-        "Cannot bind to org.tomlj.TomlBindTest$Duplicate: a and b are both bound to the key x",
+        "Cannot bind to org.tomlj.TomlBindTest$Duplicate: a and b both have the key x",
         assertThrows(IllegalArgumentException.class, () -> empty.as(Duplicate.class)).getMessage());
     assertEquals(
         "Cannot bind org.tomlj.TomlBindTest$ClashHolder.clash: Cannot bind to org.tomlj.TomlBindTest$Clash: A and B are "

@@ -693,16 +693,25 @@ final class ObjectBinder {
       throw new IllegalArgumentException(
           "Cannot bind to " + raw.getName() + ": it has no constructor without parameters");
     }
-    makeAccessible(constructor, raw);
+    makeAccessible(constructor, raw, "bind to");
     return constructor;
   }
 
-  private static void makeAccessible(AccessibleObject member, Class<?> declaringClass) {
+  /**
+   * Make a constructor, field or accessor accessible by reflection.
+   *
+   * @param member The constructor, field or accessor.
+   * @param declaringClass The class it is declared in.
+   * @param verb What is done with the class: {@code "bind to"} or {@code "write"}.
+   */
+  private static void makeAccessible(AccessibleObject member, Class<?> declaringClass, String verb) {
     try {
       member.setAccessible(true);
     } catch (RuntimeException e) {
       throw new IllegalArgumentException(
-          "Cannot bind to "
+          "Cannot "
+              + verb
+              + " "
               + declaringClass.getName()
               + ": it is not accessible to TomlJ; open its package to the module org.tomlj",
           e);
@@ -789,10 +798,20 @@ final class ObjectBinder {
     if (raw.isInterface() || Modifier.isAbstract(raw.getModifiers())) {
       return "it is an interface or abstract class";
     }
-    if (raw.getName().startsWith("java.") || raw.getName().startsWith("javax.")) {
+    if (raw.getName().startsWith("java.") || raw.getName().startsWith("javax.") || isPlatformClass(raw)) {
       return "TomlJ does not " + verb + " it";
     }
     return null;
+  }
+
+  /**
+   * Whether a class is loaded by the bootstrap or platform class loader, and so is part of the JDK even though its name
+   * is not {@code java.*} or {@code javax.*}, such as {@code sun.nio.fs.UnixPath}.
+   */
+  @SuppressWarnings("ReferenceEquality") // the platform class loader is one instance, never equal to another loader
+  private static boolean isPlatformClass(Class<?> raw) {
+    ClassLoader loader = raw.getClassLoader();
+    return loader == null || loader == ClassLoader.getPlatformClassLoader();
   }
 
   private static void checkBindableClass(Class<?> raw, Type type) {
@@ -848,9 +867,10 @@ final class ObjectBinder {
    * The components of a record, or the fields of a class and its superclasses that are bound: all but static, transient
    * and final fields. The fields of a superclass come first.
    *
+   * @param verb What is done with the record or class: {@code "bind to"} or {@code "write"}.
    * @throws IllegalArgumentException If two members have the same key, or a member is not accessible.
    */
-  static List<Member> members(Type genericType, TomlBindOptions options) {
+  static List<Member> members(Type genericType, TomlBindOptions options, String verb) {
     Class<?> type = rawClass(genericType);
     List<Member> list = new ArrayList<>();
     if (Records.isRecord(type)) {
@@ -866,7 +886,7 @@ final class ObjectBinder {
               "Record " + type.getName() + " has no field or accessor for " + component.name,
               e);
         }
-        makeAccessible(accessor, type);
+        makeAccessible(accessor, type, verb);
         list.add(member(component.name, resolve(component.genericType, arguments), field, accessor, options));
       }
     } else {
@@ -886,7 +906,7 @@ final class ObjectBinder {
               || field.isSynthetic()) {
             continue;
           }
-          makeAccessible(field, raw);
+          makeAccessible(field, raw, verb);
           declared.add(member(field.getName(), resolve(field.getGenericType(), arguments), field, null, options));
         }
         list.addAll(0, declared);
@@ -902,13 +922,15 @@ final class ObjectBinder {
       Member previous = byKey.put(member.key, member);
       if (previous != null) {
         throw new IllegalArgumentException(
-            "Cannot bind to "
+            "Cannot "
+                + verb
+                + " "
                 + type.getName()
                 + ": "
                 + previous.name
                 + " and "
                 + member.name
-                + " are both bound to the key "
+                + " both have the key "
                 + member.key);
       }
     }
@@ -1030,7 +1052,7 @@ final class ObjectBinder {
     void init(Type genericType, TomlBindOptions options, Map<Type, Binder> made) {
       List<Property> list = new ArrayList<>();
       List<Class<?>> parameterTypes = new ArrayList<>();
-      for (Member member : members(genericType, options)) {
+      for (Member member : members(genericType, options, "bind to")) {
         list.add(property(type, member, false, options, made));
         parameterTypes.add(member.field.getType());
       }
@@ -1040,7 +1062,7 @@ final class ObjectBinder {
       } catch (NoSuchMethodException e) {
         throw new IllegalStateException("Record " + type.getName() + " has no canonical constructor", e);
       }
-      makeAccessible(canonical, type);
+      makeAccessible(canonical, type, "bind to");
       this.properties = list;
       this.byKey = byKey(list);
       this.constructor = canonical;
@@ -1096,7 +1118,7 @@ final class ObjectBinder {
     void init(Type genericType, TomlBindOptions options, Map<Type, Binder> made) {
       Constructor<?> noArg = noArgConstructor(type);
       List<Property> list = new ArrayList<>();
-      for (Member member : members(genericType, options)) {
+      for (Member member : members(genericType, options, "bind to")) {
         list.add(property(member.field.getDeclaringClass(), member, true, options, made));
       }
       this.properties = list;
