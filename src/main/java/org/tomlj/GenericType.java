@@ -26,6 +26,11 @@ import java.lang.reflect.Type;
  * Map<String, Server> servers = table.as(new GenericType<Map<String, Server>>() {});
  * }</pre>
  *
+ * <p>
+ * A class between the subclass and {@code GenericType} is allowed. Its type variables are replaced with the type
+ * arguments the subclass gives it, so with {@code abstract class ServerMap<V> extends GenericType<Map<String, V>>},
+ * {@code new ServerMap<Server>() {}} names {@code Map<String, Server>}.
+ *
  * @param <T> The type to bind to.
  * @see TomlTable#as(GenericType)
  * @see TomlArray#as(GenericType)
@@ -35,23 +40,26 @@ public abstract class GenericType<T> {
   private final Type type;
 
   /**
-   * Create a generic type that names the type argument of the subclass.
+   * Create a generic type that names the type argument given to {@code GenericType} by the subclass, resolved through
+   * any class between it and {@code GenericType}.
    *
-   * @throws IllegalStateException If the subclass does not give a type argument.
+   * @throws IllegalStateException If no type argument is given to {@code GenericType}.
    */
   protected GenericType() {
-    Type superclass = getClass().getGenericSuperclass();
-    if (!(superclass instanceof ParameterizedType)) {
+    Type supertype = JavaTypes.supertype(getClass(), GenericType.class);
+    Type argument =
+        (supertype instanceof ParameterizedType) ? ((ParameterizedType) supertype).getActualTypeArguments()[0] : null;
+    if (argument == null) {
       throw new IllegalStateException(
           "A GenericType must be created with a type argument, such as new GenericType<List<String>>() {}");
     }
-    this.type = ((ParameterizedType) superclass).getActualTypeArguments()[0];
+    this.type = argument;
   }
 
   /**
    * The type named.
    *
-   * @return The type argument of the subclass.
+   * @return The type argument given to {@code GenericType} by the subclass.
    */
   public final Type type() {
     return type;
