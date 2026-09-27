@@ -1029,7 +1029,7 @@ final class ObjectWriter {
     private List<Writer> writers = Collections.emptyList();
 
     void init(Type type, TomlBindOptions options, Map<Type, Writer> made) {
-      List<ObjectBinder.Member> list = ObjectBinder.members(type, options);
+      List<ObjectBinder.Member> list = ObjectBinder.members(type, options, "write");
       List<Writer> memberWriters = new ArrayList<>(list.size());
       for (ObjectBinder.Member member : list) {
         try {

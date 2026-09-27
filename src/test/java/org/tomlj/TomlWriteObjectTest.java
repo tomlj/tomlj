@@ -356,6 +356,25 @@ class TomlWriteObjectTest {
     assertEquals(
         "Cannot write children[0]: the value holds itself, and TOML cannot hold a value within itself",
         assertThrows(IllegalArgumentException.class, () -> MutableTomlTable.from(node)).getMessage());
+    assertEquals(
+        "Cannot write org.tomlj.TomlWriteObjectTest$Duplicate: a and b both have the key x",
+        assertThrows(IllegalArgumentException.class, () -> MutableTomlTable.from(new Duplicate("1", "2")))
+            .getMessage());
+  }
+
+  record Duplicate(@TomlName("x") String a, @TomlName("x") String b) {}
+
+  record WithAny(Object any) {}
+
+  @Test
+  void rejectsJdkInternalClassesWithAConverterHint() {
+    // sun.nio.fs.UnixPath is not named java.* or javax.*, but is loaded by the bootstrap class loader
+    Object internal = Path.of("x");
+    assertEquals(
+        "Cannot write any: Cannot write "
+            + internal.getClass().getName()
+            + ": TomlJ does not write it; register a converter for it in TomlBindOptions",
+        assertThrows(IllegalArgumentException.class, () -> MutableTomlTable.from(new WithAny(internal))).getMessage());
   }
 
   @Test
