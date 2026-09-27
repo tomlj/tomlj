@@ -530,6 +530,24 @@ class TomlBindTest {
     assertEquals(List.of("items[0]: expected a string, found an integer (line 1, column 10)"), errors(e));
   }
 
+  abstract static class MapOf<V> extends GenericType<Map<String, V>> {
+  }
+
+  abstract static class ServerList extends GenericType<List<Server>> {
+  }
+
+  static class ServerList2 extends GenericType<List<Server>> {
+  }
+
+  @Test
+  void resolvesGenericTypesThroughAnIntermediateClass() {
+    Map<String, Long> ports = Toml.parse("a = 1\nb = 2\n").as(new MapOf<Long>() {});
+    assertEquals(Map.of("a", 1L, "b", 2L), ports);
+
+    assertEquals(new GenericType<List<Server>>() {}.type(), new ServerList() {}.type());
+    assertEquals(new GenericType<List<Server>>() {}.type(), new ServerList2().type());
+  }
+
   record Pair<A,B>(
   A first,
   @Nullable
