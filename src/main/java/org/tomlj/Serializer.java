@@ -617,6 +617,16 @@ final class Serializer {
     }
   }
 
+  /**
+   * Whether a blank line was requested after the last line written and is not yet written. This is the case when that
+   * line ends an unattached comment, which a blank line separates from any line that follows.
+   *
+   * @return {@code true} if a blank line is pending.
+   */
+  boolean blankLinePending() {
+    return blankLineOwed;
+  }
+
   private void beginLine(String lineIndent) throws IOException {
     lastHeader = null;
     if (blankLineOwed) {

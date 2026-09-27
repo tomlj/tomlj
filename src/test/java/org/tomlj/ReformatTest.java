@@ -67,6 +67,12 @@ class ReformatTest {
                 result -> requireTable(result, "t").reformat(NOTHING),
                 "[t]\nx = 1\n\n[t.c]\nz = 3\n[u]\ny = 2\n"),
             reformatted(
+                "a table reformatted to keep nothing that ends with an unattached comment is separated from the"
+                    + " header after it",
+                "[t]\nx = 1\n[u]\ny = 2\n",
+                result -> requireTable(result, "t").addComment("note").reformat(NOTHING),
+                "[t]\nx = 1\n# note\n\n[u]\ny = 2\n"),
+            reformatted(
                 "the comments of a table reformatted to keep nothing are written from the model",
                 "# above\n[t]  # after\n# a run of its own\n\nx = 1\n",
                 result -> requireTable(result, "t").reformat(NOTHING),

@@ -643,6 +643,21 @@ class SourcePreservingSerializerTest {
                 result -> requireTable(result, "t").getOrCreateTable("s").set("k", 1),
                 "[t]\nb = 2\n\n[t.s]\nk = 1\n[u]\nc = 3\n"),
             edited(
+                "a new table that ends with an unattached comment is separated from the header after it",
+                "[t]\nb = 2\n[u]\nc = 3\n",
+                result -> requireTable(result, "t").getOrCreateTable("s").set("k", 1).addComment("note"),
+                "[t]\nb = 2\n\n[t.s]\nk = 1\n# note\n\n[u]\nc = 3\n"),
+            edited(
+                "a new table that ends with an unattached comment keeps the blank lines above the header after it",
+                "[t]\nb = 2\n\n\n[u]\nc = 3\n",
+                result -> requireTable(result, "t").getOrCreateTable("s").set("k", 1).addComment("note"),
+                "[t]\nb = 2\n\n[t.s]\nk = 1\n# note\n\n\n[u]\nc = 3\n"),
+            edited(
+                "a new table that ends with an unattached comment at the end of the document ends it",
+                "[t]\nb = 2\n",
+                result -> requireTable(result, "t").getOrCreateTable("s").set("k", 1).addComment("note"),
+                "[t]\nb = 2\n\n[t.s]\nk = 1\n# note\n"),
+            edited(
                 "a new table of the root goes at the end of the document",
                 "a = 1\n[t]\nb = 2\n",
                 result -> result.getOrCreateTable("new").set("k", 1),
@@ -652,6 +667,12 @@ class SourcePreservingSerializerTest {
                 "[[t]]\nx = 1\n[q]\ny = 2\n",
                 result -> requireArray(result, "t").add(MutableTomlTable.create().set("x", 2)),
                 "[[t]]\nx = 1\n\n[[t]]\nx = 2\n[q]\ny = 2\n"),
+            edited(
+                "a new table of an array of tables that ends with an unattached comment is separated from the header"
+                    + " after it",
+                "[[t]]\nx = 1\n[q]\ny = 2\n",
+                result -> requireArray(result, "t").add(MutableTomlTable.create().set("x", 2).addComment("note")),
+                "[[t]]\nx = 1\n\n[[t]]\nx = 2\n# note\n\n[q]\ny = 2\n"),
             edited(
                 "a new table at the start of an array of tables goes before the first one and the run above it",
                 "a = 1\n\n# first\n[[t]]\nx = 1\n[q]\ny = 2\n",

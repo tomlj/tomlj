@@ -1367,7 +1367,9 @@ final class SourcePreservingSerializer {
         block.writeSections(entry, new ArrayList<>(path));
       }
       append(text);
-      afterComment = false;
+      // A section that ends with an unattached comment is separated from the line after it, as that comment would be
+      // attached ABOVE the line otherwise
+      afterComment = block.blankLinePending();
       if (rank == BEFORE_LINE) {
         // A header of the document follows, and is separated from this section as from any other
         requestBlankLine();
