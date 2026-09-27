@@ -45,7 +45,7 @@ The examples use Java 17. TomlJ itself needs Java 9 or later.
 The examples depend on `org.tomlj:tomlj`, as your project would:
 
 ```groovy
-implementation 'org.tomlj:tomlj:2.1.0'
+implementation 'org.tomlj:tomlj:2.1.1'
 ```
 
 ## What the examples show
