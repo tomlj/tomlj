@@ -404,6 +404,24 @@ class TomlBindTest {
         errors(e));
   }
 
+  record FloatFields(float overflow, float underflow, float negativeUnderflow) {}
+
+  @Test
+  void reportsFloatRangeErrors() {
+    TomlBindException e = bindFails("""
+        overflow = 1e50
+        underflow = 1e-50
+        negativeUnderflow = -1e-50
+        """, FloatFields.class);
+    assertEquals(
+        List
+            .of(
+                "overflow: 1.0E50 is out of range for float (line 1, column 12)",
+                "underflow: 1.0E-50 is out of range for float (line 2, column 13)",
+                "negativeUnderflow: -1.0E-50 is out of range for float (line 3, column 21)"),
+        errors(e));
+  }
+
   static class Containers {
     int[] ints;
     String[][] nested;

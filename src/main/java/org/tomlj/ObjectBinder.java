@@ -449,10 +449,11 @@ final class ObjectBinder {
   private static Object bindFloat(Object value, Location location, Context context) {
     if (value instanceof Double) {
       double d = (Double) value;
-      if (Double.isFinite(d) && Math.abs(d) > Float.MAX_VALUE) {
+      float f = (float) d;
+      if (Double.isFinite(d) && (Math.abs(d) > Float.MAX_VALUE || (d != 0 && f == 0))) {
         return context.error(location, d + " is out of range for float");
       }
-      return (float) d;
+      return f;
     }
     if (value instanceof Long) {
       long l = (Long) value;
