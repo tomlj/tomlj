@@ -343,7 +343,7 @@ class TomlValueTest {
 
   @Test
   void aValueInTheNotationOfAValueWithNoRecordOfItIsWrittenInTheDefaultNotation() {
-    TomlParseResult result = Toml.parse("a = 0xFF\n", TomlParseOptions.defaults().withoutSource());
+    TomlParseResult result = Toml.parse("a = 0xFF\n", TomlParseOptions.sourceless());
     assertFalse(result.hasErrors());
     result.set("a", TomlValue.inNotationOf(result.entry("a").value(), 171));
 

@@ -443,8 +443,7 @@ class SourceSpanTest {
 
   @Test
   void aParseWithoutSourceRecordsNothing() {
-    ParsedTomlTable table =
-        parse("# a comment\n[a] # after\nb = 1\nc = [2]\n", TomlParseOptions.defaults().withoutSource());
+    ParsedTomlTable table = parse("# a comment\n[a] # after\nb = 1\nc = [2]\n", TomlParseOptions.sourceless());
     assertNull(table.source());
     assertEquals(-1, table.trailerStart());
     assertNull(spanOf(table, "a", "b"));

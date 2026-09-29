@@ -90,7 +90,7 @@ class SourcePreservingSerializerTest {
     String input = "# a run\n[a]\n  x = 0x10  # note\n\n[[b]]\n  y = [ 1,2 ]\n";
     TomlParseResult result = Toml.parse(input);
     assertFalse(result.hasErrors(), () -> joinErrors(result));
-    TomlParseResult withoutSource = Toml.parse(input, TomlParseOptions.defaults().withoutSource());
+    TomlParseResult withoutSource = Toml.parse(input, TomlParseOptions.sourceless());
 
     assertEquals(withoutSource.toToml(LF), result.toToml(LF.keep(TomlWriteOptions.Keep.NOTHING)));
   }
@@ -567,7 +567,7 @@ class SourcePreservingSerializerTest {
   @Test
   void writesADocumentWithNoRetainedSourceInTheDefaultStyleWhenTheOptionsKeepTheNotation() {
     String input = "# a run\n[a]\n  x = 0x10  # note\n\n[[b]]\n  y = [ 1,2 ]\n";
-    TomlParseResult withoutSource = Toml.parse(input, TomlParseOptions.defaults().withoutSource());
+    TomlParseResult withoutSource = Toml.parse(input, TomlParseOptions.sourceless());
     assertFalse(withoutSource.hasErrors(), () -> joinErrors(withoutSource));
 
     assertEquals(withoutSource.toToml(LF), withoutSource.toToml(LF.keep(TomlWriteOptions.Keep.NOTATION)));

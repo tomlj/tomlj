@@ -101,7 +101,7 @@ Writes `deploy.toml` with each `TomlWriteOptions.Keep` value: `LAYOUT`, the defa
 file exactly as it was read; `NOTATION` keeps the form of every key and value and lays the document
 out anew with the indentation and line width given; `NOTHING` writes it in the default style. It
 also reformats one table with `reformat`, writes the document for TOML 1.0.0, and parses it without
-its source text, for an application that only reads it.
+its source text to save memory.
 
 ### 06-walking-the-model
 

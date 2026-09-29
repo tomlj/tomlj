@@ -16,9 +16,8 @@ value. An edit changes only the lines it touches. This is what the default optio
 
 Only the parse result itself is written this way. `toToml()` on a table or array taken from it, or
 on a copy of one, writes it in the default style, and so are a document built through the editing
-API and a result parsed with `TomlParseOptions.defaults().withoutSource()`. Keeping the text takes
-memory, and an application that only reads a document never uses it, so parse without the source
-when the document will not be written back.
+API and a result parsed with `TomlParseOptions.sourceless()`. Parsing without the source saves
+memory when the document will not be written back.
 
 A value read from a document keeps the literal it was written with, `0x10` or `'literal'`, wherever
 it is written, in the default style included, unless the options ask to keep nothing. An inline
