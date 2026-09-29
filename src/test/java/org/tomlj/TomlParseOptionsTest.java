@@ -58,6 +58,11 @@ class TomlParseOptionsTest {
   }
 
   @Test
+  void sourcelessIsTheDefaultsWithoutSource() {
+    assertEquals(TomlParseOptions.defaults().withoutSource(), TomlParseOptions.sourceless());
+  }
+
+  @Test
   void withVersionAndWithMaxNestingDepthKeepWhetherTheSourceIsRetained() {
     TomlParseOptions original = TomlParseOptions.defaults().withoutSource();
 

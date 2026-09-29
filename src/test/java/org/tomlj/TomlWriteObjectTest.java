@@ -593,7 +593,7 @@ class TomlWriteObjectTest {
   void updatesArraysKeepingTheTablesTheyHold() {
     String source = "[[group]]\na = 1\n[[group]]\na = 2 # two\n";
     TomlParseResult document = parse(source);
-    Groups groups = Toml.parse(source, TomlParseOptions.defaults().withoutSource()).as(Groups.class);
+    Groups groups = Toml.parse(source, TomlParseOptions.sourceless()).as(Groups.class);
     document.update(new Groups(List.of(groups.group().get(1))));
     assertEquals("[[group]]\na = 2 # two\n", document.toToml());
   }
@@ -612,7 +612,7 @@ class TomlWriteObjectTest {
         x = 'y' # x
         """;
     TomlParseResult document = parse(source);
-    Plugins plugins = Toml.parse(source, TomlParseOptions.defaults().withoutSource()).as(Plugins.class);
+    Plugins plugins = Toml.parse(source, TomlParseOptions.sourceless()).as(Plugins.class);
     document.update(plugins);
     assertEquals(source, document.toToml());
 

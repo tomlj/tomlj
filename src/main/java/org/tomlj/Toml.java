@@ -46,8 +46,8 @@ import org.antlr.v4.runtime.IntStream;
 public final class Toml {
   private static final Pattern simpleKeyPattern = Pattern.compile("^[A-Za-z0-9_-]+$");
 
-  // A document parsed to be bound keeps no source text, which only writing it back would use.
-  private static final TomlParseOptions BINDING = TomlParseOptions.defaults().withoutSource();
+  // A document parsed to be bound keeps no source text, to save memory.
+  private static final TomlParseOptions BINDING = TomlParseOptions.sourceless();
 
   private Toml() {}
 

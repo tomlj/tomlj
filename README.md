@@ -148,8 +148,7 @@ one table or array and everything nested in it:
 result.getTable("server").reformat(TomlWriteOptions.Keep.NOTHING);
 ```
 
-Keeping the text takes memory, and an application that only reads a document never uses it. Parse
-with `TomlParseOptions.defaults().withoutSource()` to keep no source text; such a result is written
+Parse with `TomlParseOptions.sourceless()` to save the memory the text takes; the result is written
 in the default style. [docs/writing.md](docs/writing.md) describes writing in full: where each kind
 of edit lands, what each amount keeps, the default style and the options.
 

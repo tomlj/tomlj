@@ -241,7 +241,7 @@ class ReformatTest {
 
   @Test
   void writesADocumentWithNoSourceTheSameWayRegardlessOfReformat() {
-    TomlParseResult result = Toml.parse("a   =   0x10\n[t]\nx = 1\n", TomlParseOptions.defaults().withoutSource());
+    TomlParseResult result = Toml.parse("a   =   0x10\n[t]\nx = 1\n", TomlParseOptions.sourceless());
     assertFalse(result.hasErrors(), () -> joinErrors(result));
     String written = result.toToml(LF);
 

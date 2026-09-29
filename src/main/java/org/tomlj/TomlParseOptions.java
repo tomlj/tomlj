@@ -51,6 +51,16 @@ public final class TomlParseOptions {
   }
 
   /**
+   * The default parse options, but keeping no source text: the same as {@code defaults().withoutSource()}.
+   *
+   * @return The default parse options, keeping no source text.
+   * @see #withoutSource()
+   */
+  public static TomlParseOptions sourceless() {
+    return new TomlParseOptions(TomlVersion.LATEST, DEFAULT_MAX_NESTING_DEPTH, false);
+  }
+
+  /**
    * Create a copy of these options that parses at a different specification version.
    *
    * @param version The version level to parse at.
@@ -98,11 +108,9 @@ public final class TomlParseOptions {
    * Create a copy of these options that keeps no source text.
    *
    * <p>
-   * By default a parse result keeps the text it was parsed from, and records where each line it accepted sits in that
-   * text, so that {@link TomlTable#toToml()} can write the document back as it was read. The text and the record take
-   * memory that an application which only reads a document never uses, and such an application can parse with these
-   * options instead. A document parsed with them records nothing about how it was written, so {@code toToml()} writes
-   * it in the default style, as it writes a document built with the editing API.
+   * By default a parse result keeps the text it was parsed from, and where each line it accepted sits in that text, so
+   * that {@link TomlTable#toToml()} can write the document back as it was read. Parsing without the source takes less
+   * memory, and {@code toToml()} then writes the document in the default style.
    *
    * @return A new set of options that keeps no source text.
    */
@@ -133,7 +141,7 @@ public final class TomlParseOptions {
   /**
    * Whether a parse result keeps the source text of the document it was read from.
    *
-   * @return {@code true} unless these options came from {@link #withoutSource()}.
+   * @return {@code true} unless these options came from {@link #sourceless()} or {@link #withoutSource()}.
    * @see #withoutSource()
    */
   public boolean retainsSource() {
