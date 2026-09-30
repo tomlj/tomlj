@@ -16,8 +16,8 @@ Run `./gradlew dev` before committing. It applies Spotless formatting, and the b
 
 ## Constraints
 
-- `src/main` compiles with `--release 9`, so no `var`, records, text blocks or pattern matching there. Tests compile
-  with `--release 17`.
+- `src/main` compiles with `--release 8`, so no `var`, records, text blocks, pattern matching, private interface methods
+  or Java 9+ APIs (such as `Objects.checkIndex`) there. Tests compile with `--release 17`.
 - Compilation uses `-Werror` with Error Prone, so any warning fails the build.
 - Keep `checker-qual` on the 3.x line: 4.x requires Java 11.
 - Do not switch ANTLR generation to `-Xexact-output-dir` with a custom `outputDirectory`: Gradle 9 registers that

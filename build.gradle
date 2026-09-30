@@ -167,8 +167,10 @@ sourcesJar.dependsOn generateGrammarSource
 
 jacoco { toolVersion = '0.8.15' }
 
-// The library targets Java 9; tests use JUnit 6, which requires Java 17.
-compileJava.options.release = 9
+// The library targets Java 8; tests use JUnit 6, which requires Java 17. JDK 21 warns that release 8 is obsolete,
+// and -Werror would make that warning an error.
+compileJava.options.release = 8
+compileJava.options.compilerArgs += ['-Xlint:-options']
 compileTestJava.options.release = 17
 
 tasks.withType(JavaCompile) {
@@ -276,6 +278,32 @@ jar {
     'Automatic-Module-Name': moduleName)
   }
 }
+
+// Run a smoke test on a Java 8 runtime, since the unit tests use JUnit 6, which requires Java 17. The test is a plain
+// main method, compiled for Java 8 and run with the jar and its runtime dependencies. It needs a Java 8 installation
+// Gradle can find, so check only compiles it; CI runs it with a JDK 8 from setup-java, passing
+// -Porg.gradle.java.installations.fromEnv=JAVA_HOME_8_X64.
+sourceSets {
+  java8Test {
+    compileClasspath += sourceSets.main.output + configurations.compileClasspath
+  }
+}
+
+compileJava8TestJava.options.encoding = 'UTF-8'
+compileJava8TestJava.options.release = 8
+compileJava8TestJava.options.compilerArgs += ['-Xlint:-options']
+
+tasks.register('java8Test', JavaExec) {
+  description = 'Runs the smoke test in src/java8Test against the jar on a Java 8 runtime.'
+  group = 'verification'
+  javaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(8)
+  }
+  classpath = sourceSets.java8Test.output + files(tasks.jar) + configurations.runtimeClasspath
+  mainClass = 'org.tomlj.Java8SmokeTest'
+}
+
+check.dependsOn java8TestClasses
 
 shadowJar {
   configurations = [
