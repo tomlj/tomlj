@@ -279,6 +279,32 @@ jar {
   }
 }
 
+// Run a smoke test on a Java 8 runtime, since the unit tests use JUnit 6, which requires Java 17. The test is a plain
+// main method, compiled for Java 8 and run with the jar and its runtime dependencies. It needs a Java 8 installation
+// Gradle can find, so check only compiles it; CI runs it with a JDK 8 from setup-java, passing
+// -Porg.gradle.java.installations.fromEnv=JAVA_HOME_8_X64.
+sourceSets {
+  java8Test {
+    compileClasspath += sourceSets.main.output + configurations.compileClasspath
+  }
+}
+
+compileJava8TestJava.options.encoding = 'UTF-8'
+compileJava8TestJava.options.release = 8
+compileJava8TestJava.options.compilerArgs += ['-Xlint:-options']
+
+tasks.register('java8Test', JavaExec) {
+  description = 'Runs the smoke test in src/java8Test against the jar on a Java 8 runtime.'
+  group = 'verification'
+  javaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(8)
+  }
+  classpath = sourceSets.java8Test.output + files(tasks.jar) + configurations.runtimeClasspath
+  mainClass = 'org.tomlj.Java8SmokeTest'
+}
+
+check.dependsOn java8TestClasses
+
 shadowJar {
   configurations = [
     project.configurations.compileClasspath
