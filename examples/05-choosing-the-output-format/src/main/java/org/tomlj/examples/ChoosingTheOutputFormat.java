@@ -79,7 +79,7 @@ public final class ChoosingTheOutputFormat {
 
     // A document that will not be written back can be parsed without its text, which saves memory. It is written in
     // the default style.
-    TomlParseResult readOnly = parse(text, TomlParseOptions.defaults().withoutSource());
+    TomlParseResult readOnly = parse(text, TomlParseOptions.sourceless());
     String readOnlyToml = readOnly.toToml();
     boolean same = readOnlyToml.equals(inDefaultStyle);
     System.out.println("--- parsed without the source, same as Keep.NOTHING: " + same);

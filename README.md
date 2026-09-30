@@ -248,11 +248,11 @@ To include using Maven:
 <dependency>
   <groupId>org.tomlj</groupId>
   <artifactId>tomlj</artifactId>
-  <version>2.1.1</version>
+  <version>2.2.0</version>
 </dependency>
 ```
 
-To include using Gradle: `implementation 'org.tomlj:tomlj:2.1.1'`
+To include using Gradle: `implementation 'org.tomlj:tomlj:2.2.0'`
 
 If your project already uses ANTLR and you would rather share one copy of the runtime, use
 `org.tomlj:tomlj-antlr` instead. It is the same library, depending on `org.antlr:antlr4-runtime`
