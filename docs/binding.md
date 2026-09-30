@@ -76,7 +76,7 @@ Records nest, and a record may hold itself:
 record Node(String name, List<Node> children) {}
 ```
 
-TomlJ compiles for Java 9 and finds records by reflection, so records are bound on any Java version
+TomlJ compiles for Java 8 and finds records by reflection, so records are bound on any Java version
 that has them.
 
 ## Classes

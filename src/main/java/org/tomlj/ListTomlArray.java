@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -180,14 +179,14 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
 
   @Override
   public ListTomlArray insertBefore(int index, Object value) {
-    Objects.checkIndex(index, size());
+    checkIndex(index);
     Object normalized = TomlValues.normalize(value);
     return insertEntry(entries.get(index), normalized, false);
   }
 
   @Override
   public ListTomlArray insertAfter(int index, Object value) {
-    Objects.checkIndex(index, size());
+    checkIndex(index);
     Object normalized = TomlValues.normalize(value);
     return insertEntry(entries.get(index), normalized, true);
   }
@@ -274,14 +273,14 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
 
   @Override
   public ListTomlArray insertCommentBefore(int index, TomlComment comment) {
-    Objects.checkIndex(index, size());
+    checkIndex(index);
     requireNonNull(comment);
     return insertComment(entries.get(index), comment, false);
   }
 
   @Override
   public ListTomlArray insertCommentAfter(int index, TomlComment comment) {
-    Objects.checkIndex(index, size());
+    checkIndex(index);
     requireNonNull(comment);
     return insertComment(entries.get(index), comment, true);
   }
@@ -310,6 +309,13 @@ class ListTomlArray extends ElementContainer<Entry.Indexed> implements MutableTo
     }
     insertEditedComment(after ? index + 1 : index, comment.requireUnattached().withoutPosition());
     return this;
+  }
+
+  // The check and message of Objects.checkIndex, which Java 8 does not have.
+  private void checkIndex(int index) {
+    if (index < 0 || index >= size()) {
+      throw new IndexOutOfBoundsException("Index " + index + " out of bounds for length " + size());
+    }
   }
 
   @Override

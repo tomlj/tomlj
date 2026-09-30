@@ -454,7 +454,7 @@ public interface MutableTomlTable extends TomlTable {
    * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
    */
   default MutableTomlTable setCommentAbove(List<String> path, List<String> lines) {
-    entryOrThrow(path).setCommentAbove(lines);
+    MutableTomlTables.entryOrThrow(this, path).setCommentAbove(lines);
     return this;
   }
 
@@ -486,7 +486,7 @@ public interface MutableTomlTable extends TomlTable {
    * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
    */
   default MutableTomlTable setCommentAfter(List<String> path, String text) {
-    entryOrThrow(path).setCommentAfter(text);
+    MutableTomlTables.entryOrThrow(this, path).setCommentAfter(text);
     return this;
   }
 
@@ -526,7 +526,7 @@ public interface MutableTomlTable extends TomlTable {
    * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
    */
   default MutableTomlTable setComment(List<String> path, String text, TomlComment.Placement placement) {
-    entryOrThrow(path).setComment(text, placement);
+    MutableTomlTables.entryOrThrow(this, path).setComment(text, placement);
     return this;
   }
 
@@ -560,7 +560,7 @@ public interface MutableTomlTable extends TomlTable {
    * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
    */
   default MutableTomlTable setComment(List<String> path, TomlComment comment) {
-    entryOrThrow(path).setComment(comment);
+    MutableTomlTables.entryOrThrow(this, path).setComment(comment);
     return this;
   }
 
@@ -590,7 +590,7 @@ public interface MutableTomlTable extends TomlTable {
    * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
    */
   default MutableTomlTable removeCommentAbove(List<String> path) {
-    entryOrThrow(path).removeCommentAbove();
+    MutableTomlTables.entryOrThrow(this, path).removeCommentAbove();
     return this;
   }
 
@@ -620,7 +620,7 @@ public interface MutableTomlTable extends TomlTable {
    * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
    */
   default MutableTomlTable removeCommentAfter(List<String> path) {
-    entryOrThrow(path).removeCommentAfter();
+    MutableTomlTables.entryOrThrow(this, path).removeCommentAfter();
     return this;
   }
 
@@ -656,7 +656,7 @@ public interface MutableTomlTable extends TomlTable {
    * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
    */
   default MutableTomlTable removeComment(List<String> path, TomlComment.Placement placement) {
-    entryOrThrow(path).removeComment(placement);
+    MutableTomlTables.entryOrThrow(this, path).removeComment(placement);
     return this;
   }
 
@@ -1056,26 +1056,6 @@ public interface MutableTomlTable extends TomlTable {
    * @throws NullPointerException If {@code keep} is {@code null}.
    */
   MutableTomlTable reformat(TomlWriteOptions.Keep keep);
-
-  /**
-   * Get the entry for a key, or throw if the key is not set.
-   *
-   * @param path The key path.
-   * @return The entry.
-   * @throws IllegalArgumentException If {@code path} is empty.
-   * @throws NoSuchElementException If the key is not set.
-   * @throws TomlInvalidTypeException If an element of the path preceding the final key is not a table.
-   */
-  private MutableTomlKeyValue entryOrThrow(List<String> path) {
-    if (path.isEmpty()) {
-      throw new IllegalArgumentException("path is empty");
-    }
-    MutableTomlKeyValue entry = entry(path);
-    if (entry == null) {
-      throw new NoSuchElementException(Toml.joinKeyPath(path) + " is not set");
-    }
-    return entry;
-  }
 
   /**
    * Create a deep copy of a table.

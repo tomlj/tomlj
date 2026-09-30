@@ -19,6 +19,7 @@ import static org.tomlj.JavaTypes.typeArguments;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AccessibleObject;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -811,7 +812,21 @@ final class ObjectBinder {
   @SuppressWarnings("ReferenceEquality") // the platform class loader is one instance, never equal to another loader
   private static boolean isPlatformClass(Class<?> raw) {
     ClassLoader loader = raw.getClassLoader();
-    return loader == null || loader == ClassLoader.getPlatformClassLoader();
+    return loader == null || loader == PLATFORM_CLASS_LOADER;
+  }
+
+  // The platform class loader, or on Java 8 the extension class loader: the ancestor of the system class loader whose
+  // parent is the bootstrap loader. ClassLoader.getPlatformClassLoader is not in Java 8.
+  @Nullable
+  private static final ClassLoader PLATFORM_CLASS_LOADER = platformClassLoader();
+
+  @Nullable
+  private static ClassLoader platformClassLoader() {
+    ClassLoader loader = ClassLoader.getSystemClassLoader();
+    while (loader != null && loader.getParent() != null) {
+      loader = loader.getParent();
+    }
+    return loader;
   }
 
   private static void checkBindableClass(Class<?> raw, Type type) {
@@ -1211,7 +1226,7 @@ final class ObjectBinder {
         return marked;
       }
     }
-    Boolean marked = nullMarking(type.getModule().getDeclaredAnnotations());
+    Boolean marked = nullMarking(Modules.annotations(type));
     return marked != null && marked;
   }
 
@@ -1230,7 +1245,7 @@ final class ObjectBinder {
   }
 
   /**
-   * Access to records through reflection, as TomlJ is compiled for Java 9, before records were added.
+   * Access to records through reflection, as TomlJ is compiled for Java 8, before records were added.
    */
   private static final class Records {
     @Nullable
@@ -1291,6 +1306,38 @@ final class ObjectBinder {
           list.add(new Component((String) GET_NAME.invoke(component), (Type) GET_GENERIC_TYPE.invoke(component)));
         }
         return list;
+      } catch (ReflectiveOperationException e) {
+        throw new IllegalStateException(e);
+      }
+    }
+  }
+
+  /**
+   * Access to modules through reflection, as TomlJ is compiled for Java 8, before modules were added.
+   */
+  private static final class Modules {
+    @Nullable
+    private static final Method GET_MODULE;
+
+    static {
+      Method getModule;
+      try {
+        getModule = Class.class.getMethod("getModule");
+      } catch (NoSuchMethodException e) {
+        getModule = null;
+      }
+      GET_MODULE = getModule;
+    }
+
+    /**
+     * The annotations on the module of a class, or none on Java 8, which has no modules.
+     */
+    static Annotation[] annotations(Class<?> type) {
+      if (GET_MODULE == null) {
+        return new Annotation[0];
+      }
+      try {
+        return ((AnnotatedElement) GET_MODULE.invoke(type)).getDeclaredAnnotations();
       } catch (ReflectiveOperationException e) {
         throw new IllegalStateException(e);
       }
