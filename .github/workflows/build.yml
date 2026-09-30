@@ -10,10 +10,15 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: 21
+          # The last version listed is the default; 8 runs the Java 8 smoke test.
+          java-version: |
+            8
+            21
       - uses: gradle/actions/setup-gradle@v6
       - name: "Build, test, check licenses, and generate javadoc"
         run: ./gradlew build checkLicense javadoc
+      - name: "Run the smoke test on Java 8"
+        run: ./gradlew java8Test -Porg.gradle.java.installations.fromEnv=JAVA_HOME_8_X64
       - name: "Build and run the examples"
         run: ./gradlew -p examples check
       - name: "Upload test reports"

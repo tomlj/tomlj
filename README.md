@@ -65,7 +65,7 @@ if (port > 65535) {
   accepting it.
 * **No dependencies.** The jar carries its own copy of the ANTLR runtime, relocated under TomlJ's
   own package, so there is nothing else to add and no clash with ANTLR elsewhere in your project.
-  Works on Java 9 and later.
+  Works on Java 8 and later.
 
 ## Usage
 

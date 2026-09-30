@@ -38,7 +38,7 @@ or build and run all of them:
 Each example reads its files from its own directory. `04-editing-in-place` writes its result to
 `build/manifest.toml` in its directory, leaving `manifest.toml` as it was.
 
-The examples use Java 17. TomlJ itself needs Java 9 or later.
+The examples use Java 17. TomlJ itself needs Java 8 or later.
 
 ## Using TomlJ in your own project
 
