@@ -167,8 +167,10 @@ sourcesJar.dependsOn generateGrammarSource
 
 jacoco { toolVersion = '0.8.15' }
 
-// The library targets Java 9; tests use JUnit 6, which requires Java 17.
-compileJava.options.release = 9
+// The library targets Java 8; tests use JUnit 6, which requires Java 17. JDK 21 warns that release 8 is obsolete,
+// and -Werror would make that warning an error.
+compileJava.options.release = 8
+compileJava.options.compilerArgs += ['-Xlint:-options']
 compileTestJava.options.release = 17
 
 tasks.withType(JavaCompile) {

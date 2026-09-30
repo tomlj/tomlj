@@ -49,7 +49,7 @@ if (port > 65535) {
   throws `TomlInvalidTypeException` if the value is a different type, and has an overload that takes
   a default.
 * **Few dependencies.** The ANTLR runtime is the only library needed to run it, and the `all`
-  artifact bundles that in, so there is nothing else to add. Works on Java 9 and later.
+  artifact bundles that in, so there is nothing else to add. Works on Java 8 and later.
 
 ## Usage
 

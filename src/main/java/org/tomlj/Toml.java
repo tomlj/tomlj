@@ -201,11 +201,11 @@ public final class Toml {
   // CharStreams.fromReader duplicates a surrogate pair that a read splits across its 4096-char buffer, so read the
   // whole input before handing it to ANTLR. Like fromReader, this closes the reader.
   private static String readFully(Reader reader) throws IOException {
-    try (reader) {
+    try (Reader in = reader) {
       StringBuilder builder = new StringBuilder();
       char[] buffer = new char[8192];
       int read;
-      while ((read = reader.read(buffer)) != -1) {
+      while ((read = in.read(buffer)) != -1) {
         builder.append(buffer, 0, read);
       }
       return builder.toString();
