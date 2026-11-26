@@ -17,6 +17,7 @@ import org.tomlj.internal.TomlLexer;
 import org.tomlj.internal.TomlParser;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -62,7 +63,7 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
       TomlLexer.InlineTableStart);
 
   private final List<TomlParseError> errors = new ArrayList<>();
-  private final List<Integer> syntaxErrorLines = new ArrayList<>();
+  private final BitSet syntaxErrorLines = new BitSet();
   private int lastOffendingTokenIndex = -1;
 
   @Override
@@ -85,7 +86,7 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
     }
 
     TomlPosition position = TomlPosition.positionAt(line, charPosition + 1);
-    syntaxErrorLines.add(line);
+    syntaxErrorLines.set(line);
 
     if (e instanceof AbstractTomlParser.NestingTooDeepException) {
       reportError(e.getMessage(), position);
@@ -123,12 +124,8 @@ final class AccumulatingErrorListener extends BaseErrorListener implements Error
 
   @Override
   public boolean hasSyntaxErrorBetween(int firstLine, int lastLine) {
-    for (int errorLine : syntaxErrorLines) {
-      if (errorLine >= firstLine && errorLine <= lastLine) {
-        return true;
-      }
-    }
-    return false;
+    int errorLine = syntaxErrorLines.nextSetBit(firstLine);
+    return errorLine >= 0 && errorLine <= lastLine;
   }
 
   private void reportError(String message, TomlPosition position) {

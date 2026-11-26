@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -27,6 +28,7 @@ import java.io.ObjectOutputStream;
 import java.io.StringReader;
 import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -945,6 +947,19 @@ class TomlTest {
             "Unexpected end of line, expected a key or ] (line 1, column 2)"))
     );
     // @formatter:on
+  }
+
+  @Test
+  void shouldAttributeManySyntaxErrorsToKeyValuesInLinearTime() {
+    int count = 200_000;
+    StringBuilder input = new StringBuilder("@\n".repeat(count));
+    for (int i = 0; i < count; i++) {
+      input.append('k').append(i).append("=1\n");
+    }
+    // Checking each key/value pair against every syntax error does not finish in this time.
+    TomlParseResult result = assertTimeoutPreemptively(Duration.ofSeconds(15), () -> Toml.parse(input.toString()));
+    assertEquals(count, result.errors().size());
+    assertEquals(count, result.size());
   }
 
   @ParameterizedTest
